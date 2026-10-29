@@ -15,13 +15,17 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   through a ratchet; turn faster and the tune runs faster.
 * **Wind-up** — circle to wind the key (the ratchet clicks), then pull the lever. A
   fan governor keeps time, and the tune slows as the spring runs down.
+* **Hamster** — a golden hamster runs in a wire wheel that drives the crank through a
+  quarter-twist O-ring belt. Her gait (walk, trot, half-bound), the forces from her paws, how
+  far up the wheel she rides, her bouts and rests (she's nocturnal), heart rate and metabolic
+  power are all simulated. Her pace is the tempo. "Watch her" zooms in; "Tap the cage" wakes her.
 * **Tines** — 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
   bass, or combs built to fit the tune (18 or 72 tines). Steel, brass, phosphor
   bronze, beryllium copper, titanium, aluminium or glass. Adjust the tine length (thickness follows to stay
   in tune), the thickness, the pin engagement, how worn the pins are, the comb tilt, A4 and how "aged"
   (detuned) the comb is. Tap any tine to see its mode shapes, overtone ratios and
   what makes it stop ringing.
-* **Box** — bare movement, plastic toy, walnut jewelry box, maple box with a spruce
+* **Box** — lacquered woods with real grain, velvet lining and a mother-of-pearl inlaid lid. Bare movement, plastic toy, walnut jewelry box, maple box with a spruce
   soundboard, or a Swiss rosewood cabinet. Lid open or closed. Set it on oak (with
   or without felt feet), glass, marble or a spruce resonance box, or hold it in
   your hand.

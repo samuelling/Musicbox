@@ -10,6 +10,8 @@
 // Contact reaction torque is fed back into the cylinder, so heavy chords
 // really do drag the mechanism.  See PHYSICS.md for the derivations.
 
+import { Hamster } from '../physics/hamster.js';
+
 const TWO_PI = Math.PI * 2;
 const DL = 16384, DM = DL - 1;           // delay line length (power of two)
 const RHO = 1.204, C = 343.2;
@@ -43,6 +45,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     this.fanBp = [0, 0, 0, 0];
     this.meter = [0, 0];
     this.limEnv = 0; this.limRel = Math.exp(-1 / (0.08 * sampleRate));
+    this.ham = new Hamster(sampleRate); this.hamHour = null;
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
 
@@ -68,6 +71,11 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
       case 'noise': this.noiseLevel = m.value; break;
       case 'gain': this.userGain = m.value; break;
       case 'setTurns': d.turns = m.turns; break;
+      case 'hamster':
+        if (m.opts) { this.ham.set(m.opts); if (this.p) this.setupBelt(); }
+        if (m.hour !== undefined) this.hamHour = m.hour;
+        if (m.wake) this.ham.wake();
+        break;
       case 'seek': d.theta = m.theta; d.thetaMod = ((m.theta % TWO_PI) + TWO_PI) % TWO_PI; this.initPointers(); break;
     }
   }
@@ -103,8 +111,17 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const lidFc = p.lid.fc;
     this.lidA = lidFc ? Math.exp((-TWO_PI * lidFc) / this.sr) : 0;
     this.buildCoupling();
+    this.setupBelt();
     this.setupRoom();
     this.listenerDirty = true;
+  }
+
+  // belt between the hamster wheel's hub pulley and a pulley on the crank shaft
+  setupBelt() {
+    const P = this.p.drive, H = this.ham;
+    H.setDrive(P.G_crank, P.omegaNom);
+    const mEff = P.Icrank / (P.G_crank * P.G_crank * H.rc * H.rc);   // crank train seen at the belt
+    this.beltC = 2 * 0.12 * Math.sqrt(H.kb * mEff);                 // rubber: ζ ≈ 0.12
   }
 
   initPointers() {
@@ -324,6 +341,26 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
       d.crankTickAcc += d.omega * dt * G;
       const step = TWO_PI / P.crankTeeth;
       if (d.crankTickAcc > step) { d.crankTickAcc -= step; this.pulse(0.012 * noise * (1 + 0.4 * this.rand()), 4); }
+    } else if (d.mode === 'auto') {
+      // hamster wheel -> O-ring belt -> crank pulley -> freewheel -> crank train -> cylinder
+      const H = this.ham, B = H.belt, G = P.G_crank;
+      let x = H.rw * H.thw - H.rc * (G * d.theta + B.off);
+      if (x < 0) {
+        // the belt would turn the crank backwards: the freewheel lets the pulley overrun (pawl clicks)
+        B.off += x / H.rc; B.back += -x / H.rc; x = 0;
+        const step = TWO_PI / P.crankTeeth;
+        if (B.back > step) { B.back -= step; this.pulse(0.16 * noise * (0.7 + 0.3 * this.rand()), 5); }
+      }
+      let F = H.kb * x + this.beltC * (H.rw * H.ww - H.rc * G * d.omega);
+      if (F > H.Fslip) { const xs = H.Fslip / H.kb; B.off += (x - xs) / H.rc; x = xs; F = H.Fslip; }   // belt slips on the pulley
+      if (F < 0) F = 0;                                    // a belt can only pull
+      B.x = x;
+      H.step(F);
+      I = P.Icrank;
+      tau = F * H.rc * G * 0.92 - P.tauBearing * sgn - P.viscous * d.omega + d.tauContact;
+      d.crankTickAcc += d.omega * dt * G;
+      const step = TWO_PI / P.crankTeeth;
+      if (d.crankTickAcc > step) { d.crankTickAcc -= step; this.pulse(0.012 * noise * (1 + 0.4 * this.rand()), 4); }
     } else {
       // winding the key (ratchet clicks at each click-wheel tooth)
       if (d.windTo > d.windCur) {
@@ -358,7 +395,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const dth = d.omega * dt;
     d.theta += dth;
     d.thetaMod += dth; if (d.thetaMod >= TWO_PI) d.thetaMod -= TWO_PI;
-    if (d.mode !== 'crank') { d.turns -= dth / (TWO_PI * P.G_spring); if (d.turns < 0) d.turns = 0; }
+    if (d.mode === 'spring') { d.turns -= dth / (TWO_PI * P.G_spring); if (d.turns < 0) d.turns = 0; }
   }
 
   // Contact of one pin (at offset dphi from release) with tine i, using the
@@ -678,6 +715,11 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const noise = this.noiseLevel;
     const d = this.drv, dp = p.drive;
     const fanNom = dp.G_fan * dp.omegaNom;
+    const auto = d.mode === 'auto', ham = this.ham;
+    if (auto) {
+      const now = new Date();
+      ham.behave(n * dt, this.hamHour ?? (now.getHours() + now.getMinutes() / 60));
+    }
     const gain = 4.0 * this.userGain * (p.gain || 1);
     const lidA = this.lidA, leak = p.lid.leak;
     const tableUnb = p.table && p.table.unbaffled;
@@ -695,7 +737,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         const y = 2 * rr * Math.cos(w) * ps[0] - rr * rr * ps[1];
         ps[1] = ps[0]; ps[0] = y; Fm += y * 0.3;
       }
-      const busy = this.activeTines || Fm !== 0 || (d.mode !== 'crank' && d.omega > 0) || (d.mode === 'crank' && d.omega > 1e-4);
+      const busy = this.activeTines || Fm !== 0 || (d.mode === 'spring' && d.omega > 0) || (d.mode !== 'spring' && d.omega > 1e-4) || (auto && (ham.f > 0 || Math.abs(ham.ww) > 2e-3));
       if (busy && !this.structAwake) { this.structAwake = true; }
       if (busy) this.renderLeft = this.renderTail;
       if (!this.structAwake) {
@@ -718,7 +760,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         let ty = (Math.PI / 4) * p.geom.ny * o.Pd, tz = (Math.PI / 4) * p.geom.nz * o.Pd;
         // governor fan whirr (aerodynamic, inside the box)
         let fan = 0;
-        if (d.mode !== 'crank' && d.omega > 0) {
+        if (d.mode === 'spring' && d.omega > 0) {
           const r = (dp.G_fan * d.omega) / fanNom;
           const amp = 2.2e-3 * noise * r * r * r;
           if (amp > 1e-7) {
@@ -737,6 +779,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
           ty = leak * ty + (1 - leak) * z[0]; tz = leak * tz + (1 - leak) * z[1]; fan = leak * fan + (1 - leak) * z[2];
         }
         Dy += ty; Dz += tz; Mdot += fan;
+        if (auto) Mdot += ham.sound(noise);   // the wheel: paws, rungs, axle (radiated from beside the box)
         const pd = this.prevDdot;
         const Ddx = (Dx - pd[0]) * sr, Ddy = (Dy - pd[1]) * sr, Ddz = (Dz - pd[2]) * sr;
         pd[0] = Dx; pd[1] = Dy; pd[2] = Dz;
@@ -820,6 +863,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         fanRpm: (dp.G_fan * d.omega * 60) / TWO_PI, crank: d.theta * dp.G_crank, brake: d.brake,
         amp: this.amp.slice(), defl: this.defl.slice(), splL, splR, contacts, awake,
         torque: d.tauContact, srcPos: this.srcPos,
+        ham: auto ? ham.report() : null,
       });
       this.amp.fill(0);
     }

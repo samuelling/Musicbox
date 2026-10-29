@@ -3,6 +3,8 @@
 // so the comb faces the camera and the pinned cylinder sits behind it. The mapping is a
 // reflection, so a box-frame counter-clockwise rotation (y->z) is a negative three.js X rotation.
 import * as THREE from 'three';
+import { HamsterRig } from './hamster-scene.js';
+import { woodMaterial, boxGeo, velvetMaterial, inlayMaterial } from './materials.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TINE_MATERIALS, PLATE_MATERIALS, ENCLOSURES, SURFACES, PIN } from '../physics/constants.js';
@@ -31,6 +33,7 @@ export class MusicBoxScene {
     this.controls.enableDamping = true; this.controls.target.set(0, 12, 0);
     this.dirty = 3;
     this.controls.addEventListener('change', () => { this.dirty = Math.max(this.dirty, 2); });
+    this.controls.addEventListener('start', () => { this.camAnim = null; });
     this.controls.minDistance = 25; this.controls.maxDistance = 2500;
     const hemi = new THREE.HemisphereLight(0x8a7a6a, 0x120c08, 0.16); this.scene.add(hemi);
     const key = (this.keyLight = new THREE.DirectionalLight(0x9db4ff, 0.32));   // moonlight through a window
@@ -123,13 +126,15 @@ export class MusicBoxScene {
     const woodMat = (col, rough = 0.62) => new THREE.MeshStandardMaterial({ color: col, roughness: rough, metalness: 0.0 });
     let bottomY = -floorH;
     if (enc.boxed) {
-      const cm = woodMat(caseCol, enc.caseMat === 'abs' ? 0.45 : 0.55);
+      const wooden = ['maple', 'walnut', 'rosewood'].includes(enc.caseMat);
+      const cm = wooden ? woodMaterial(enc.caseMat, { gloss: 0.6 }) : woodMat(caseCol, enc.caseMat === 'abs' ? 0.45 : 0.55);
       const box = new THREE.Group();
-      const add = (w, h, d, x, y, z, m = cm) => { const ms = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); ms.position.set(x, y, z); ms.castShadow = true; ms.receiveShadow = true; box.add(ms); return ms; };
+      const add = (w, h, d, x, y, z, m = cm) => { const ms = new THREE.Mesh(wooden && m === cm ? boxGeo(w, h, d) : new THREE.BoxGeometry(w, h, d), m); ms.position.set(x, y, z); ms.castShadow = true; ms.receiveShadow = true; box.add(ms); return ms; };
       const cx = floorCx, cz = floorCy;
       const yb = -floorH - wall * 0.4;
       add(Lx, wall * 0.8, Ly, cx, yb, cz);                                    // bottom rim
-      const sb = new THREE.Mesh(new THREE.BoxGeometry(a, floorH, b), woodMat(WOOD[enc.plate.mat] ?? 0xe8cf9a, 0.5));
+      const sbMat = ['spruce', 'walnut', 'maple'].includes(enc.plate.mat) ? woodMaterial(enc.plate.mat, { gloss: 0.15, mm: 160 }) : woodMat(WOOD[enc.plate.mat] ?? 0xe8cf9a, 0.5);
+      const sb = new THREE.Mesh(boxGeo(a, floorH, b, 160), sbMat);
       sb.position.set(cx, -floorH / 2, cz); sb.receiveShadow = true; box.add(sb); // soundboard
       const H = Lz - wall;
       // front panel is an inner glass window so the movement stays visible
@@ -139,14 +144,44 @@ export class MusicBoxScene {
       add(Lx, H, wall, cx, yb + H / 2, cz - Ly / 2 + wall / 2);               // back
       add(wall, H, Ly, cx - Lx / 2 + wall / 2, yb + H / 2, cz);
       add(wall, H, Ly, cx + Lx / 2 - wall / 2, yb + H / 2, cz);
+      if (wooden) {
+        // velvet lining on the inner walls, a moulded plinth, brass hinges and a keyhole plate
+        const vel = velvetMaterial(enc.caseMat === 'maple' ? 0x1d3a2c : 0x5a0f1c);
+        const vh = H - wall * 1.2, vy = yb + wall * 0.4 + vh / 2 + wall * 0.4;
+        const lin = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), vel); m.position.set(x, y, z); m.receiveShadow = true; box.add(m); };
+        lin(Lx - 2 * wall, vh, 0.6, cx, vy, cz - Ly / 2 + wall + 0.3);
+        lin(0.6, vh, Ly - 2 * wall, cx - Lx / 2 + wall + 0.3, vy, cz);
+        lin(0.6, vh, Ly - 2 * wall, cx + Lx / 2 - wall - 0.3, vy, cz);
+        add(Lx + 4, wall * 0.9, Ly + 4, cx, yb - wall * 0.2, cz);             // plinth moulding
+        const brassM = new THREE.MeshStandardMaterial({ color: 0xc8a050, metalness: 1, roughness: 0.28 });
+        for (const sx of [-1, 1]) {
+          const hg = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, Math.min(26, Lx * 0.14), 12), brassM);
+          hg.rotation.z = Math.PI / 2; hg.position.set(cx + sx * Lx * 0.3, yb + H + 0.5, cz - Ly / 2 - 0.6); hg.castShadow = true; box.add(hg);
+        }
+        const esc = new THREE.Group(); esc.position.set(cx, yb + wall * 0.6, cz + Ly / 2 + 0.2);
+        const plate = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.6, 24), brassM); plate.rotation.x = Math.PI / 2; plate.scale.set(0.8, 1, 1.25); esc.add(plate);
+        const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.8, 12), new THREE.MeshBasicMaterial({ color: 0x080503 })); hole.rotation.x = Math.PI / 2; hole.position.set(0, 0.8, 0.1); esc.add(hole);
+        const slot = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.4, 0.8), hole.material); slot.position.set(0, -0.6, 0.1); esc.add(slot);
+        if (wall * 1.2 > 8) box.add(esc);
+      }
       // lid, hinged along the back top edge
       const lidPivot = new THREE.Group(); lidPivot.position.set(cx, yb + H, cz - Ly / 2);
-      const lidMat = woodMat(caseCol, 0.5);
-      const lid = new THREE.Mesh(new THREE.BoxGeometry(Lx, (enc.lidH || 0.005) * MM, Ly), lidMat);
-      lid.position.set(0, ((enc.lidH || 0.005) * MM) / 2, Ly / 2); lid.castShadow = true;
+      const lidT = (enc.lidH || 0.005) * MM;
+      let lid;
+      if (wooden) {
+        // inlaid lid: mother-of-pearl on the top, and again on the inside panel you see when it is open
+        const side = woodMaterial(enc.caseMat, { gloss: 0.6 }), inl = inlayMaterial(Math.round(Lx + 3), Math.round(Ly + 3), enc.caseMat);
+        lid = new THREE.Mesh(new THREE.BoxGeometry(Lx + 3, lidT, Ly + 3), [side, side, inl, inl, side, side]);
+        lid.position.set(0, lidT / 2, (Ly + 3) / 2 - 1.5);
+      } else {
+        const lidMat = woodMat(caseCol, 0.5);
+        lid = new THREE.Mesh(new THREE.BoxGeometry(Lx, lidT, Ly), lidMat);
+        lid.position.set(0, lidT / 2, Ly / 2);
+        if (cfg.lid !== 'open') { lidMat.transparent = true; lidMat.opacity = 0.28; lidMat.depthWrite = false; }
+      }
+      lid.castShadow = true; lid.receiveShadow = true;
       lidPivot.add(lid);
       if (cfg.lid === 'open') lidPivot.rotation.x = -1.85;
-      else { lidMat.transparent = true; lidMat.opacity = 0.28; lidMat.depthWrite = false; }
       box.add(lidPivot);
       this.root.add(box);
       bottomY = yb - wall * 0.4;
@@ -168,8 +203,10 @@ export class MusicBoxScene {
       const col = WOOD[tp.mat] ?? 0x8a6a4a;
       const tmat = tp.mat === 'glass'
         ? new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.05, metalness: 0, transmission: 0.6, transparent: true, opacity: 0.55 })
+        : tp.mat === 'oak' ? woodMaterial('oak', { gloss: 0.35, planks: 6, mm: tp.a * MM })
+        : tp.mat === 'spruce' ? woodMaterial('spruce', { gloss: 0.2, mm: 300 })
         : woodMat(col, tp.mat === 'marble' ? 0.25 : 0.7);
-      const top = new THREE.Mesh(new THREE.BoxGeometry(tp.a * MM, tp.h * MM, tp.b * MM), tmat);
+      const top = new THREE.Mesh(boxGeo(tp.a * MM, tp.h * MM, tp.b * MM, tp.mat === 'oak' ? tp.a * MM : 300), tmat);
       top.position.set(floorCx + (0.5 - 0.43) * tp.a * MM, bottomY - (tp.h * MM) / 2, floorCy + (0.47 - 0.5) * tp.b * MM);
       top.receiveShadow = true; this.root.add(top);
       // an old candle on the table, beside the box (inside the table's edge)
@@ -267,6 +304,9 @@ export class MusicBoxScene {
     const knob = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 11, 16), woodMat(0x3b2416, 0.4)); knob.rotation.z = Math.PI / 2; knob.position.set(6.5, 0, 25); crank.add(knob);
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 4, 16), this.mats.brass); hub.rotation.z = Math.PI / 2; crank.add(hub);
     this.root.add(crank);
+    // where a belt drive can take power off the crank shaft (used by the hamster rig)
+    this.crankAnchor = { x: combLen / 2 + 22, y: axZ, z: axY, boxRight: enc.boxed ? floorCx + Lx / 2 : floorCx + a / 2, bottomY, tip: null };
+    this.hamRig = null;
     this.setMode(cfg.mode || this.state.mode);
     // camera target on the pluck point
     const tip = toV(0, axY + g.Ty * MM, axZ + g.Tz * MM);
@@ -283,6 +323,7 @@ export class MusicBoxScene {
       this.controls.target.copy(tgt);
       this.camera.position.copy(tgt).add(new THREE.Vector3(0.1, 0.82, 0.62).normalize().multiplyScalar(d));
     } else this.camera.position.set(tip.x + span * 0.75, tip.y + span * 1.35, tip.z + span * 1.9);
+    this.homeTarget = this.controls.target.clone(); this.homeCam = this.camera.position.clone();
     this.controls.update();
   }
 
@@ -492,9 +533,47 @@ export class MusicBoxScene {
   }
 
   setMode(mode) {
+    const was = this.state.mode;
     this.state.mode = mode;
     if (this.crank) this.crank.visible = mode === 'crank';
-    if (this.windKey) this.windKey.visible = mode !== 'crank';
+    if (this.windKey) this.windKey.visible = mode === 'spring';
+    if (this.hamRig) this.hamRig.group.visible = mode === 'auto';
+    if (was !== mode && (was === 'auto' || mode === 'auto')) this.frame(mode === 'auto' ? 'rig' : 'box');
+    this.dirty = Math.max(this.dirty, 2);
+  }
+
+  // hamster wheel rig, belted to the crank (o: R, rw, rc, surface, mass in SI)
+  buildHamRig(o) {
+    if (!this.crankAnchor) return;
+    if (this.hamRig) { this.root.remove(this.hamRig.group); this.hamRig.group.traverse((m) => m.geometry && m.geometry.dispose()); }
+    this.hamRig = new HamsterRig(this.crankAnchor, { ...o, shells: this.quality === 'eco' ? 9 : 16 });
+    this.hamRig.group.visible = this.state.mode === 'auto';
+    this.root.add(this.hamRig.group);
+    this.dirty = 3;
+  }
+  hamState(h) { if (this.hamRig) this.hamRig.setState(h); }
+
+  // smoothly reframe the camera: the box (and candle), the hamster rig, or a close-up of her
+  frame(what) {
+    if (!this.tipWorld) return;
+    let tgt, pos;
+    if (what === 'rig' && this.hamRig) {
+      // fit the movement, the candle and the wheel in view
+      const box = new THREE.Box3().setFromObject(this.hamRig.group);
+      box.expandByPoint(this.tipWorld);
+      if (this.candle) box.expandByPoint(this.candle.g.getWorldPosition(new THREE.Vector3()));
+      const sph = box.getBoundingSphere(new THREE.Sphere());
+      tgt = sph.center.clone(); tgt.y -= sph.radius * 0.1;
+      const fov = (this.camera.fov * Math.PI) / 180, fit = Math.min(fov, 2 * Math.atan(Math.tan(fov / 2) * this.camera.aspect));
+      const d = (sph.radius * 0.92) / Math.sin(fit / 2);
+      pos = tgt.clone().add(new THREE.Vector3(0.0, 0.42, 0.91).normalize().multiplyScalar(d));
+    } else if (what === 'hamster' && this.hamRig) {
+      tgt = this.hamRig.focus(); tgt.y -= 15;
+      pos = tgt.clone().add(new THREE.Vector3(0.3, 0.25, 0.92).normalize().multiplyScalar(340));
+      this.follow = true;
+    } else { tgt = this.homeTarget.clone(); pos = this.homeCam.clone(); }
+    if (what !== 'hamster') this.follow = false;
+    this.camAnim = { t: 0, t0: performance.now(), fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos };
   }
 
   // physics state from the worklet (~45 Hz)
@@ -531,11 +610,34 @@ export class MusicBoxScene {
         }
       }
     }
+    if (this.camAnim) {
+      const A = this.camAnim; A.t = Math.min(1, (now - A.t0) / 900);
+      const e = A.t * A.t * (3 - 2 * A.t);
+      this.controls.target.lerpVectors(A.fromT, A.tgt, e); this.camera.position.lerpVectors(A.fromP, A.pos, e);
+      this.dirty = Math.max(this.dirty, 2);
+      if (A.t >= 1) this.camAnim = null;
+    }
+    const rigOn = this.hamRig && this.hamRig.group.visible;
+    if (rigOn) {
+      const th = s.theta + s.omega * Math.min(0.06, (now - s.t) / 1000);
+      this.hamRig.update(dt, th * (s.gCrank || 1));
+      if (this.follow && !this.camAnim) {
+        // keep her centred while orbiting is still yours
+        const f = this.hamRig.focus(); f.y -= 15;
+        const d = f.clone().sub(this.controls.target).multiplyScalar(Math.min(1, dt * 4));
+        this.controls.target.add(d); this.camera.position.add(d);
+      }
+    }
     this.controls.update();
     if (this.state.keyAngle !== this.lastKey) { this.lastKey = this.state.keyAngle; this.dirty = Math.max(this.dirty, 1); }
-    if (this.candle && this.candleBusy) {
+    if (rigOn && !(this.candle && this.candleBusy)) {
+      // the hamster breathes, blinks and runs: always animate (every frame while she runs)
+      this.candleFrame = !this.candleFrame;
+      const quick = this.hamRig.st && this.hamRig.st.f > 0;
+      if (this.dirty <= 0 && this.candleFrame && !quick) return;
+    } else if (this.candle && this.candleBusy) {
       // a lit flame never stops; ~30 fps is plenty for a flicker when nothing else moves
-      const quick = this.igniteT >= 0 || this.smoke.alive > 0;   // lighting and smoke get every frame
+      const quick = this.igniteT >= 0 || this.smoke.alive > 0 || (rigOn && this.hamRig.st && this.hamRig.st.f > 0);   // lighting, smoke and running get every frame
       this.flicker(dt); this.stepSmoke(dt);
       this.candleFrame = !this.candleFrame;
       if (this.dirty <= 0 && this.candleFrame && !quick) return;

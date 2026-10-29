@@ -1,5 +1,6 @@
 import { Engine } from './audio/engine.js';
 import { strikeMatch } from './audio/match.js';
+import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physics/hamster.js';
 import { MusicBoxScene } from './render/scene.js';
 import { CrankPad } from './ui/crank.js';
 import { ListenerMap } from './ui/listener-map.js';
@@ -16,7 +17,7 @@ const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
 
 // ------------------------------------------------------------------ state
-const cfg = { ...DEFAULT_CONFIG, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'living' };
+const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing' }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'living' };
 let song = null;            // compiled tune (onsets)
 let songId = 'brahms';
 let built = null;           // last build result (info, arrangement, combNotes, geom, drive, room)
@@ -73,6 +74,9 @@ function onBuilt(res) {
   engine.send({ type: 'patch', patch }, collectBuffers(patch));
   scene.build(info, { geom: built.geom }, cfg, pinsCopy);
   scene.setMode(cfg.mode);
+  scene.quality = cfg.quality;
+  buildRig();
+  if (cfg.mode === 'auto') scene.frame($('hamWatch').classList.contains('on') ? 'hamster' : 'rig');
   if (selectedTine >= info.tines.length) selectedTine = -1;
   refreshAfterBuild();
 }
@@ -151,6 +155,7 @@ function pushAll() {
   engine.send({ type: 'gain', value: +$('vol').value });
   engine.send({ type: 'airBrake', value: cfg.airBrake });
   engine.send({ type: 'listener', listener: { ...map.listener } });
+  sendHam();
 }
 
 // ------------------------------------------------------------------ crank pad
@@ -167,6 +172,10 @@ function setMode(mode) {
   cfg.mode = mode;
   document.querySelectorAll('.modeSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
   $('windInfo').classList.toggle('hidden', mode !== 'spring');
+  $('hamInfo').classList.toggle('hidden', mode !== 'auto');
+  $('gaitCard').classList.toggle('hidden', mode !== 'auto');
+  $('pad').classList.toggle('hidden', mode === 'auto');
+  if (mode === 'auto') { sendHam(); $('hamWatch').classList.remove('on'); }
   $('padLabel').innerHTML = mode === 'crank' ? 'Circle clockwise<br>to crank' : 'Circle clockwise<br>to wind';
   pad.mode = mode; pad.draw();
   engine.send({ type: 'mode', mode });
@@ -181,6 +190,69 @@ $('lever').addEventListener('click', () => {
   $('lever').textContent = braked ? 'Start' : 'Stop';
   $('lever').classList.toggle('stop', !braked);
 });
+
+// ------------------------------------------------------------------ hamster drive
+const fillH = (id, obj, val) => { const el = $(id); el.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; el.appendChild(o); } el.value = val; };
+fillH('hamWheel', WHEELS, cfg.ham.wheel); fillH('hamTread', SURFACES_H, cfg.ham.surface); fillH('hamAxle', AXLES, cfg.ham.axle);
+function sendHam() { engine.send({ type: 'hamster', opts: { ...cfg.ham } }); }
+function buildRig() {
+  if (!built) return;
+  const R = WHEELS[cfg.ham.wheel].D / 2, [rw, rc] = pulleyRadii(built.drive.G_crank, built.drive.omegaNom, R);
+  scene.buildHamRig({ R, rw, rc, surface: cfg.ham.surface, mass: cfg.ham.mass });
+  const M = cfg.ham.mass;
+  $('hamDriveInfo').textContent = [
+    `belt       ${(rw * 2e3).toFixed(0)} mm hub pulley → ${(rc * 2e3).toFixed(0)} mm crank pulley (×${(rw / rc).toFixed(2)}), quarter-twist O-ring`,
+    `tempo      100% when she runs 0.44 m/s (${(0.44 / R * 60 / TAU).toFixed(0)} wheel rpm)`,
+    `her limits VO2max ≈ ${(vo2maxW(M) / 20.1 * 60).toFixed(1)} ml O2/min, aerobic pace up to ≈ ${((0.7 * vo2maxW(M) / M - 6.03 * M ** -0.303) / (10.7 * M ** -0.316)).toFixed(2)} m/s`,
+  ].join('\n');
+}
+$('hamMass').addEventListener('input', (e) => { cfg.ham.mass = +e.target.value / 1000; $('hamMassv').textContent = e.target.value + ' g'; sendHam(); clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 250); });
+for (const [id, key] of [['hamWheel', 'wheel'], ['hamTread', 'surface'], ['hamAxle', 'axle']]) $(id).addEventListener('change', (e) => { cfg.ham[key] = e.target.value; sendHam(); buildRig(); });
+$('hamWake').addEventListener('click', () => { ensureStarted(); engine.send({ type: 'hamster', wake: true }); });
+$('hamWatch').addEventListener('click', () => {
+  const on = !$('hamWatch').classList.contains('on');
+  $('hamWatch').classList.toggle('on', on); $('hamWatch').textContent = on ? 'Whole rig' : 'Watch her';
+  scene.frame(on ? 'hamster' : 'rig');
+});
+// footfall (Hildebrand) diagram: stance bars for each paw scrolling right to left
+const gaitCv = $('gaitCanvas'), gaitHist = [];
+let lastHam = null, lastHamT = 0;
+function drawGait() {
+  requestAnimationFrame(drawGait);
+  if (cfg.mode !== 'auto') return;
+  const cv = gaitCv, dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
+  if (cv.width !== Math.round(W * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const h = lastHam;
+  const now = performance.now() / 1000;
+  if (h) {
+    const ph = (h.phase + h.f * Math.min(0.08, now - lastHamT)) % 1, off = GAITS[h.gait];
+    const st = [0, 1, 2, 3].map((k) => { let u = ph - off[k]; u -= Math.floor(u); return h.f > 0 && Math.abs(h.v) > 0.04 ? u < h.D : true; });
+    gaitHist.push({ t: now, st });
+    while (gaitHist.length && gaitHist[0].t < now - 2.2) gaitHist.shift();
+  }
+  const top = 22, rowH = (H - top - 8) / 4, x0 = 30, span = W - x0 - 8;
+  c.font = '10px -apple-system, sans-serif'; c.fillStyle = '#b5a58f';
+  ['LF', 'RF', 'LH', 'RH'].forEach((n, k) => c.fillText(n, 8, top + rowH * k + rowH * 0.68));
+  for (let i = 1; i < gaitHist.length; i++) {
+    const a = gaitHist[i - 1], b = gaitHist[i];
+    const xa = x0 + span * (1 - (now - a.t) / 2.2), xb = x0 + span * (1 - (now - b.t) / 2.2);
+    for (let k = 0; k < 4; k++) if (b.st[k]) { c.fillStyle = k < 2 ? '#8fc1d9' : '#e3b45a'; c.fillRect(xa, top + rowH * k + 3, xb - xa + 0.6, rowH - 6); }
+  }
+  c.fillStyle = '#f2e6d4'; c.font = '11px -apple-system, sans-serif';
+  const g = h ? (h.f > 0 && Math.abs(h.v) > 0.04 ? ({ walk: 'walk', trot: 'trot', bound: 'half-bound' })[h.gait] : 'standing') : '—';
+  c.fillText(h ? `${g} · ${(Math.abs(h.v)).toFixed(2)} m/s · ${h.f.toFixed(1)} strides/s · duty ${(h.D * 100).toFixed(0)}%` : 'footfalls', 8, 14);
+}
+requestAnimationFrame(drawGait);
+function hamText(h) {
+  const hour = new Date().getHours();
+  const what = h.state === 'run'
+    ? `<b>${({ walk: 'Walking', trot: 'Trotting', bound: 'Half-bounding' })[h.gait]}</b> ${(Math.abs(h.v) * 3.6).toFixed(1)} km/h · ${h.slip ? 'paws slipping · ' : ''}${(h.phi * 57.3).toFixed(0)}° up the wheel`
+    : `<b>${({ sit: 'Resting', groom: 'Washing her face', look: 'Looking around', run: 'Pausing' })[h.act] || 'Resting'}</b>`;
+  const day = h.day < 0.7 ? ` · it's daytime and hamsters are nocturnal, so she naps more` : '';
+  return `${what}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} tonight${day}`;
+}
 
 // ------------------------------------------------------------------ listener map
 const map = new ListenerMap($('map'), (L) => {
@@ -436,6 +508,11 @@ function applyState() {
   const st = lastState;
   if (!built || !st) return;
   scene.update(st, built.drive.G_crank, built.drive.G_fan);
+  if (st.ham) {
+    lastHam = st.ham; lastHamT = performance.now() / 1000; scene.hamState(st.ham);
+    const now = performance.now();
+    if (!applyState.ht || now - applyState.ht > 400) { applyState.ht = now; $('hamTxt').innerHTML = hamText(st.ham); }
+  }
   const spl = Math.max(st.splL, st.splR);
   $('spl').textContent = isFinite(spl) && spl > 5 ? `${spl.toFixed(0)} dB SPL` : '— dB';
   if (cfg.mode === 'spring') {
@@ -453,6 +530,11 @@ function applyState() {
     `crank      ${(st.omega * built.drive.G_crank * 60 / TAU).toFixed(0)} rpm`,
     `spring     ${st.turns.toFixed(2)} turns wound`,
     `governor   ${st.fanRpm.toFixed(0)} rpm`,
+    ...(st.ham ? [
+      `hamster    ${st.ham.state}, ${(Math.abs(st.ham.v)).toFixed(2)} m/s (wants ${st.ham.vCmd.toFixed(2)}), ${st.ham.gait} ${st.ham.f.toFixed(1)} Hz, duty ${st.ham.D.toFixed(2)}`,
+      `           φ ${(st.ham.phi * 57.3).toFixed(1)}° up the wheel, paw force ${(st.ham.F * 1e3).toFixed(0)} mN, belt ${(st.ham.belt * 1e3).toFixed(1)} mN`,
+      `           ${st.ham.Emet.toFixed(2)} W metabolic, ♥ ${st.ham.hr.toFixed(0)} bpm, reserve ${(st.ham.reserve * 100).toFixed(0)}%, ${st.ham.dist.toFixed(0)} m, ${(st.ham.kJ / 4.184).toFixed(2)} kcal`,
+    ] : []),
     `pin load   ${(-st.torque * 1e3).toFixed(2)} mN·m on the cylinder`,
     `contacts   ${st.contacts} pins touching tines, ${st.awake} tines ringing`,
     `at ears    L ${st.splL.toFixed(1)} dB · R ${st.splR.toFixed(1)} dB SPL`,

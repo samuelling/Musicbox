@@ -26,7 +26,13 @@
     <div class="modeSwitch">
       <button data-mode="crank" class="on">Hand crank</button>
       <button data-mode="spring">Wind-up</button>
+      <button data-mode="auto">Hamster</button>
     </div>
+    <div id="hamInfo" class="hamInfo hidden">
+      <div id="hamTxt" class="hamTxt">She's waking up…</div>
+      <div class="hamBtns"><button id="hamWake">Tap the cage</button><button id="hamWatch">Watch her</button></div>
+    </div>
+    <div id="gaitCard" class="gaitCard hidden" aria-label="Footfall diagram"><canvas id="gaitCanvas"></canvas></div>
     <div id="windInfo" class="windInfo hidden">
       <div class="gauge"><div id="springBar"></div></div>
       <span id="springTxt">0 turns</span>
@@ -120,6 +126,14 @@
         <label>Governor air brake <input type="range" id="airBrake" min="0.4" max="2.5" step="0.01" value="1"><span id="airBrakev">×1.00</span></label>
       </div>
       <div id="boxInfo" class="small mono"></div>
+      <h3>Hamster drive <span class="small">a golden hamster in a wheel, belted to the crank</span></h3>
+      <div class="grid">
+        <label>Hamster <input type="range" id="hamMass" min="85" max="210" step="1" value="125"><span id="hamMassv">125 g</span></label>
+        <label>Wheel <select id="hamWheel"></select></label>
+        <label>Tread <select id="hamTread"></select></label>
+        <label>Axle <select id="hamAxle"></select></label>
+      </div>
+      <div id="hamDriveInfo" class="small mono"></div>
     </section>
 
     <!-- PHYSICS -->
