@@ -30,9 +30,13 @@
     </div>
     <div id="hamInfo" class="hamInfo hidden">
       <div id="hamTxt" class="hamTxt">She's waking up…</div>
-      <div class="hamBtns"><button id="hamPlace">Place her in the wheel</button><button id="hamWatch">Watch her</button><button id="hamCover">Cover the cage</button></div>
+      <div class="hamBtns"><button id="hamPlace"><span class="ic">🎡</span>Place her in the wheel</button><button id="hamWatch"><span class="ic">👀</span>Watch her</button><button id="hamCover"><span class="ic">🧺</span>Cover the cage</button></div>
       <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="1"><span id="hamGearv">×1.00</span></label>
-      <label class="hamLover"><input type="checkbox" id="hamLover"> Wheel lover <span class="small">(off = a real hamster's night)</span></label>
+      <div class="hamNature" role="group" aria-label="Her nature">
+        <span>Her nature</span>
+        <div class="seg"><button data-lover="0" class="on">Real hamster</button><button data-lover="1">♥ Wheel lover</button></div>
+        <input type="checkbox" id="hamLover" hidden>
+      </div>
     </div>
     <div id="gaitCard" class="gaitCard hidden" aria-label="Footfall diagram"><canvas id="gaitCanvas"></canvas></div>
     <div id="windInfo" class="windInfo hidden">
@@ -44,15 +48,25 @@
       <canvas id="padCanvas"></canvas>
       <div id="padLabel" class="padLabel">Circle clockwise<br>to crank</div>
     </div>
+    <div id="navCtl" class="navCtl" aria-label="Move around the room">
+      <div class="zoomBtns"><button id="zoomIn" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zoomOut" aria-label="Zoom out" title="Zoom out (−)">−</button></div>
+      <div class="dpad" aria-label="Walk">
+        <button data-move="fwd" class="up" aria-label="Walk forward" title="Forward (W / ↑)">▲</button>
+        <button data-move="tl" class="lt" aria-label="Turn left" title="Turn left (Q / ←)">↶</button>
+        <button id="eyesBtn" class="mid" aria-label="See through your eyes" title="First person: see through your eyes">👁</button>
+        <button data-move="tr" class="rt" aria-label="Turn right" title="Turn right (E / →)">↷</button>
+        <button data-move="back" class="dn" aria-label="Step back" title="Back (S / ↓)">▼</button>
+      </div>
+      <div class="posture"><button id="standBtn" title="Stand up (Space)">Stand</button><span id="postureTxt">Sitting</span><button id="crouchBtn" title="Crouch (C)">Crouch</button></div>
+    </div>
+    <div id="keyHint" class="keyHint">W A S D walk · Q E turn · Space stand · C crouch · + − zoom</div>
     <div id="busy" class="busy hidden">Tuning tines…</div>
   </section>
 
   <nav class="tabs">
     <button data-tab="tunes" class="on">Tunes</button>
-    <button data-tab="listen">Listen</button>
-    <button data-tab="comb">Tines</button>
-    <button data-tab="box">Box</button>
-    <button data-tab="physics">Physics</button>
+    <button data-tab="musicbox">Music Box</button>
+    <button data-tab="listen">Listener</button>
   </nav>
 
   <main id="panels">
@@ -120,6 +134,9 @@
     </section>
 
     <!-- TINES / COMB -->
+    <div class="subtabs hidden" role="tablist" aria-label="Music box">
+      <button data-sub="comb" class="on">Tines</button><button data-sub="box">Box</button><button data-sub="physics">Physics</button>
+    </div>
     <section class="panel" data-panel="comb">
       <div class="grid">
         <label>Comb <select id="comb"></select></label>

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { HamsterRig } from './hamster-scene.js';
 import { woodMaterial, boxGeo, velvetMaterial, inlayMaterial } from './materials.js';
-import { Cabin } from './cabin.js';
+import { makeRoom } from './rooms.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TINE_MATERIALS, PLATE_MATERIALS, ENCLOSURES, SURFACES, PIN } from '../physics/constants.js';
@@ -34,8 +34,8 @@ export class MusicBoxScene {
     this.controls.enableDamping = true; this.controls.target.set(0, 12, 0);
     this.dirty = 3;
     this.controls.addEventListener('change', () => { this.dirty = Math.max(this.dirty, 2); });
-    this.controls.addEventListener('start', () => { this.camAnim = null; });
-    this.controls.minDistance = 25; this.controls.maxDistance = 2500;
+    this.controls.addEventListener('start', () => { this.camAnim = null; this.zoomAnim = null; });
+    this.controls.minDistance = 25; this.controls.maxDistance = 9000;
     const hemi = (this.hemi = new THREE.HemisphereLight(0x8a7a6a, 0x120c08, 0.16)); this.scene.add(hemi);
     const key = (this.keyLight = new THREE.DirectionalLight(0x9db4ff, 0.32));   // moonlight through a window
     key.position.set(160, 260, 140); key.castShadow = true;
@@ -70,7 +70,7 @@ export class MusicBoxScene {
       if (!look || !this.followListener) return;
       const dx = e.clientX - look[0], dy = e.clientY - look[1]; look = [e.clientX, e.clientY];
       const k = (this.camera.fov * Math.PI / 180) / Math.max(200, canvas.clientHeight);
-      if (this.onLook) this.onLook(dx * k);   // turning your head moves the listener's facing
+      if (this.onLook) this.onLook(-dx * k);   // grab the world: drag right and you turn to your left (as the up/down drag does)
       const cur = this.lookPitch ?? this.autoPitch ?? 0;
       if (Math.abs(dy) > 0) this.lookPitch = Math.max(-1.2, Math.min(1.2, cur + dy * k));
       this.dirty = Math.max(this.dirty, 2);
@@ -144,6 +144,8 @@ export class MusicBoxScene {
   // Build the whole mechanism from the model report.
   build(info, patch, cfg, pinsList) {
     this.dirty = 5;
+    // a rebuild (another comb, case, tune...) keeps your view: remember it relative to the pluck point
+    const keep = this.tipWorld ? { d: this.tipWorld.clone(), zoomed: this.zoomed, follow: this.follow } : null;
     this.root.clear(); this.candle = null; this.tines = []; this.selected = -1;
     const g = patch.geom, enc = ENCLOSURES[cfg.enclosure], surf = SURFACES[cfg.surface];
     const tm = TINE_MATERIALS[cfg.material];
@@ -359,7 +361,8 @@ export class MusicBoxScene {
     this.root.add(crank);
     // the room around it (room space -> scene), placed by placeRoom()
     this.roomOuter = new THREE.Group(); this.roomInner = new THREE.Group(); this.roomOuter.add(this.roomInner); this.root.add(this.roomOuter);
-    this.cabin = null; this.boxCenterY = bottomY + Lz / 2; this.bottomYv = bottomY;
+    this.boxCenterY = bottomY + Lz / 2; this.bottomYv = bottomY;
+    if (this.roomObj) this.roomInner.add(this.roomObj.group);       // the room survives rebuilds of the box
     // where a belt drive can take power off the crank shaft (used by the hamster rig)
     this.crankAnchor = { x: combLen / 2 + 22, y: axZ, z: axY, boxRight: enc.boxed ? floorCx + Lx / 2 : floorCx + a / 2, bottomY, tip: null };
     this.hamRig = null;
@@ -381,6 +384,14 @@ export class MusicBoxScene {
     } else this.camera.position.set(tip.x + span * 0.75, tip.y + span * 1.35, tip.z + span * 1.9);
     this.homeTarget = this.controls.target.clone(); this.homeCam = this.camera.position.clone();
     this.combSpan = combLen; this.zoomed = null;
+    if (keep) {
+      // put the camera back where it was (shifted with the pluck point), and any move in progress too
+      this.controls.target.copy(this.lastTarget); this.camera.position.copy(this.lastCam);
+      const d = tip.clone().sub(keep.d);
+      this.controls.target.add(d); this.camera.position.add(d);
+      if (this.camAnim) for (const k of ['fromT', 'fromP', 'tgt', 'pos']) this.camAnim[k].add(d);
+      this.zoomed = keep.zoomed; this.follow = keep.follow;
+    }
     this.controls.update();
   }
 
@@ -455,10 +466,18 @@ export class MusicBoxScene {
   lightCandle() {
     if (this.litTarget === 1) return;
     this.litTarget = 1; this.igniteT = 0; this.smokeT = -1;
+    clearTimeout(this.fireTimer);
+    this.fireTimer = setTimeout(() => { if (this.roomObj && this.roomObj.setFire && this.litTarget === 1) this.roomObj.setFire(true); }, 700);
+    if (!this.everLit) {
+      // the first light: watch the flame catch, then move in to the music box
+      this.everLit = true;
+      setTimeout(() => { if (this.zoomed === 'wide' && !this.followListener) this.frame(this.state.mode === 'auto' ? 'rig' : 'box'); }, 1100);
+    }
     this.dirty = Math.max(this.dirty, 2);
   }
   snuffCandle() {
     if (this.litTarget === 0) return;
+    clearTimeout(this.fireTimer); if (this.roomObj && this.roomObj.setFire) this.roomObj.setFire(false);
     this.litTarget = 0; this.igniteT = -1; this.smokeT = 0; this.ember = 1;
     this.dirty = Math.max(this.dirty, 2);
   }
@@ -614,17 +633,59 @@ export class MusicBoxScene {
   // r: { dims, boxPos (m, room), boxYaw, tableTop (m) or null if held, cabin }
   placeRoom(r) {
     this.roomDef = r;
-    if (this.cabin && (!r.cabin || this.cabinDims !== r.dims.join())) { this.roomInner.remove(this.cabin.group); this.cabin = null; }
-    if (r.cabin && !this.cabin) { this.cabin = new Cabin(r.dims); this.cabinDims = r.dims.join(); this.roomInner.add(this.cabin.group); }
-    this.scene.fog = r.cabin ? null : this.baseFog;
+    const key = [r.kind, r.dims.join(), r.boxPos ? r.boxPos.map((v) => v.toFixed(2)).join() : 'held'].join('|');
+    if (this.roomObj && this.roomKey !== key) {
+      this.roomObj.group.removeFromParent();
+      this.roomObj.group.traverse((m) => { if (m.geometry) m.geometry.dispose(); });
+      this.roomObj = null;
+    }
+    if (!this.roomObj) {
+      this.roomObj = makeRoom(r.kind, r.dims, r.boxPos);
+      this.roomKey = key;
+      if (this.roomObj) this.roomInner.add(this.roomObj.group);
+      if (this.roomObj && this.roomObj.setFire) this.roomObj.setFire(this.litTarget === 1);
+    }
+    this.cabin = this.roomObj;     // (the hut and the other rooms share update/setFire)
+    this.scene.fog = this.roomObj ? null : this.baseFog;
     this.updateRoomTransform();
-    if (r.cabin) {
+    const moon = this.roomObj && this.roomObj.moon;
+    if (moon) {
       // moonlight comes in through the window, cold and low
-      const w = this.toScene(2.6, r.dims[1] + 3, 3.6), o = this.toScene(r.boxPos ? r.boxPos[0] : 2.4, r.boxPos ? r.boxPos[1] : 1.8, 0.8);
+      const w = this.toScene(...moon), o = this.toScene(r.boxPos ? r.boxPos[0] : 2.4, r.boxPos ? r.boxPos[1] : 1.8, 0.8);
       this.keyLight.position.copy(w.sub(o).normalize().multiplyScalar(600));
-      this.hemi.intensity = 0.1;
-    } else { this.keyLight.position.set(160, 260, 140); this.hemi.intensity = 0.16; }
+      this.keyLight.intensity = 0.32; this.hemi.intensity = 0.1;
+    } else { this.keyLight.position.set(160, 260, 140); this.keyLight.intensity = r.kind === 'anechoic' ? 0.12 : 0.32; this.hemi.intensity = 0.16; }
+    if (this.litTarget !== 1 && !this.everLit && !this.followListener) this.frame('wide', true);
     this.dirty = 3;
+  }
+  // pull the orbiting camera back inside the room (toward its target) if it has gone through a wall
+  keepInRoom() {
+    if (!this.roomObj || !this.roomDef) return;
+    const [X, Y, Z] = this.roomDef.dims.map((v) => v * 1000), m = 180;
+    const inside = (p) => { const q = this.roomInner.worldToLocal(p.clone()); return q.x > m && q.x < X - m && q.z > m && q.z < Y - m && q.y > 60 && q.y < Z - 260; };
+    const c = this.camera.position, t = this.controls.target;
+    if (inside(c) || !inside(t)) return;
+    let lo = 0, hi = 1; const v = c.clone().sub(t);
+    for (let i = 0; i < 18; i++) { const mid = (lo + hi) / 2; if (inside(t.clone().addScaledVector(v, mid))) lo = mid; else hi = mid; }
+    c.copy(t).addScaledVector(v, lo);
+  }
+  // a camera position for target tgt looking along dir at distance d, kept inside the room: if the
+  // way back is blocked by a wall, look down more steeply, then come closer
+  fitInRoom(tgt, dir, d) {
+    if (!this.roomObj || !this.roomDef) return tgt.clone().addScaledVector(dir, d);
+    const [X, Y, Z] = this.roomDef.dims.map((v) => v * 1000), m = 200;
+    const inside = (p) => { const q = this.roomInner.worldToLocal(p.clone()); return q.x > m && q.x < X - m && q.z > m && q.z < Y - m && q.y > 60 && q.y < Z - 280; };
+    const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize(), el0 = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+    let best = null;
+    for (let el = el0; el <= 1.35; el += 0.08) {
+      const dd = flat.clone().multiplyScalar(Math.cos(el)); dd.y = Math.sin(el);
+      const p = tgt.clone().addScaledVector(dd, d);
+      if (inside(p)) return p;
+      if (!best) best = dd;
+    }
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 18; i++) { const mid = (lo + hi) / 2; if (inside(tgt.clone().addScaledVector(best, d * mid))) lo = mid; else hi = mid; }
+    return tgt.clone().addScaledVector(best, d * lo);
   }
   updateRoomTransform() {
     const r = this.roomDef; if (!r || !this.roomOuter) return;
@@ -672,9 +733,10 @@ export class MusicBoxScene {
     if (!this.avatar) this.makeAvatar();
     const eye = this.toScene(L.x, L.y, L.z);
     const ahead = this.toScene(L.x + Math.cos(L.yaw), L.y + Math.sin(L.yaw), L.z).sub(eye).normalize();
-    const vis = !this.followListener && this.roomDef && !this.roomDef.held;
-    this.avatar.visible = vis; this.avatarRing.visible = vis;
+    const vis = !this.followListener && this.roomDef && !this.roomDef.held && this.zoomed !== 'wide';
     this.avatar.position.copy(eye);
+    const near = this.camera.position.distanceTo(eye) < 900;      // don't fill the view with your own head
+    this.avatar.visible = vis && !near; this.avatarRing.visible = vis;
     this.avatar.rotation.set(0, Math.atan2(-ahead.z, ahead.x), 0);
     this.avatarRing.position.set(eye.x, this.toScene(L.x, L.y, 0.005).y, eye.z);
     if (!this.followListener) return;
@@ -692,31 +754,55 @@ export class MusicBoxScene {
   }
 
   // smoothly reframe the camera: the box (and candle), the hamster rig, or a close-up of her
-  frame(what) {
+  frame(what, now = false) {
     if (!this.tipWorld) return;
-    let tgt, pos;
-    if (what === 'rig' && this.hamRig) {
+    let tgt, pos, dur = 900, fovTo = this.followListener ? 62 : 38;
+    const fov = (this.camera.fov * Math.PI) / 180, fit = Math.min(fov, 2 * Math.atan(Math.tan(fov / 2) * this.camera.aspect));
+    if (what === 'wide' && this.roomDef) {
+      // the opening view: the table, the candle, the (covered) cage, and the room around them,
+      // from a corner in front of the table, a little above eye height
+      const r = this.roomDef, [X, Y, Z] = r.dims, B = r.boxPos || [X / 2, Y / 2, 0.9];
+      const back = Math.min(B[1] - 0.3, Math.max(1.6, Y * 0.3));
+      pos = this.toScene(B[0] + 0.1, B[1] - back, Math.min(Z - 0.4, 1.85));
+      tgt = this.toScene(B[0] - 0.2, B[1] + 1.0, (r.tableTop || 0.75) + 0.12);
+      fovTo = 60;
+      const v = pos.clone().sub(tgt); pos = this.fitInRoom(tgt, v.clone().normalize(), v.length());
+    } else if (what === 'rig' && this.hamRig) {
       // fit the movement, the candle and the wheel in view
       const box = new THREE.Box3().setFromObject(this.hamRig.group);
       box.expandByPoint(this.tipWorld);
       if (this.candle) box.expandByPoint(this.candle.g.getWorldPosition(new THREE.Vector3()));
       const sph = box.getBoundingSphere(new THREE.Sphere());
       tgt = sph.center.clone(); tgt.y -= sph.radius * 0.1;
-      const fov = (this.camera.fov * Math.PI) / 180, fit = Math.min(fov, 2 * Math.atan(Math.tan(fov / 2) * this.camera.aspect));
       const d = (sph.radius * 0.92) / Math.sin(fit / 2);
-      pos = tgt.clone().add(new THREE.Vector3(0.0, 0.42, 0.91).normalize().multiplyScalar(d));
+      pos = this.fitInRoom(tgt, new THREE.Vector3(0.0, 0.42, 0.91).normalize(), d);
     } else if (what === 'hamster' && this.hamRig) {
       tgt = this.hamRig.focus(); tgt.y -= 15;
-      pos = tgt.clone().add(new THREE.Vector3(-0.42, 0.42, 0.8).normalize().multiplyScalar(360));
+      pos = this.fitInRoom(tgt, new THREE.Vector3(-0.42, 0.42, 0.8).normalize(), 360);
       this.follow = true;
     } else if (what === 'closeup') {
       // right in on the comb and cylinder, from in front and a little above
       tgt = this.tipWorld.clone();
-      pos = tgt.clone().add(new THREE.Vector3(0.12, 0.62, 0.78).normalize().multiplyScalar(Math.max(150, this.combSpan * 1.9)));
-    } else { tgt = this.homeTarget.clone(); pos = this.homeCam.clone(); }
+      pos = this.fitInRoom(tgt, new THREE.Vector3(0.12, 0.62, 0.78).normalize(), Math.max(150, this.combSpan * 1.9));
+    } else {
+      tgt = this.homeTarget.clone(); const v = this.homeCam.clone().sub(tgt); pos = this.fitInRoom(tgt, v.clone().normalize(), v.length());
+    }
+    if (this.zoomed === 'wide' && what !== 'wide') dur = 2600;      // from the opening view, a slow move in
     if (what !== 'hamster') this.follow = false;
-    this.zoomed = what === 'closeup' || what === 'hamster' ? what : null;
-    this.camAnim = { t: 0, t0: performance.now(), fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos };
+    this.zoomed = what === 'closeup' || what === 'hamster' || what === 'wide' ? what : null;
+    if (now) { this.camAnim = null; this.controls.target.copy(tgt); this.camera.position.copy(pos); this.camera.fov = fovTo; this.camera.updateProjectionMatrix(); this.controls.update(); this.dirty = 3; return; }
+    this.camAnim = { t: 0, t0: performance.now(), dur, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos, fov0: this.camera.fov, fov1: fovTo };
+  }
+  // zoom buttons: dolly toward or away from what you are looking at
+  dolly(k) {
+    if (this.followListener) {
+      // through your own eyes, zoom narrows or widens your field of view
+      this.camera.fov = Math.max(22, Math.min(85, this.camera.fov * k)); this.camera.updateProjectionMatrix(); this.dirty = 3; return;
+    }
+    this.camAnim = null;
+    const t = this.controls.target, v = this.camera.position.clone().sub(t);
+    const d = Math.max(this.controls.minDistance, Math.min(this.controls.maxDistance, v.length() * k));
+    this.zoomAnim = { from: v.length(), to: d, t0: performance.now() };
   }
 
   // physics state from the worklet (~45 Hz)
@@ -754,10 +840,17 @@ export class MusicBoxScene {
       }
     }
     if (this.camAnim && this.followListener) this.camAnim = null;
+    if (this.zoomAnim) {
+      const Z = this.zoomAnim, u = Math.min(1, (now - Z.t0) / 280), e = u * (2 - u);
+      const t = this.controls.target, v = this.camera.position.clone().sub(t).normalize();
+      this.camera.position.copy(t).addScaledVector(v, Z.from + (Z.to - Z.from) * e);
+      this.dirty = Math.max(this.dirty, 2); if (u >= 1) this.zoomAnim = null;
+    }
     if (this.camAnim) {
-      const A = this.camAnim; A.t = Math.min(1, (now - A.t0) / 900);
-      const e = A.t * A.t * (3 - 2 * A.t);
+      const A = this.camAnim; A.t = Math.min(1, (now - A.t0) / (A.dur || 900));
+      const e = A.dur > 1500 ? (A.t < 0.5 ? 4 * A.t ** 3 : 1 - (-2 * A.t + 2) ** 3 / 2) : A.t * A.t * (3 - 2 * A.t);
       this.controls.target.lerpVectors(A.fromT, A.tgt, e); this.camera.position.lerpVectors(A.fromP, A.pos, e);
+      if (A.fov0 !== A.fov1) { this.camera.fov = A.fov0 + (A.fov1 - A.fov0) * e; this.camera.updateProjectionMatrix(); }
       this.dirty = Math.max(this.dirty, 2);
       if (A.t >= 1) this.camAnim = null;
     }
@@ -774,6 +867,8 @@ export class MusicBoxScene {
       }
     }
     if (this.controls.enabled) this.controls.update();
+    if (!this.followListener) this.keepInRoom();
+    this.lastTarget = this.controls.target.clone(); this.lastCam = this.camera.position.clone();
     this.updateListenerView();
     const cabinOn = !!this.cabin;
     if (cabinOn) this.cabin.update(dt);

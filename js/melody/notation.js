@@ -122,6 +122,12 @@ export function harmonize(melody, length, meter, opts = {}) {
 export function compileSong(song) {
   let length = 0;
   const all = [];
+  if (song.generate) {
+    // generative: a fresh piece every time it is chosen
+    const g = song.generate();
+    g.notes.sort((a, b) => a.step - b.step || a.midi - b.midi);
+    return { id: song.id, title: song.title, credit: song.credit, bpm: song.bpm, meter: song.meter, steps: g.length, notes: g.notes, key: null, seed: g.seed };
+  }
   song.voices.forEach((v, vi) => {
     const { notes, length: L } = parseVoice(v);
     length = Math.max(length, L);

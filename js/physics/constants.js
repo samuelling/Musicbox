@@ -91,7 +91,6 @@ export const FEET = {
 export const ROOMS = {
   cabin:    { name: 'Alpine hut (timber walls, storm outside)', dims: [5.8, 4.6, 2.5], alpha: [0.11, 0.14], floor: [0.09, 0.11], walls: true, reverb: true, cabin: true },
   anechoic: { name: 'Anechoic chamber', dims: [8, 8, 6], alpha: [1, 1], floor: [1, 1], walls: false, reverb: false },
-  outdoors: { name: 'Garden (outdoors)', dims: [30, 30, 30], alpha: [1, 1], floor: [0.25, 0.55], walls: false, reverb: false },
   nursery:  { name: 'Nursery (carpet, curtains)', dims: [3.6, 3.2, 2.5], alpha: [0.22, 0.45], floor: [0.25, 0.5], walls: true, reverb: true },
   living:   { name: 'Living room', dims: [5.6, 4.3, 2.7], alpha: [0.16, 0.32], floor: [0.12, 0.25], walls: true, reverb: true },
   parlor:   { name: 'Wood-panelled parlour', dims: [8.0, 6.0, 3.4], alpha: [0.09, 0.16], floor: [0.08, 0.12], walls: true, reverb: true },

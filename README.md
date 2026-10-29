@@ -22,7 +22,7 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   for tempo. Her gait (walk, trot, half-bound), the forces from her paws, how
   far up the wheel she rides, her bouts and rests (she's nocturnal), heart rate and metabolic
   power are all simulated. Her pace is the tempo. "Watch her" zooms in; "Tap the cage" wakes her.
-* **Tines** — 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
+* **Music Box** (Tines · Box · Physics) — **Tines**: 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
   bass, or combs built to fit the tune (18 or 72 tines). Steel, brass, phosphor
   bronze, beryllium copper, titanium, aluminium or glass. Adjust the tine length (thickness follows to stay
   in tune), the thickness, the pin engagement, how worn the pins are, the comb tilt, A4 and how "aged"
@@ -32,14 +32,22 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   soundboard, or a Swiss rosewood cabinet. Lid open or closed. Set it on oak (with
   or without felt feet), glass, marble or a spruce resonance box, or hold it in
   your hand.
-* **Listen** — by default you're in a timber hut in the Alps, snowed in by a storm. "Follow perspective" makes the 3D view your eyes. Sound is rendered binaurally with a structural HRTF (head, pinna, shoulder) on every path — choose in-ear (AirPods), over-ear or speakers, set your head and ear size, and turn your device to turn your head. Or drag your head around a nursery, living room, parlour, stone chapel,
-  garden or anechoic chamber; turn it with two fingers. Distance, direction,
+* **Listener** — by default you're in a timber hut in the Alps, snowed in by a storm: a fire you light
+  with the candle, an oak regulator on the wall, a watercolour over the mantel and an alphorn in the corner.
+  Or play in a nursery (a cuckoo clock), a living room (a mantel clock), a wood-panelled parlour
+  (a longcase clock with the real phase of the moon), a stone chapel (a great painted dial) or an
+  anechoic chamber (a lab clock). Every clock shows the real time. Walk with W A S D or the on-screen
+  pad, turn with Q E, stand (Space) or crouch (C), zoom with + −; 👁 makes the 3D view your eyes.
+  Sound is rendered binaurally with a structural HRTF (head, pinna, shoulder) on every path — choose in-ear (AirPods), over-ear or speakers, set your head and ear size, and turn your device to turn your head. Or drag your head on the room map; turn it with two fingers. Distance, direction,
   reflections, Doppler and head shadow are all simulated. The header shows the dB
   SPL at your ears.
 * **Tunes** — classics (Brahms, Beethoven, Pachelbel, Greensleeves, a three-voice
   Frère Jacques round…), **Christmas** (Jingle Bells, Silent Night, Deck the Halls,
   We Wish You a Merry Christmas, Good King Wenceslas, Joy to the World, Carol of the
-  Bells), and **Hanukkah** (Ma'oz Tzur). Import MIDI files, or compose on the pin
+  Bells), **Hanukkah** (Ma'oz Tzur, Oh Chanukah), **Swiss** (Rufst du, mein Vaterland; an original
+  Ländler; an alphorn call on the natural notes) and **Ambient** — generative pieces of short phrases
+  looping on prime-numbered periods, so they drift apart and never line up the same way; a new piece
+  every time you choose one. Import MIDI files, or compose on the pin
   roll while the box plays, save to *My tunes*, and share as a link.
 
 ## The physics

@@ -99,6 +99,9 @@ const PROMPTS = {
 };
 function showPrompt(kind, sub) {
   prompt.classList.toggle('gone', !kind);
+  // walking and zoom controls appear once the candle is lit (a quiet first screen)
+  if (kind === 'first') { $('navCtl').classList.add('hidden'); $('keyHint').classList.add('hidden'); }
+  if (!kind) { $('navCtl').classList.remove('hidden'); $('keyHint').classList.remove('hidden'); }
   if (!kind) return;
   const [a, b] = PROMPTS[kind] || [kind, ''];
   prompt.querySelector('.lightText').textContent = a;
@@ -188,7 +191,11 @@ function setMode(mode) {
   $('hamInfo').classList.toggle('hidden', mode !== 'auto');
   $('gaitCard').classList.toggle('hidden', mode !== 'auto');
   $('pad').classList.toggle('hidden', mode === 'auto');
-  if (mode === 'auto') { sendHam(); $('hamWatch').classList.remove('on'); }
+  if (mode === 'auto') {
+    sendHam(); $('hamWatch').classList.remove('on'); $('hamWatch').innerHTML = '<span class="ic">👀</span>Watch her';
+    // the first time you meet her, make it plain she can be put to work, watched, or put to bed
+    try { if (!localStorage.getItem('musicbox.metHer')) { localStorage.setItem('musicbox.metHer', '1'); $('hamInfo').classList.add('intro'); setTimeout(() => $('hamInfo').classList.remove('intro'), 9000); } } catch (e) { /* private mode */ }
+  }
   $('padLabel').innerHTML = mode === 'crank' ? 'Circle clockwise<br>to crank' : 'Circle clockwise<br>to wind';
   pad.mode = mode; pad.draw();
   engine.send({ type: 'mode', mode });
@@ -234,12 +241,15 @@ $('hamGear').addEventListener('input', (e) => {
   cfg.ham.gear = +e.target.value; $('hamGearv').textContent = '×' + cfg.ham.gear.toFixed(2); sendHam();
   clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 200);
 });
-$('hamLover').addEventListener('change', (e) => { cfg.ham.lover = e.target.checked; if (life) life.mode = cfg.ham.lover ? 'lover' : 'real'; sendHam(); });
+$('hamLover').addEventListener('change', (e) => { cfg.ham.lover = e.target.checked; if (life) life.mode = cfg.ham.lover ? 'lover' : 'real'; sendHam(); syncNature(); });
+function syncNature() { document.querySelectorAll('.hamNature .seg button').forEach((b) => b.classList.toggle('on', (b.dataset.lover === '1') === !!cfg.ham.lover)); }
+document.querySelectorAll('.hamNature .seg button').forEach((b) => b.addEventListener('click', () => { const h = $('hamLover'); h.checked = b.dataset.lover === '1'; h.dispatchEvent(new Event('change')); }));
+syncNature();
 $('hamWatch').addEventListener('click', () => {
   const on = !$('hamWatch').classList.contains('on');
   // the camera can't fly to her while it is your eyes
-  if (on && $('follow').checked) { $('follow').checked = false; scene.setFollow(false); }
-  $('hamWatch').classList.toggle('on', on); $('hamWatch').textContent = on ? 'Whole rig' : 'Watch her';
+  if (on && $('follow').checked) { $('follow').checked = false; scene.setFollow(false); $('eyesBtn').classList.remove('on'); }
+  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch her';
   scene.frame(on ? 'hamster' : 'rig');
 });
 // footfall (Hildebrand) diagram: stance bars for each paw scrolling right to left
@@ -345,13 +355,96 @@ $('headTrack').addEventListener('change', async (e) => {
 });
 
 // follow perspective: the 3D view is your eyes; dragging it turns your head
-$('follow').addEventListener('change', (e) => scene.setFollow(e.target.checked));
+$('follow').addEventListener('change', (e) => { scene.setFollow(e.target.checked); $('eyesBtn').classList.toggle('on', e.target.checked); });
 scene.onLook = (d) => {
   map.faceBox = false; $('faceBox').checked = false;
   map.listener.yaw -= d; map.emit();
 };
 $('faceBox').addEventListener('change', (e) => { map.faceBox = e.target.checked; map.emit(); });
-$('earH').addEventListener('input', (e) => { map.listener.z = +e.target.value; $('earHv').textContent = (+e.target.value).toFixed(2) + ' m'; map.emit(); });
+$('earH').addEventListener('input', (e) => { map.listener.z = walk.zT = +e.target.value; $('earHv').textContent = (+e.target.value).toFixed(2) + ' m'; postureLabel(); map.emit(); });
+
+// ------------------------------------------------------------------ walking about
+// W/S (or ↑/↓) forward and back, A/D sidestep, Q/E (or ←/→) turn, Space stand, C crouch, +/− zoom;
+// the on-screen pad does the same for touch. Your ears move with you, so you hear the room change.
+const POSTURES = [['Crouching', 0.8], ['Sitting', 1.2], ['Standing', 1.62]];
+const walk = { keys: new Set(), pad: new Set(), raf: 0, last: 0, zT: 1.2 };
+function postureLabel() {
+  const z = walk.zT; let i = 0; for (let k = 1; k < POSTURES.length; k++) if (Math.abs(POSTURES[k][1] - z) < Math.abs(POSTURES[i][1] - z)) i = k;
+  $('postureTxt').textContent = Math.abs(POSTURES[i][1] - z) < 0.06 ? POSTURES[i][0] : `ears ${z.toFixed(2)} m`;
+  $('standBtn').disabled = z >= 1.6; $('crouchBtn').disabled = z <= 0.82;
+}
+function posture(dir) {
+  const z = walk.zT;
+  const next = dir > 0 ? POSTURES.find(([, h]) => h > z + 0.05) : [...POSTURES].reverse().find(([, h]) => h < z - 0.05);
+  if (!next) return;
+  walk.zT = next[1]; postureLabel(); walkLoop();
+}
+const held = (k) => walk.keys.has(k);
+function walkLoop() {
+  if (walk.raf) return;
+  walk.last = performance.now();
+  const step = (now) => {
+    const dt = Math.min(0.05, (now - walk.last) / 1000); walk.last = now;
+    const L = map.listener, P = walk.pad;
+    const f = (held('KeyW') || held('ArrowUp') || P.has('fwd') ? 1 : 0) - (held('KeyS') || held('ArrowDown') || P.has('back') ? 1 : 0);
+    const sd = (held('KeyD') ? 1 : 0) - (held('KeyA') ? 1 : 0);
+    const turn = (held('KeyQ') || held('ArrowLeft') || P.has('tl') ? 1 : 0) - (held('KeyE') || held('ArrowRight') || P.has('tr') ? 1 : 0);
+    let moved = false;
+    if (turn) { map.faceBox = false; $('faceBox').checked = false; L.yaw += turn * 1.5 * dt; moved = true; }
+    if (f || sd) {
+      const v = (L.z < 1.0 ? 0.45 : 1.0) * dt, n = Math.hypot(f, sd);
+      const fx = Math.cos(L.yaw), fy = Math.sin(L.yaw), rx = Math.sin(L.yaw), ry = -Math.cos(L.yaw);
+      let x = L.x + (f * fx + sd * rx) / n * v, y = L.y + (f * fy + sd * ry) / n * v;
+      [x, y] = collide(x, y);
+      L.x = x; L.y = y; moved = true;
+    }
+    if (Math.abs(walk.zT - L.z) > 0.002) { L.z += (walk.zT - L.z) * Math.min(1, dt * 5); moved = true; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; }
+    if (moved) map.emit();
+    if (moved || f || sd || turn) walk.raf = requestAnimationFrame(step); else walk.raf = 0;
+  };
+  walk.raf = requestAnimationFrame(step);
+}
+// keep inside the walls, and out of the table (and the hamster's cage beside the box)
+function collide(x, y) {
+  if (!built) return [x, y];
+  const room = ROOMS[cfg.room], [X, Y] = room.dims, m = 0.25;
+  if (room.walls) { x = Math.min(Math.max(x, m), X - m); y = Math.min(Math.max(y, m), Y - m); }
+  const b = built.room.boxPos, t = map.table;
+  if (b && t && !built.room.held) {
+    const x0 = b[0] - t[0] / 2 - m, x1 = b[0] + t[0] / 2 + m + 0.35, y0 = b[1] - t[1] / 2 - m, y1 = b[1] + t[1] / 2 + m;
+    if (x > x0 && x < x1 && y > y0 && y < y1) {
+      const d = [[x - x0, x0, null], [x1 - x, x1, null], [y - y0, null, y0], [y1 - y, null, y1]].sort((p, q) => p[0] - q[0])[0];
+      if (d[1] !== null) x = d[1]; else y = d[2];
+    }
+  }
+  return [x, y];
+}
+const typing = (e) => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+window.addEventListener('keydown', (e) => {
+  if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (WALK_KEYS.has(e.code)) { e.preventDefault(); walk.keys.add(e.code); walkLoop(); $('keyHint').classList.add('gone'); return; }
+  if (e.repeat) return;
+  if (e.code === 'Space' && e.target.tagName !== 'BUTTON') { e.preventDefault(); posture(+1); }
+  else if (e.code === 'KeyC') posture(-1);
+  else if (e.code === 'Equal' || e.code === 'NumpadAdd') scene.dolly(0.8);
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') scene.dolly(1.25);
+});
+window.addEventListener('keyup', (e) => walk.keys.delete(e.code));
+window.addEventListener('blur', () => { walk.keys.clear(); walk.pad.clear(); document.querySelectorAll('.dpad .held').forEach((b) => b.classList.remove('held')); });
+document.querySelectorAll('.dpad button[data-move]').forEach((b) => {
+  const on = (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ } walk.pad.add(b.dataset.move); b.classList.add('held'); walkLoop(); };
+  const off = () => { walk.pad.delete(b.dataset.move); b.classList.remove('held'); };
+  b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
+  b.addEventListener('contextmenu', (e) => e.preventDefault());
+});
+$('standBtn').addEventListener('click', () => posture(+1));
+$('crouchBtn').addEventListener('click', () => posture(-1));
+$('zoomIn').addEventListener('click', () => scene.dolly(0.8));
+$('zoomOut').addEventListener('click', () => scene.dolly(1.25));
+$('eyesBtn').addEventListener('click', () => { const f = $('follow'); f.checked = !f.checked; f.dispatchEvent(new Event('change')); });
+setTimeout(() => $('keyHint').classList.add('gone'), 20000);
+postureLabel();
 $('yaw').addEventListener('input', (e) => { map.faceBox = false; $('faceBox').checked = false; map.listener.yaw = (+e.target.value * Math.PI) / 180; $('yawv').textContent = e.target.value + '°'; map.emit(); });
 $('vol').addEventListener('input', (e) => engine.send({ type: 'gain', value: +e.target.value }));
 function updateDist() {
@@ -406,11 +499,21 @@ $('makeOwn').addEventListener('toggle', () => {
 });
 
 // ------------------------------------------------------------------ tabs
-document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
-  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
-  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === b.dataset.tab));
+// Tunes · Listen · Music box; the music box tab holds Tines, Box and Physics as sub-tabs
+let subTab = 'comb';
+function showPanel(name) {
+  const sub = ['comb', 'box', 'physics'].includes(name);
+  if (sub) subTab = name;
+  const tab = sub ? 'musicbox' : name;
+  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
+  document.querySelector('.subtabs').classList.toggle('hidden', tab !== 'musicbox');
+  document.querySelectorAll('.subtabs button').forEach((x) => x.classList.toggle('on', x.dataset.sub === subTab));
+  const panel = tab === 'musicbox' ? subTab : tab;
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === panel));
   requestAnimationFrame(() => { map.resize(); roll.resize(); strip.resize(); insp.resize(); });
-}));
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showPanel(b.dataset.tab === 'musicbox' ? subTab : b.dataset.tab)));
+document.querySelectorAll('.subtabs button').forEach((b) => b.addEventListener('click', () => showPanel(b.dataset.sub)));
 
 // ------------------------------------------------------------------ tunes
 const store = {
@@ -580,7 +683,7 @@ function selectTine(i, fromScene) {
   const m1 = t.modes[0];
   $('tineName').textContent = `${t.name} · ${t.f0.toFixed(1)} Hz · L ${(t.L * 1e3).toFixed(2)} mm · t ${(t.t0 * 1e3).toFixed(2)}→${(t.t1 * 1e3).toFixed(2)} mm${t.lead ? ` · lead ${(t.lead * 1e3).toFixed(3)} g` : ''}${t.damper ? ' · damper' : ''}`;
   if (fromScene) {
-    document.querySelector('.tabs button[data-tab="comb"]').click();
+    showPanel('comb');
   }
 }
 
@@ -594,14 +697,14 @@ function refreshAfterBuild() {
   const surf = SURFACES[cfg.surface];
   map.boxZ = built.room.boxPos ? built.room.boxPos[2] : 0;
   map.setRoom(room, built.room.boxPos, surf.plate ? [surf.plate.a, surf.plate.b] : null, built.room.held);
-  scene.placeRoom({ dims: room.dims, boxPos: built.room.boxPos, boxYaw: built.room.boxYaw, tableTop: built.room.tableTop, held: built.room.held, cabin: !!room.cabin });
+  scene.placeRoom({ dims: room.dims, boxPos: built.room.boxPos, boxYaw: built.room.boxYaw, tableTop: built.room.tableTop, held: built.room.held, kind: cfg.room });
   scene.setListener(map.listener);
   if (placeListenerNextBuild) {
     placeListenerNextBuild = false;
     const [X, Y] = room.dims;
     const b = built.room.boxPos || [X / 2, Y / 2, 1.1];
     let ly = b[1] - 1.1; if (ly < 0.4) ly = Math.min(Y - 0.4, b[1] + 1.1);
-    map.listener.x = b[0] + 0.15; map.listener.y = ly; map.listener.z = +$('earH').value;
+    map.listener.x = b[0] + 0.15; map.listener.y = ly; map.listener.z = walk.zT = +$('earH').value; postureLabel();
     map.faceBox = $('faceBox').checked;
     map.emit();
   }
@@ -696,4 +799,4 @@ $('meterSel').value = song.meter.join(',');
 renderSongs();
 setMode('crank');
 requestBuild(0);
-window.__mb = { cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; }, roll };
+window.__mb = { walk, collide,  cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; }, roll };

@@ -3,13 +3,14 @@
 // millimetres with x = room x, y = height, z = room y (so it lines up with the acoustic room).
 import * as THREE from 'three';
 import { woodMaterial } from './materials.js';
+import { regulator, wallMount } from './clocks.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
 function tex(c, srgb = true) { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
 
 // --- the view out of the window: night sky, moon, snowy peaks, forest, snowfield
-function valleyTexture() {
+export function valleyTexture() {
   const [c, x] = canvas(2048, 900), W = 2048, H = 900;
   // a storm sky: low, heavy cloud lit faintly from somewhere above; no stars tonight
   const sky = x.createLinearGradient(0, 0, 0, H * 0.75);
@@ -57,7 +58,7 @@ function valleyTexture() {
 }
 
 // old floorboards: wide, worn, grey-brown, gaps between boards, nail heads, scuffed paths
-function oldPlanks() {
+export function oldPlanks() {
   const W = 1024, H = 1024, [c, x] = canvas(W, H);
   let y = 0, row = 0;
   while (y < H) {
@@ -107,7 +108,7 @@ function hewnTimber() {
   const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
 
-function stoneTexture() {
+export function stoneTexture() {
   const [c, x] = canvas(1024, 1024);
   x.fillStyle = '#6f675c'; x.fillRect(0, 0, 1024, 1024);       // mortar
   let y = 0;
@@ -145,7 +146,7 @@ function rugTexture() {
   return tex(c);
 }
 
-function frostTexture() {
+export function frostTexture() {
   // ice ferns growing in from the edges and corners of each pane; a faint even haze elsewhere
   const [c, x] = canvas(256, 256);
   x.fillStyle = 'rgba(255,255,255,0.12)'; x.fillRect(0, 0, 256, 256);
@@ -165,10 +166,138 @@ function frostTexture() {
   return tex(c, false);
 }
 
-function flakeTexture() {
+export function flakeTexture() {
   const [c, x] = canvas(32, 32);
   const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.4, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = g; x.fillRect(0, 0, 32, 32); return tex(c);
+}
+
+// ---- an original watercolour: a summer alp, a chalet, firs, peaks, painted in soft washes
+function watercolour() {
+  const W = 1024, H = 760, [c, x] = canvas(W, H);
+  x.fillStyle = '#f4efe2'; x.fillRect(0, 0, W, H);                       // paper
+  const wash = (fill, pts, n = 4, j = 10, a0 = 0.16) => {
+    const a = Math.min(0.6, a0 * 1.7);
+    for (let k = 0; k < n; k++) {
+      x.fillStyle = fill.replace('A', a.toFixed(3)); x.beginPath();
+      pts.forEach(([px, py], i) => (i ? x.lineTo : x.moveTo).call(x, px + R(-j, j), py + R(-j, j))); x.closePath(); x.fill();
+      x.strokeStyle = fill.replace('A', (a * 0.9).toFixed(3)); x.lineWidth = R(1, 2.5); x.stroke();   // pigment gathers at the edge of a wash
+    }
+  };
+  const ridge = (y0, amp, f, seed) => { const p = [[0, H]]; for (let i = 0; i <= 40; i++) { const u = i / 40; p.push([u * W, y0 - amp * Math.abs(Math.sin(u * f + seed)) - amp * 0.4 * Math.sin(u * f * 2.7 + seed * 3)]); } p.push([W, H]); return p; };
+  // sky: a wet-in-wet blue fading to warm at the horizon, a cloud lifted out
+  const sk = x.createLinearGradient(0, 0, 0, H * 0.55); sk.addColorStop(0, 'rgba(120,160,205,0.55)'); sk.addColorStop(1, 'rgba(240,220,190,0.15)');
+  x.fillStyle = sk; x.fillRect(0, 0, W, H * 0.6);
+  for (let i = 0; i < 6; i++) { x.fillStyle = 'rgba(250,248,240,0.35)'; x.beginPath(); x.ellipse(R(150, 900), R(60, 200), R(60, 140), R(18, 36), 0, 0, 7); x.fill(); }
+  wash('rgba(120,135,170,A)', ridge(H * 0.42, 150, 5.5, 0.6), 5, 8, 0.12);          // far peaks
+  // snow on the peaks: leave the paper, with a blue shadow side
+  wash('rgba(252,250,245,A)', ridge(H * 0.30, 60, 5.5, 0.6).slice(1, -1).concat([[W, H * 0.33], [0, H * 0.33]]), 2, 5, 0.25);
+  wash('rgba(95,130,110,A)', ridge(H * 0.58, 70, 3.1, 2.2), 5, 10, 0.13);            // the alp
+  wash('rgba(120,165,80,A)', ridge(H * 0.70, 40, 2.3, 4.1), 5, 12, 0.15);            // meadow
+  wash('rgba(150,185,90,A)', ridge(H * 0.84, 25, 1.7, 1.3), 4, 14, 0.15);
+  // firs
+  for (let i = 0; i < 26; i++) { const fx = R(0, W), fy = H * R(0.56, 0.7), s = R(18, 40) * (fy / H); wash('rgba(40,70,55,A)', [[fx, fy - s * 3], [fx + s, fy], [fx - s, fy]], 2, 3, 0.22); }
+  // the chalet: weathered wood, a wide low roof, a white gable cross
+  const cx = W * 0.62, cy = H * 0.68;
+  wash('rgba(140,90,55,A)', [[cx - 70, cy], [cx + 70, cy], [cx + 70, cy - 60], [cx - 70, cy - 60]], 3, 2, 0.25);
+  wash('rgba(85,60,45,A)', [[cx - 95, cy - 55], [cx, cy - 110], [cx + 95, cy - 55]], 3, 2, 0.3);
+  x.fillStyle = 'rgba(250,245,235,0.8)'; x.fillRect(cx - 40, cy - 45, 18, 16); x.fillRect(cx + 20, cy - 45, 18, 16);
+  x.fillStyle = 'rgba(200,60,60,0.5)'; for (let i = 0; i < 6; i++) x.fillRect(cx - 50 + i * 18, cy - 30, 10, 5);   // geraniums at the windows
+  // wildflowers in the foreground: dabs
+  const fl = ['rgba(240,240,250,A)', 'rgba(230,200,60,A)', 'rgba(170,110,200,A)', 'rgba(220,90,90,A)'];
+  for (let i = 0; i < 260; i++) { x.fillStyle = fl[i % 4].replace('A', R(0.35, 0.7).toFixed(2)); x.beginPath(); x.arc(R(0, W), H * R(0.78, 0.98), R(1.5, 4), 0, 7); x.fill(); }
+  // paper grain and a soft, uneven border where the washes stop
+  const img = x.getImageData(0, 0, W, H), d = img.data;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const k = (j * W + i) * 4, n = (Math.random() - 0.5) * 14 + 6 * Math.sin(i * 0.9) * Math.sin(j * 1.1);
+    const e = Math.min(i, W - 1 - i, j, H - 1 - j) / 40, fade = Math.min(1, Math.max(0, e + 0.15 * Math.sin(i * 0.05 + j * 0.07)));
+    for (let ch = 0; ch < 3; ch++) d[k + ch] = (d[k + ch] + n) * fade + [244, 239, 226][ch] * (1 - fade);
+  }
+  x.putImageData(img, 0, 0);
+  return tex(c);
+}
+
+// ---- a carved Swiss frame: linden wood, a running band of leaves and edelweiss in relief,
+// an edelweiss rosette at each corner and a carved crest on top. Origin at the back, face +z.
+function carvedTexture() {
+  const [c, x] = canvas(1024, 128);
+  x.fillStyle = '#808080'; x.fillRect(0, 0, 1024, 128);
+  for (let i = 0; i < 16; i++) {
+    const cx = i * 64 + 32;
+    x.fillStyle = '#c8c8c8';
+    for (const s of [-1, 1]) { x.beginPath(); x.ellipse(cx + s * 16, 64 + s * 10, 22, 9, s * 0.6, 0, 7); x.fill(); }
+    x.fillStyle = '#f0f0f0'; for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; x.beginPath(); x.ellipse(cx + Math.cos(a) * 9, 64 + Math.sin(a) * 9, 9, 4, a, 0, 7); x.fill(); }
+    x.fillStyle = '#505050'; x.beginPath(); x.arc(cx, 64, 3, 0, 7); x.fill();
+  }
+  x.fillStyle = '#404040'; x.fillRect(0, 0, 1024, 10); x.fillRect(0, 118, 1024, 10);
+  x.fillStyle = '#d0d0d0'; x.fillRect(0, 12, 1024, 5); x.fillRect(0, 111, 1024, 5);
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t;
+}
+function edelweiss(mat, r) {
+  const g = new THREE.Group();
+  for (let k = 0; k < 9; k++) { const a = k / 9 * Math.PI * 2; const p = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 6), mat); p.scale.set(1, 0.36, 0.3); p.position.set(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9, 0); p.rotation.z = a; g.add(p); }
+  for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; const b = new THREE.Mesh(new THREE.SphereGeometry(r * 0.22, 8, 6), mat); b.position.set(Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.25, r * 0.15); g.add(b); }
+  return g;
+}
+function framedWatercolour() {
+  const g = new THREE.Group();
+  const PW = 760, PH = 560, F = 95, D = 46;
+  const ct = carvedTexture();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a34, roughness: 0.62, bumpMap: ct, bumpScale: 6 });
+  const plain = new THREE.MeshStandardMaterial({ color: 0x6e4526, roughness: 0.55 });
+  const bar = (len, horiz, x, y) => {
+    const t = ct.clone(); t.needsUpdate = true; t.repeat.set(len / 380, 1);
+    const m = wood.clone(); m.bumpMap = t; m.map = null;
+    const geo = new THREE.BoxGeometry(horiz ? len : F, horiz ? F : len, D);
+    if (!horiz) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getY(i), uv.getX(i)); }
+    const b = new THREE.Mesh(geo, m); b.position.set(x, y, D / 2); b.castShadow = true; g.add(b);
+  };
+  bar(PW + 2 * F, true, 0, PH / 2 + F / 2); bar(PW + 2 * F, true, 0, -PH / 2 - F / 2);
+  bar(PH, false, -PW / 2 - F / 2, 0); bar(PH, false, PW / 2 + F / 2, 0);
+  // a raised inner lip and a gilt fillet next to the paper
+  const gilt = new THREE.MeshStandardMaterial({ color: 0xc9a050, metalness: 0.9, roughness: 0.35 });
+  for (const [w, h, x, y] of [[PW + 24, 12, 0, PH / 2 + 6], [PW + 24, 12, 0, -PH / 2 - 6], [12, PH, -PW / 2 - 6, 0], [12, PH, PW / 2 + 6, 0]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 16), gilt); m.position.set(x, y, D + 4); g.add(m); }
+  for (const [w, h, x, y] of [[PW + 2 * F + 16, 16, 0, PH / 2 + F + 8], [PW + 2 * F + 16, 16, 0, -PH / 2 - F - 8], [16, PH + 2 * F, -PW / 2 - F - 8, 0], [16, PH + 2 * F, PW / 2 + F + 8, 0]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, D + 14), plain); m.position.set(x, y, (D + 14) / 2); g.add(m); }
+  // edelweiss rosettes at the corners, and a crest of two leaves and a flower on top
+  const pale = new THREE.MeshStandardMaterial({ color: 0xa6764c, roughness: 0.6 });
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) { const e = edelweiss(pale, 26); e.position.set(sx * (PW / 2 + F / 2), sy * (PH / 2 + F / 2), D + 10); g.add(e); }
+  const crest = edelweiss(pale, 44); crest.position.set(0, PH / 2 + F + 30, D / 2 + 10); g.add(crest);
+  for (const s of [-1, 1]) { const l = new THREE.Mesh(new THREE.SphereGeometry(60, 12, 8), pale); l.scale.set(1.5, 0.45, 0.25); l.position.set(s * 95, PH / 2 + F + 18, D / 2 + 6); l.rotation.z = -s * 0.35; g.add(l); }
+  // the painting behind glass, on a cream mat
+  const mat = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshStandardMaterial({ color: 0xefe8d8, roughness: 0.9 })); mat.position.z = 6; g.add(mat);
+  const art = new THREE.Mesh(new THREE.PlaneGeometry(PW - 90, PH - 80), new THREE.MeshStandardMaterial({ map: watercolour(), roughness: 0.85 })); art.position.z = 8; g.add(art);
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.07, depthWrite: false })); glass.position.z = 30; g.add(glass);
+  return g;
+}
+
+// ---- an alphorn, propped in the corner: a long conical spruce tube wrapped with cane bindings,
+// the bell upturned on the floor, the mouthpiece up near the ceiling.  Local +x runs out of the corner.
+function alphorn() {
+  const g = new THREE.Group();
+  const top = new THREE.Vector3(30, 2330, 0), N = 90;
+  const path = new THREE.CatmullRomCurve3([top, new THREE.Vector3(420, 1600, 0), new THREE.Vector3(980, 560, 0), new THREE.Vector3(1300, 150, 0), new THREE.Vector3(1520, 80, 0), new THREE.Vector3(1700, 150, 0), new THREE.Vector3(1790, 300, 0)]);
+  const radius = (u) => 13 + 32 * u + (u > 0.78 ? Math.pow((u - 0.78) / 0.22, 2.6) * 95 : 0);
+  const frames = path.computeFrenetFrames(N, false), seg = 18, pos = [], uv = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, p = path.getPointAt(u), n = frames.normals[i], b = frames.binormals[i], r = radius(u);
+    for (let k = 0; k <= seg; k++) { const a = k / seg * Math.PI * 2; pos.push(p.x + r * (Math.cos(a) * n.x + Math.sin(a) * b.x), p.y + r * (Math.cos(a) * n.y + Math.sin(a) * b.y), p.z + r * (Math.cos(a) * n.z + Math.sin(a) * b.z)); uv.push(u * 8, k / seg); }
+  }
+  for (let i = 0; i < N; i++) for (let k = 0; k < seg; k++) { const a = i * (seg + 1) + k, c = a + seg + 1; idx.push(a, c, a + 1, a + 1, c, c + 1); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+  const spruce = woodMaterial('spruce', { gloss: 0.55, mm: 500, side: THREE.DoubleSide }); spruce.color = new THREE.Color(0xd09a62);   // varnished, honey-coloured
+  const tube = new THREE.Mesh(geo, spruce); tube.castShadow = true; tube.receiveShadow = true; g.add(tube);
+  // cane bindings, a painted band of edelweiss at the bell, and the hardwood mouthpiece
+  const cane = new THREE.MeshStandardMaterial({ color: 0x9a7a4a, roughness: 0.6 });
+  for (const u of [0.12, 0.24, 0.36, 0.48, 0.6, 0.7]) {
+    const p = path.getPointAt(u), t = path.getTangentAt(u);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(radius(u) + 2, 3.5, 6, 20), cane); ring.position.copy(p);
+    ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), t); g.add(ring);
+  }
+  const band = new THREE.MeshStandardMaterial({ color: 0x2a3a6a, roughness: 0.5 });
+  { const u = 0.86, p = path.getPointAt(u), t = path.getTangentAt(u); const r = new THREE.Mesh(new THREE.TorusGeometry(radius(u) + 1, 9, 8, 28), band); r.position.copy(p); r.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), t); g.add(r); }
+  const mp = new THREE.Mesh(new THREE.CylinderGeometry(16, 10, 70, 14), new THREE.MeshStandardMaterial({ color: 0x3a2214, roughness: 0.4 }));
+  const t0 = path.getTangentAt(0); mp.position.copy(top).addScaledVector(t0, -30); mp.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), t0.clone().negate()); g.add(mp);
+  return g;
 }
 
 export const CABIN_FEATURES = {
@@ -298,8 +427,12 @@ export class Cabin {
     }
     this.fireLight = new THREE.PointLight(0xff8a3c, 2.4e6, 0, 2);
     this.fireLight.position.set(fd + 220, hearthH + 260, fc); g.add(this.fireLight);
-    this.fireN = 0; this.t = 0;
-    this.buildClock(1150, RY);
+    this.fireN = 0; this.t = 0; this.fire = 0; this.fireTarget = 0;   // the fire is laid but unlit until you light the candle
+    this.moon = [2.6, RY / 1000 + 3, 3.6];
+    this.clock = wallMount(g, [RX, RY], regulator(), 'y1', 1150, 1460);
+    // an Alpine watercolour over the mantel, in a carved Swiss frame; the alphorn in the corner
+    wallMount(g, [RX, RY], { g: framedWatercolour() }, 'x0', fc, hearthH + openH + 640, fd + 2);
+    const horn = alphorn(); horn.position.set(110, 0, RY - 110); horn.rotation.y = Math.PI / 4; g.add(horn);
 
     // ---- a corner bench (the Eckbank of a farmhouse Stube) and firewood by the hearth ----
     const benchM = timber(2); benchM.color = new THREE.Color(0x9a7a60);
@@ -318,68 +451,10 @@ export class Cabin {
     }
   }
 
-  // A Vienna regulator on the wall by the window: walnut case with a glazed door, enamel dial,
-  // a long wooden-rod pendulum with a brass lenticular bob swinging at its own physical period,
-  // and the brass driving weight.  The hands show the real local time.
-  buildClock(x, wallZ) {
-    // local frame: +z out of the clock face. The cabin group is mirrored into scene space, so the
-    // clock carries a counter-reflection (scale.x = -1) to keep its numerals and hands the right way round.
-    const Dp0 = 140;
-    const g = new THREE.Group(); g.position.set(x, 1180, wallZ - 4 - Dp0); g.rotation.y = Math.PI; g.scale.x = -1; this.group.add(g);
-    const walnut = woodMaterial('walnut', { gloss: 0.7, mm: 500 });
-    const brass = new THREE.MeshStandardMaterial({ color: 0xd2a84e, metalness: 1, roughness: 0.22 });
-    const W = 360, H = 1150, Dp = 140;
-    const box = (w, h, d, x, y, z, m = walnut) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; g.add(b); return b; };
-    box(W, H, 14, 0, 0, -Dp + 7);                    // back board
-    box(16, H, Dp, -W / 2 + 8, 0, -Dp / 2); box(16, H, Dp, W / 2 - 8, 0, -Dp / 2);
-    box(W + 50, 40, Dp + 30, 0, H / 2 + 20, -Dp / 2 + 10); box(W + 30, 30, Dp + 20, 0, -H / 2 - 15, -Dp / 2 + 6);
-    // crown: an arched pediment with turned finials, and a carved bottom drop
-    const ped = new THREE.Mesh(new THREE.CylinderGeometry(W / 2 + 10, W / 2 + 10, 30, 32, 1, false, -Math.PI / 2, Math.PI), walnut);
-    ped.rotation.x = Math.PI / 2; ped.scale.set(1, 1, 0.42); ped.position.set(0, H / 2 + 40, -Dp / 2 + 10); g.add(ped);
-    for (const sx of [-1, 0, 1]) { const f = new THREE.Mesh(new THREE.SphereGeometry(sx ? 16 : 22, 14, 10), brass); f.position.set(sx * (W / 2 + 4), H / 2 + (sx ? 58 : 128), -Dp / 2 + 10); f.scale.set(1, 1.5, 1); g.add(f); }
-    const drop = new THREE.Mesh(new THREE.ConeGeometry(60, 110, 20), walnut); drop.rotation.x = Math.PI; drop.position.set(0, -H / 2 - 85, -Dp / 2 + 6); g.add(drop);
-    // enamel dial with Roman numerals
-    const c = document.createElement('canvas'); c.width = c.height = 512; const x2 = c.getContext('2d');
-    const gr = x2.createRadialGradient(256, 230, 40, 256, 256, 256); gr.addColorStop(0, '#fbf6ea'); gr.addColorStop(1, '#e9dfc8');
-    x2.fillStyle = gr; x2.beginPath(); x2.arc(256, 256, 252, 0, 7); x2.fill();
-    x2.strokeStyle = '#2a2420'; x2.lineWidth = 3; x2.beginPath(); x2.arc(256, 256, 236, 0, 7); x2.stroke(); x2.beginPath(); x2.arc(256, 256, 214, 0, 7); x2.stroke();
-    for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, r0 = i % 5 ? 222 : 216; x2.lineWidth = i % 5 ? 2 : 5; x2.beginPath(); x2.moveTo(256 + Math.sin(a) * r0, 256 - Math.cos(a) * r0); x2.lineTo(256 + Math.sin(a) * 236, 256 - Math.cos(a) * 236); x2.stroke(); }
-    x2.fillStyle = '#1d1815'; x2.font = 'bold 44px Georgia, serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle';
-    ['XII', 'I', 'II', 'III', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'].forEach((n, i) => { const a = i / 12 * Math.PI * 2; x2.save(); x2.translate(256 + Math.sin(a) * 178, 256 - Math.cos(a) * 178); x2.rotate(a); x2.fillText(n, 0, 0); x2.restore(); });
-    x2.font = 'italic 22px Georgia, serif'; x2.fillText('Wien', 256, 330);
-    const dt = new THREE.CanvasTexture(c); dt.colorSpace = THREE.SRGBColorSpace; dt.anisotropy = 8;
-    const dial = new THREE.Mesh(new THREE.CircleGeometry(125, 64), new THREE.MeshStandardMaterial({ map: dt, roughness: 0.35 }));
-    dial.position.set(0, H / 2 - 175, -24); dial.rotation.y = 0; g.add(dial);
-    const bezel = new THREE.Mesh(new THREE.TorusGeometry(128, 7, 10, 64), brass); bezel.position.copy(dial.position); bezel.position.z += 2; g.add(bezel);
-    // hands: hour and minute, blued-steel spades, and a centre boss
-    const handM = new THREE.MeshStandardMaterial({ color: 0x1b2236, metalness: 0.8, roughness: 0.35 });
-    const hand = (len, w) => { const sh = new THREE.Shape(); sh.moveTo(-w * 0.35, -len * 0.15); sh.lineTo(w * 0.35, -len * 0.15); sh.lineTo(w * 0.25, len * 0.7); sh.lineTo(w, len * 0.78); sh.lineTo(0, len); sh.lineTo(-w, len * 0.78); sh.lineTo(-w * 0.25, len * 0.7); sh.closePath();
-      const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), handM); const p = new THREE.Group(); p.add(m); p.position.copy(dial.position); g.add(p); return p; };
-    this.hourHand = hand(72, 9); this.hourHand.position.z += 6; this.minHand = hand(104, 7); this.minHand.position.z += 9;
-    const boss = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 6, 16), brass); boss.rotation.x = Math.PI / 2; boss.position.copy(dial.position); boss.position.z += 12; g.add(boss);
-    // pendulum: wooden rod, brass lenticular bob; its period from its length, T = 2π√(L/g)
-    const Lp = 640, pivotY = H / 2 - 320;
-    this.pend = new THREE.Group(); this.pend.position.set(0, pivotY, -60); g.add(this.pend);
-    const rod = new THREE.Mesh(new THREE.BoxGeometry(12, Lp, 4), walnut); rod.position.y = -Lp / 2; this.pend.add(rod);
-    const bob = new THREE.Mesh(new THREE.SphereGeometry(62, 32, 16), brass); bob.scale.set(1, 1, 0.22); bob.position.y = -Lp; this.pend.add(bob);
-    this.pendW = Math.sqrt(9.81 / (Lp / 1000 * 0.92));            // compound pendulum, effective length ~0.92 L
-    // the driving weight on its gut line, slowly descending through the week
-    const wt = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, 230, 24), brass); wt.position.set(-110, -120, -80); g.add(wt);
-    const line = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 300, 6), new THREE.MeshBasicMaterial({ color: 0x8a7a5a })); line.position.set(-110, 145, -80); g.add(line);
-    // the glazed door
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 40, H - 60), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, transparent: true, opacity: 0.08, depthWrite: false }));
-    glass.position.set(0, 0, 8); g.add(glass);
-    for (const [w, h, x, y] of [[W, 26, 0, H / 2 - 18], [W, 26, 0, -H / 2 + 18], [26, H, -W / 2 + 13, 0], [26, H, W / 2 - 13, 0], [W, 18, 0, H / 2 - 330]]) box(w, h, 20, x, y, 0);
-  }
-
+  setFire(on) { this.fireTarget = on ? 1 : 0.06; }
   update(dt) {
     this.t += dt;
-    if (this.minHand) {
-      const now = new Date(), m = now.getMinutes() + now.getSeconds() / 60, h = (now.getHours() % 12) + m / 60;
-      this.minHand.rotation.z = -m / 60 * Math.PI * 2;
-      this.hourHand.rotation.z = -h / 12 * Math.PI * 2;
-      this.pend.rotation.z = 0.065 * Math.sin(this.pendW * (performance.now() / 1000));
-    }
+    this.clock.tick(new Date(), performance.now() / 1000);
     // snow: falling, drifting in a light wind, recycled at the bottom
     // the storm: wind in gusts (a few seconds each), snow driven sideways and swirling
     if (Math.random() < dt * 0.25) this.gust = R(0.6, 1.4);
@@ -398,12 +473,15 @@ export class Cabin {
     this.snowGeo.attributes.position.needsUpdate = true;
     // fire: a smoothed random walk drives light and flames
     this.fireN += (Math.random() * 2 - 1 - this.fireN) * Math.min(1, dt * 8);
-    const lvl = 1 + 0.22 * this.fireN + 0.08 * Math.sin(this.t * 13.7);
-    this.fireLight.intensity = 2.4e6 * lvl;
-    this.embers.material.color.setRGB(1, 0.32 + 0.08 * lvl, 0.08);
+    // catching: kindling first (a few seconds), then the logs; banked back to embers when snuffed
+    this.fire += (this.fireTarget - this.fire) * Math.min(1, dt * (this.fireTarget > this.fire ? 0.45 : 0.25));
+    const F = this.fire, lvl = (1 + 0.22 * this.fireN + 0.08 * Math.sin(this.t * 13.7)) * F;
+    this.fireLight.intensity = 2.4e6 * lvl + 4e4;
+    this.embers.material.color.setRGB(0.25 + 0.75 * F, 0.06 + 0.3 * F + 0.08 * lvl, 0.02 + 0.06 * F);
     for (const f of this.flames) {
-      const s = 0.7 + 0.3 * Math.sin(this.t * (5 + f.ph) + f.ph) + 0.15 * this.fireN;
-      f.m.scale.set(f.w * 0.8, f.h * s, f.w);
+      const s = (0.7 + 0.3 * Math.sin(this.t * (5 + f.ph) + f.ph) + 0.15 * this.fireN) * Math.min(1, F * 1.4) + 1e-3;
+      f.m.visible = F > 0.02;
+      f.m.scale.set(f.w * 0.8 * Math.min(1, 0.4 + F), f.h * s, f.w * Math.min(1, 0.4 + F));
       f.m.position.set(f.base.x, f.base.y + f.h * s * 0.5, f.base.z + 18 * Math.sin(this.t * 3.1 + f.ph));
     }
   }

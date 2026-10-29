@@ -3,6 +3,8 @@
 // accomp: 'broken' | 'root' | 'none' — melody-only tunes get a generated
 // music-box accompaniment from the harmoniser.
 
+import { ambient } from './ambient.js';
+
 const rep = (s, n) => Array(n).fill(s).join(' ');
 
 export const SONGS = [
@@ -90,6 +92,38 @@ export const SONGS = [
     id: 'ohchanukah', key: 'Dm', cat: 'Hanukkah', title: 'Oh Chanukah (Oy Khanike)', credit: 'Yiddish folk song, pub. 1912 (M. Rivesman)', bpm: 120, meter: [4, 4], pickup: 2, accomp: 'broken',
     voices: ['D4:2 | A4:2 A4 A4 A4 D5 A4 A4 A4 | A4:4 G4:2 F4 G4:4 E4:2 E4 | A4:2 A4 A4 A4 D5 D5 A4 A4 | A4:4 G4:2 F4 G4:4 E4:4 | F4:2 G4 A4 G4 F4:4 F4:2 F4 | G4:4 F4:2 E4 F4:8 | F4:2 G4 A4 G4 F4:4 F4 | G4:4 F4:2 E4 D4:8 | A4:4 A4:8 D4:4 | A4:4 A4:8 D4:4 | A4:2 A4 A4 A4 G4:4 Bb4 | A4:16 | A4:2 A4 A4 A4 Bb4:4 A4:2 G4 | A4:4 A4:2 A4 Bb4:4 A4:2 G4 | F4:4 F4:2 F4 G4:4 F4:2 G4 | A4:16 | A4:2 A4 A4 A4 Bb4:4 A4:2 G4 | A4:4 A4:2 A4 Bb4:4 A4:2 G4 | F4:4 F4:2 F4 G4:4 F4:2 E4 | D4:8 r:8'],
   },
+
+  // ---------------------------------------------------------------- Swiss
+  {
+    id: 'rufstdu', key: 'G', cat: 'Swiss', title: 'Rufst du, mein Vaterland', credit: 'Swiss anthem 1811–1961 (J. R. Wyss), sung to the old tune of God Save the King', bpm: 76, meter: [3, 4], accomp: 'broken',
+    voices: ['G5:4 G5:4 A5:4 | F#5:6 G5:2 A5:4 | B5:4 B5:4 C6:4 | B5:6 A5:2 G5:4 | A5:4 G5:4 F#5:4 | G5:12 | D6:4 D6:4 D6:4 | D6:6 C6:2 B5:4 | C6:4 C6:4 C6:4 | C6:6 B5:2 A5:4 | B5:4 C6:2 B5:2 A5:2 G5:2 | B5:6 C6:2 D6:4 | E6:2 C6:2 B5:4 A5:4 | G5:12'],
+  },
+  {
+    id: 'laendler', key: 'F', cat: 'Swiss', title: 'Ländler for a Snowed-in Night', credit: 'Original, in the style of a Swiss Ländler', bpm: 132, meter: [3, 4], pickup: 4, accomp: 'broken',
+    voices: ['C5:4 | F5:4 A5:4 C6:4 | A5:8 F5:4 | E5:4 G5:4 Bb5:4 | G5:8 E5:4 | C5:4 E5:4 G5:4 | Bb5:4 A5:4 G5:4 | F5:4 A5:4 G5:4 | F5:8 C5:4 | F5:4 A5:4 C6:4 | D6:8 C6:4 | Bb5:4 A5:4 G5:4 | C6:8 A5:4 | G5:4 Bb5:4 D6:4 | C6:4 A5:4 F5:4 | G5:4 E5:4 G5:4 | F5:8'],
+  },
+  {
+    id: 'alpcall', key: 'F', cat: 'Swiss', title: 'Alphorn Call (on the natural notes)', credit: "Original, on an F alphorn's harmonics, with its sharp 'alphorn fa'", bpm: 60, meter: [4, 4], accomp: 'root',
+    voices: ['C5:4 F5:8 A5:4 | C6:12 A5:4 | B5:2 C6:2 B5:2 A5:2 G5:8 | F5:16 | C5:4 F5:4 A5:4 C6:4 | G5:8 A5:4 B5:4 | C6:4 A5:4 F5:4 G5:4 | F5:16'],
+  },
+
+  // ---------------------------------------------------------------- Ambient (generative)
+  {
+    id: 'amb-snow', cat: 'Ambient', title: 'Snow on the Window', credit: 'Generative: a new piece each time you choose it', bpm: 54, meter: [4, 4],
+    generate: () => ambient({ pitches: [65, 67, 69, 72, 74, 77, 79, 81, 84, 86], bars: 48, loops: 6, phrase: [1, 3], minGap: 10, bass: [65, 60] }),
+  },
+  {
+    id: 'amb-ember', cat: 'Ambient', title: 'Embers', credit: 'Generative: slow, low and warm (a new piece each time)', bpm: 46, meter: [4, 4],
+    generate: () => ambient({ pitches: [62, 65, 67, 69, 72, 74, 77, 79], bars: 40, loops: 6, phrase: [1, 2], minGap: 14, minP: 59, maxP: 137, bass: [62, 57] }),
+  },
+  {
+    id: 'amb-glacier', cat: 'Ambient', title: 'Glacier Light', credit: 'Generative: high and glassy, Lydian (a new piece each time)', bpm: 58, meter: [4, 4],
+    generate: () => ambient({ pitches: [72, 74, 76, 78, 79, 83, 84, 86, 88, 90, 91], bars: 48, loops: 7, phrase: [2, 3], minGap: 8, minP: 37, maxP: 113 }),
+  },
+  {
+    id: 'amb-hours', cat: 'Ambient', title: 'The Long Hours', credit: 'Generative: sparse minor pentatonic (a new piece each time)', bpm: 50, meter: [4, 4],
+    generate: () => ambient({ pitches: [69, 72, 74, 76, 79, 81, 84, 86, 88], bars: 56, loops: 5, phrase: [1, 2], minGap: 12, minP: 53, maxP: 137, bass: [57, 64] }),
+  },
 ];
 
-export const CATEGORIES = ['Classics', 'Christmas', 'Hanukkah', 'My tunes'];
+export const CATEGORIES = ['Classics', 'Christmas', 'Hanukkah', 'Swiss', 'Ambient', 'My tunes'];
