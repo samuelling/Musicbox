@@ -16,12 +16,15 @@ export class MusicBoxScene {
     const r = (this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' }));
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.toneMapping = THREE.ACESFilmicToneMapping;
-    r.toneMappingExposure = 1.05;
+    r.toneMappingExposure = 0.95;
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x15110e);
+    // a dim room after dark: faint ambient, cold window light, everything else from the candle
+    this.scene.background = new THREE.Color(0x070504);
+    this.scene.fog = new THREE.Fog(0x070504, 450, 2200);
     const pm = new THREE.PMREMGenerator(r);
     this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.12;
     this.camera = new THREE.PerspectiveCamera(38, 1, 1, 30000);
     this.camera.position.set(95, 85, 120);
     this.controls = new OrbitControls(this.camera, canvas);
@@ -29,13 +32,14 @@ export class MusicBoxScene {
     this.dirty = 3;
     this.controls.addEventListener('change', () => { this.dirty = Math.max(this.dirty, 2); });
     this.controls.minDistance = 25; this.controls.maxDistance = 2500;
-    const hemi = new THREE.HemisphereLight(0xfff1dc, 0x241a12, 0.55); this.scene.add(hemi);
-    const key = (this.keyLight = new THREE.DirectionalLight(0xffe6c4, 2.2));
+    const hemi = new THREE.HemisphereLight(0x8a7a6a, 0x120c08, 0.16); this.scene.add(hemi);
+    const key = (this.keyLight = new THREE.DirectionalLight(0x9db4ff, 0.32));   // moonlight through a window
     key.position.set(160, 260, 140); key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
     const sc = key.shadow.camera; sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 10; sc.far = 900;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x9fb7ff, 0.6); rim.position.set(-200, 120, -180); this.scene.add(rim);
+    const rim = new THREE.DirectionalLight(0x9fb7ff, 0.12); rim.position.set(-200, 120, -180); this.scene.add(rim);
+    this.candle = null;
     this.root = new THREE.Group(); this.scene.add(this.root);
     this.mats = {
       brass: new THREE.MeshStandardMaterial({ color: 0xcaa24e, metalness: 1, roughness: 0.28 }),
@@ -92,7 +96,7 @@ export class MusicBoxScene {
   // Build the whole mechanism from the model report.
   build(info, patch, cfg, pinsList) {
     this.dirty = 5;
-    this.root.clear(); this.tines = []; this.selected = -1;
+    this.root.clear(); this.candle = null; this.tines = []; this.selected = -1;
     const g = patch.geom, enc = ENCLOSURES[cfg.enclosure], surf = SURFACES[cfg.surface];
     const tm = TINE_MATERIALS[cfg.material];
     const R = g.R * MM, combLen = info.cylinder.combLen * MM;
@@ -163,6 +167,11 @@ export class MusicBoxScene {
       const top = new THREE.Mesh(new THREE.BoxGeometry(tp.a * MM, tp.h * MM, tp.b * MM), tmat);
       top.position.set(floorCx + (0.5 - 0.43) * tp.a * MM, bottomY - (tp.h * MM) / 2, floorCy + (0.47 - 0.5) * tp.b * MM);
       top.receiveShadow = true; this.root.add(top);
+      // an old candle on the table, beside the box (inside the table's edge)
+      const half = (tp.a * MM) / 2, tableCx = top.position.x;
+      const cxC = Math.max(tableCx - half + 45, (enc.boxed ? floorCx - Lx / 2 : floorCx - a / 2) - 75);
+      const czC = (enc.boxed ? floorCy : floorCy) - Math.min(70, (tp.b * MM) / 2 - 45) * 0.6;
+      this.addCandle(new THREE.Vector3(cxC, bottomY, czC));
     }
 
     // ---------- bedplate ----------
@@ -260,8 +269,99 @@ export class MusicBoxScene {
     this.tipWorld = tip;
     // frame the movement: above and in front, looking down into the box
     const span = Math.max(combLen, 60);
-    this.camera.position.set(tip.x + span * 0.75, tip.y + span * 1.35, tip.z + span * 1.9);
+    if (this.candle) {
+      // frame the movement and the candle together (the movement a little right of centre,
+      // clear of the crank pad's corner)
+      const flame = this.candle.g.position.clone(); flame.y += 55;
+      const tgt = tip.clone().lerp(flame, 0.36); tgt.y = tip.y - 4; tgt.z += 12;
+      const d = Math.max(250, tip.distanceTo(flame) * 2.05);
+      this.controls.target.copy(tgt);
+      this.camera.position.copy(tgt).add(new THREE.Vector3(0.1, 0.82, 0.62).normalize().multiplyScalar(d));
+    } else this.camera.position.set(tip.x + span * 0.75, tip.y + span * 1.35, tip.z + span * 1.9);
     this.controls.update();
+  }
+
+  // ---------- an old, burnt-down candle in a brass chamberstick ----------
+  addCandle(pos) {
+    const g = new THREE.Group(); g.position.copy(pos);
+    const brass = new THREE.MeshStandardMaterial({ color: 0x8d6a2e, metalness: 1, roughness: 0.45 });
+    // dish with a raised rim, and a finger ring
+    const dish = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [40, 0], [42, 2.5], [40, 4], [37, 3], [15, 3.5], [14, 9], [0, 9]].map(([x, y]) => new THREE.Vector2(x, y)), 48), brass);
+    dish.castShadow = true; dish.receiveShadow = true; g.add(dish);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(9, 2, 10, 28), brass);
+    ring.position.set(44, 9, 0); ring.rotation.y = Math.PI / 2; g.add(ring);
+    // yellowed wax, burnt down unevenly, with a melted crater and drips
+    const wax = new THREE.MeshStandardMaterial({ color: 0xc9b083, roughness: 0.6, metalness: 0, emissive: 0x6a3008, emissiveIntensity: 0.35 }); // light scattering inside the wax
+    const H = 52, Rw = 12;
+    const prof = [];
+    for (let i = 0; i <= 12; i++) { const y = (i / 12) * H; prof.push(new THREE.Vector2(Rw * (1 + 0.035 * Math.sin(i * 2.3)), y)); }
+    prof.push(new THREE.Vector2(Rw * 0.94, H + 2.5), new THREE.Vector2(Rw * 0.7, H - 1.5), new THREE.Vector2(2, H - 3), new THREE.Vector2(0, H - 3));
+    const body = new THREE.Mesh(new THREE.LatheGeometry(prof, 40), wax);
+    // lopsided top: shear the upper rim so one side has burnt lower
+    const pa = body.geometry.attributes.position;
+    for (let i = 0; i < pa.count; i++) { const y = pa.getY(i); if (y > H - 4) pa.setY(i, y - Math.max(0, pa.getX(i)) * 0.28); }
+    body.geometry.computeVertexNormals();
+    body.position.y = 9; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    const rnd = (k) => Math.sin(k * 12.9898) * 43758.5453 % 1;
+    for (let k = 0; k < 7; k++) {
+      const ang = rnd(k + 1) * Math.PI * 2, len = 8 + Math.abs(rnd(k + 7)) * 28, r = 1.0 + Math.abs(rnd(k + 3)) * 0.9;
+      const drip = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), wax);
+      drip.scale.set(1, 1, 0.6); drip.rotation.y = -ang;
+      drip.position.set(Math.cos(ang) * (Rw + r * 0.15), 9 + H - 6 - r - len / 2 - Math.abs(rnd(k + 5)) * 5, Math.sin(ang) * (Rw + r * 0.15));
+      drip.castShadow = true; g.add(drip);
+    }
+    const pool = new THREE.Mesh(new THREE.CylinderGeometry(17, 18, 2.2, 32), wax); pool.position.y = 10; g.add(pool);
+    // charred, curled wick
+    const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 7, 8), new THREE.MeshStandardMaterial({ color: 0x120c08, roughness: 1 }));
+    wick.position.y = 9 + H - 1; wick.rotation.z = 0.25; g.add(wick);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a10 }));
+    tip.position.set(-0.9, 9 + H + 2.6, 0); g.add(tip);
+    // flame: bright core inside a softer outer envelope, blue at the base
+    const flame = new THREE.Group(); flame.position.y = 9 + H + 1.5;
+    const addMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false });
+    const outer = new THREE.Mesh(new THREE.SphereGeometry(4.2, 20, 14), addMat(0xff9a35, 0.55));
+    outer.scale.set(1, 2.7, 1); outer.position.y = 8; flame.add(outer);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(2.4, 16, 12), addMat(0xfff1c4, 0.95));
+    core.scale.set(1, 2.4, 1); core.position.y = 6; flame.add(core);
+    const blue = new THREE.Mesh(new THREE.SphereGeometry(2.6, 14, 10), addMat(0x3a5cff, 0.35));
+    blue.scale.set(1, 0.8, 1); blue.position.y = 1.5; flame.add(blue);
+    // halo sprite
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const cx = cv.getContext('2d'); const grd = cx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,200,120,0.9)'); grd.addColorStop(0.25, 'rgba(255,150,60,0.35)'); grd.addColorStop(1, 'rgba(255,120,40,0)');
+    cx.fillStyle = grd; cx.fillRect(0, 0, 128, 128);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    halo.scale.set(70, 70, 1); halo.position.y = 9; flame.add(halo);
+    g.add(flame);
+    // the light itself: warm, physically falling off with distance (scene units are mm)
+    const light = new THREE.PointLight(0xffa04a, 34000, 0, 2);
+    light.position.y = 9 + H + 16; light.castShadow = true;
+    light.shadow.mapSize.set(512, 512); light.shadow.camera.near = 4; light.shadow.camera.far = 2500;
+    light.shadow.bias = -0.0008; light.shadow.radius = 4;
+    g.add(light);
+    this.root.add(g);
+    this.candle = { g, flame, outer, core, light, halo, wax, base: 34000, n1: 0, n2: 0, t: 0 };
+  }
+
+  flicker(dt) {
+    const c = this.candle; if (!c) return;
+    c.t += dt;
+    // two smoothed random walks (slow breathing + quick gutter) plus an occasional draught
+    const k1 = 1 - Math.exp(-dt * 3), k2 = 1 - Math.exp(-dt * 18);
+    c.n1 += (Math.random() * 2 - 1 - c.n1) * k1;
+    c.n2 += (Math.random() * 2 - 1 - c.n2) * k2;
+    if (Math.random() < dt * 0.25) c.gust = 0.6 + Math.random() * 0.6;
+    c.gust = (c.gust || 0) * Math.exp(-dt * 2.5);
+    const gustWobble = c.gust * Math.sin(c.t * 23);
+    const lvl = 1 + 0.16 * c.n1 + 0.09 * c.n2 - 0.25 * Math.abs(gustWobble);
+    c.light.intensity = c.base * Math.max(0.45, lvl);
+    const lean = 0.06 * c.n1 + 0.25 * gustWobble;
+    c.flame.rotation.z = lean; c.flame.rotation.x = 0.05 * c.n2;
+    c.flame.scale.set(1 - 0.06 * c.n2, Math.max(0.6, 1 + 0.14 * c.n1 + 0.08 * c.n2 - 0.2 * Math.abs(gustWobble)), 1);
+    c.light.position.x = -lean * 12;
+    c.outer.material.opacity = 0.45 + 0.12 * lvl;
+    c.halo.material.opacity = 0.65 + 0.3 * (lvl - 1);
+    c.wax.emissiveIntensity = 0.3 * lvl;
   }
 
   buildPins(info, patch, pinsList) {
@@ -331,8 +431,13 @@ export class MusicBoxScene {
     }
     this.controls.update();
     if (this.state.keyAngle !== this.lastKey) { this.lastKey = this.state.keyAngle; this.dirty = Math.max(this.dirty, 1); }
-    if (this.dirty <= 0) return;      // nothing moved: save the battery
-    this.dirty--;
+    if (this.candle) {
+      // the flame never stops; ~30 fps is plenty for a flicker when nothing else moves
+      this.flicker(dt);
+      this.candleFrame = !this.candleFrame;
+      if (this.dirty <= 0 && this.candleFrame) return;
+    } else if (this.dirty <= 0) return;      // nothing moved: save the battery
+    if (this.dirty > 0) this.dirty--;
     this.renderer.render(this.scene, this.camera);
   }
 }
