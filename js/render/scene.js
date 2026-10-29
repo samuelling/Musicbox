@@ -95,9 +95,9 @@ export class MusicBoxScene {
       const k = e.pointerType === 'touch' ? 0.0052 * Math.min(1, Math.max(0.72, 900 / window.innerWidth))
         : (this.camera.fov * Math.PI / 180) / Math.max(200, canvas.clientHeight);
       if (this.onLookStart && (dx || dy)) this.onLookStart();
-      if (this.onLook) this.onLook(-dx * k);   // grab the world: drag right and you turn to your left (as the up/down drag does)
+      if (this.onLook) this.onLook(dx * k);    // lead your view: drag right and you look right, drag up and you look up (as Ashland)
       const cur = this.lookPitch ?? this.autoPitch ?? 0;
-      if (Math.abs(dy) > 0) this.lookPitch = Math.max(-1.2, Math.min(1.2, cur + dy * k));
+      if (Math.abs(dy) > 0) this.lookPitch = Math.max(-1.2, Math.min(1.2, cur - dy * k));
       this.dirty = Math.max(this.dirty, 2);
     });
     canvas.addEventListener('pointerup', () => { look = null; });
