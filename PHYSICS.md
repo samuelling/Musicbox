@@ -1,6 +1,6 @@
-# The physics inside Musicbox
+# The physics inside Frisky
 
-Nothing in Musicbox is sampled and nothing is a "music box preset". Every sound is
+Nothing in Frisky is sampled and nothing is a "music box preset". Every sound is
 integrated at 48 kHz from a chain of physical sub-models. This file explains each
 link in that chain: the equations, the numbers, and the places where the numerics
 had to be careful.

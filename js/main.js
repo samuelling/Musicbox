@@ -356,6 +356,7 @@ $('headTrack').addEventListener('change', async (e) => {
 
 // follow perspective: the 3D view is your eyes; dragging it turns your head
 $('follow').addEventListener('change', (e) => { scene.setFollow(e.target.checked); $('eyesBtn').classList.toggle('on', e.target.checked); });
+scene.onLeaveEyes = () => { $('follow').checked = false; scene.setFollow(false); $('eyesBtn').classList.remove('on'); };
 scene.onLook = (d) => {
   map.faceBox = false; $('faceBox').checked = false;
   map.listener.yaw -= d; map.emit();

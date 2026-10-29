@@ -1,4 +1,4 @@
-# Musicbox
+# Frisky
 
 A music box you can crank with your finger or wind up, and every sound it makes is
 physically modelled: tuned steel tines, pins on a brass cylinder, the governor fan,

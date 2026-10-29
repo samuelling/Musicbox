@@ -101,7 +101,11 @@ export class MusicBoxScene {
 
   // double tap: zoom into the music box (or onto the hamster's cage); again to come back out
   doubleTap(e) {
-    if (this.followListener) return;
+    if (this.followListener) {
+      // seeing through your own eyes: a double tap steps back out and zooms in on the movement
+      if (this.onLeaveEyes) this.onLeaveEyes();
+      this.frame('closeup'); return;
+    }
     const rect = this.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(v, this.camera);
