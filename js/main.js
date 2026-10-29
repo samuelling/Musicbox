@@ -667,7 +667,6 @@ function showPanel(name) {
   const tab = sub ? 'musicbox' : name;
   document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
   document.querySelector('.subtabs').classList.toggle('hidden', tab !== 'musicbox');
-  document.querySelector('.presetRow').classList.toggle('hidden', tab !== 'musicbox');
   document.querySelectorAll('.subtabs button').forEach((x) => x.classList.toggle('on', x.dataset.sub === subTab));
   const panel = tab === 'musicbox' ? subTab : tab;
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === panel));

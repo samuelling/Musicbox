@@ -195,10 +195,6 @@
     </section>
 
     <!-- TINES / COMB -->
-    <div class="presetRow hidden">
-      <label>Box type <select id="boxPreset"></select></label>
-      <p id="presetDesc" class="small"></p>
-    </div>
     <div class="subtabs hidden" role="tablist" aria-label="Music box">
       <button data-sub="comb" class="on">Tines</button><button data-sub="box">Box</button><button data-sub="cage">Cage</button><button data-sub="physics">Physics</button>
     </div>
@@ -224,6 +220,10 @@
 
     <!-- BOX -->
     <section class="panel" data-panel="box">
+      <div class="presetRow">
+        <label>Box type <select id="boxPreset"></select></label>
+        <p id="presetDesc" class="small"></p>
+      </div>
       <div class="grid">
         <label>Enclosure <select id="enclosure"></select></label>
         <label>Sitting on <select id="surface"></select></label>
