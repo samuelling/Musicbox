@@ -151,9 +151,19 @@ Two things turned out to be essential:
    the pin's far side. Those are ignored rather than "corrected" with a huge force.
 
 Contacts run with 2 substeps; 1 is unstable and 4 matches 2 to within 3%.
-Coulomb friction (μ = 0.14, smoothed) acts along the contact tangent. While touching,
-the lubricated contact also damps the pinned tine's own vibration. Without that
-damping, the "pinned-tine" mode chirps from 8 to 6 kHz as the pin slides.
+The position correction is gentle (β = 0.1). With β = 0.25 the treble tines chattered
+against the pin during the dwell before release.
+
+Coulomb friction (μ = 0.14, smoothed) acts along the contact tangent, but it only
+loads the cylinder; it does not drive the tine's bending. Because the pin's end face
+is tilted 25° to the tine's bending direction, friction has a bending component. Fed
+back into the tine, that becomes the textbook brake-squeal mode-coupling instability:
+a self-sustained ≈ 1 kHz harmonic buzz, about 20 dB under the notes, during the
+~0.1 s the tip rests on the end face. Oiled music-box pins don't squeal, so that
+path is cut; the friction work still costs spring torque.
+
+While touching, the lubricated contact also damps the pinned tine's own vibration.
+Without that damping, the "pinned-tine" mode chirps from 8 to 6 kHz as the pin slides.
 
 **Dampers.** Bass tines carry a feather damper. Just before the next pin arrives,
 the approaching pin presses it against the still-ringing tine, so the tine is

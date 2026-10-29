@@ -296,7 +296,7 @@ export function buildModel(cfgIn, combNotes, arrangement) {
       R: geom.R, rho: geom.rho, Ty: geom.T[0], Tz: geom.T[1], uy, uz, ny, nz, hd: geom.hd, re: geom.re,
       phiRel: geom.phiRel, winStart: geom.winStart, winEnd: geom.winEnd,
       kHertz: 4e6, kAxial: (PIN.E * Math.PI * PIN.d * PIN.d) / 4 / PIN.h, kBend: (3 * PIN.E * Math.PI * PIN.d ** 4) / 64 / PIN.h ** 3,
-      mu: PIN.mu, zetaC: 0.6, beta: 0.25, maxPen: 60e-6, contactDamp: 900, damperWin: 0.22, damperRate: 900,
+      mu: PIN.mu, zetaC: 0.6, beta: 0.1, maxPen: 60e-6, contactDamp: 900, damperWin: 0.22, damperRate: 900,
     },
     tines: { N, nm, base, K, A11, A12, A21, A22, B1, B2, SUB, sA11, sA12, sA21, sA22, sB1, sB2, GAM, LAM, PSI, PHI, lc, xPos, lever, meff, damper, pins },
     bed: { m: mBed, Jx, Jy, screws: Float64Array.from(screws.flat()), ks, cs },

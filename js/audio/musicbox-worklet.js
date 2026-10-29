@@ -495,7 +495,11 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
             const slip = vpy * ty + vpz * tz;
             const fric = g.mu * F * Math.tanh(slip / 2e-4);
             const Fy = F * R.ny + fric * ty, Fz = F * R.nz + fric * tz;
-            const Fn = Fy * g.ny + Fz * g.nz;
+            // Only the normal force bends the tine. Feeding the friction's bending component
+            // back in creates a mode-coupling (brake-squeal) limit cycle at ~1 kHz while the
+            // tine rests on the pin's end face; oiled music-box pins don't squeal, so friction
+            // only loads the cylinder (torque below).
+            const Fn = F * pn;
             for (let k = 0; k < m; k++) { qf[k] += t.sB1[b + k] * phs[k] * Fn; vf[k] += t.sB2[b + k] * phs[k] * Fn; }
             tauC -= (R.ry * Fz - R.rz * Fy) / SUB;
             touched = 1;
