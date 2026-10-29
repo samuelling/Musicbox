@@ -23,6 +23,17 @@ const DESC = {
   lifted: 'Being placed in the wheel',
 };
 
+// How awake a Syrian hamster is by local time: nocturnal, most active in the first half of the
+// night, drowsy at dawn, asleep through the day with short wakings to drink and eat.
+export function activityAt(h) {
+  if (h >= 20 || h < 3) return 1;
+  if (h >= 3 && h < 6) return 0.75;
+  if (h >= 6 && h < 8) return 0.35;
+  if (h >= 18 && h < 20) return 0.6 + 0.2 * (h - 18);
+  return 0.1;
+}
+const hourNow = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
+
 export class HamsterLife {
   // cage: { L, D, wheel: {x, z, entry: {x, z}}, house: {door: {x, z}, bed: {x, z}}, bowl: {x, z}, drink: {x, z, h}, dig: {x, z} }
   constructor(cage) {
@@ -38,7 +49,14 @@ export class HamsterLife {
   setCage(cage) { const fx = this.x / this.cage.L, fz = this.z / this.cage.D; this.cage = cage; if (this.where === 'cage') { this.x = fx * cage.L; this.z = fz * cage.D; } }
   get desc() { return DESC[this.act] || ''; }
 
-  wakeUp() { if (!this.awake) { this.awake = true; this.act = 'wake'; this.timer = 2.2; this.plan = []; } }
+  get activity() { return Math.min(1, activityAt(hourNow()) + (this.mode === 'lover' ? 0.25 : 0)); }
+  wakeUp() {
+    if (this.awake) return;
+    this.awake = true; this.plan = [];
+    // in the daytime she sleeps on; otherwise she wakes and stretches
+    if (this.activity < 0.35) { this.act = 'sleep'; this.timer = R(90, 600); }
+    else { this.act = 'wake'; this.timer = 2.2; }
+  }
 
   // "place hamster in wheel": a hand lifts her over and sets her on the tread
   placeInWheel() {
@@ -52,6 +70,15 @@ export class HamsterLife {
   next() {
     if (this.plan.length) { const s = this.plan.shift(); this.start(s); return; }
     const c = this.cage, b = BUDGET[this.mode];
+    // the clock: the less active the hour, the more likely she goes back to sleep in her nest
+    const A = this.activity;
+    if (Math.random() > A) {
+      const dur = A < 0.2 ? R(600, 1800) : A < 0.5 ? R(120, 480) : R(30, 90);
+      const atNest = Math.hypot(this.x - c.house.bed.x, this.z - c.house.bed.z) < 30;
+      this.plan = [...(atNest ? [] : [{ act: 'walk', to: c.house.door }, { act: 'walk', to: c.house.bed }]), { act: 'sleep', dur }];
+      if (!atNest) this.plan.push({ act: 'walk', to: c.house.door });
+      this.next(); return;
+    }
     const what = pick(b);
     const go = (p, fast = false) => ({ act: 'walk', to: p, fast });
     const near = (p, r = 25) => ({ x: p.x + R(-r, r), z: p.z + R(-r, r) });

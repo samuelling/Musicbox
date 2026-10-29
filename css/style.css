@@ -42,7 +42,7 @@ header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-a
 .modeSwitch { position: absolute; left: 10px; top: 10px; display: flex; background: #0008; border-radius: 18px; padding: 3px; }
 .modeSwitch button { border: 0; background: transparent; color: var(--dim); padding: 6px 10px; border-radius: 15px; font-size: 13px; }
 .modeSwitch button.on { background: var(--accent); color: #241a0e; font-weight: 600; }
-.windInfo { position: absolute; left: 10px; top: 52px; display: flex; align-items: center; gap: 8px; background: #0008; border-radius: 12px; padding: 6px 8px; font-size: 12px; }
+.windInfo { position: absolute; right: 12px; bottom: calc(clamp(140px, 22vmin, 230px) + 22px); display: flex; align-items: center; gap: 8px; background: #0008; border-radius: 12px; padding: 6px 8px; font-size: 12px; }
 .gauge { width: 70px; height: 8px; background: #fff2; border-radius: 4px; overflow: hidden; }
 #springBar { height: 100%; width: 0; background: linear-gradient(90deg, #d9884a, var(--accent)); }
 .lever { border: 0; border-radius: 10px; padding: 5px 10px; background: #3b6b3b; color: #fff; font-weight: 600; }

@@ -299,6 +299,7 @@ export class Cabin {
     this.fireLight = new THREE.PointLight(0xff8a3c, 2.4e6, 0, 2);
     this.fireLight.position.set(fd + 220, hearthH + 260, fc); g.add(this.fireLight);
     this.fireN = 0; this.t = 0;
+    this.buildClock(1150, RY);
 
     // ---- a corner bench (the Eckbank of a farmhouse Stube) and firewood by the hearth ----
     const benchM = timber(2); benchM.color = new THREE.Color(0x9a7a60);
@@ -317,8 +318,68 @@ export class Cabin {
     }
   }
 
+  // A Vienna regulator on the wall by the window: walnut case with a glazed door, enamel dial,
+  // a long wooden-rod pendulum with a brass lenticular bob swinging at its own physical period,
+  // and the brass driving weight.  The hands show the real local time.
+  buildClock(x, wallZ) {
+    // local frame: +z out of the clock face. The cabin group is mirrored into scene space, so the
+    // clock carries a counter-reflection (scale.x = -1) to keep its numerals and hands the right way round.
+    const Dp0 = 140;
+    const g = new THREE.Group(); g.position.set(x, 1180, wallZ - 4 - Dp0); g.rotation.y = Math.PI; g.scale.x = -1; this.group.add(g);
+    const walnut = woodMaterial('walnut', { gloss: 0.7, mm: 500 });
+    const brass = new THREE.MeshStandardMaterial({ color: 0xd2a84e, metalness: 1, roughness: 0.22 });
+    const W = 360, H = 1150, Dp = 140;
+    const box = (w, h, d, x, y, z, m = walnut) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; g.add(b); return b; };
+    box(W, H, 14, 0, 0, -Dp + 7);                    // back board
+    box(16, H, Dp, -W / 2 + 8, 0, -Dp / 2); box(16, H, Dp, W / 2 - 8, 0, -Dp / 2);
+    box(W + 50, 40, Dp + 30, 0, H / 2 + 20, -Dp / 2 + 10); box(W + 30, 30, Dp + 20, 0, -H / 2 - 15, -Dp / 2 + 6);
+    // crown: an arched pediment with turned finials, and a carved bottom drop
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(W / 2 + 10, W / 2 + 10, 30, 32, 1, false, -Math.PI / 2, Math.PI), walnut);
+    ped.rotation.x = Math.PI / 2; ped.scale.set(1, 1, 0.42); ped.position.set(0, H / 2 + 40, -Dp / 2 + 10); g.add(ped);
+    for (const sx of [-1, 0, 1]) { const f = new THREE.Mesh(new THREE.SphereGeometry(sx ? 16 : 22, 14, 10), brass); f.position.set(sx * (W / 2 + 4), H / 2 + (sx ? 58 : 128), -Dp / 2 + 10); f.scale.set(1, 1.5, 1); g.add(f); }
+    const drop = new THREE.Mesh(new THREE.ConeGeometry(60, 110, 20), walnut); drop.rotation.x = Math.PI; drop.position.set(0, -H / 2 - 85, -Dp / 2 + 6); g.add(drop);
+    // enamel dial with Roman numerals
+    const c = document.createElement('canvas'); c.width = c.height = 512; const x2 = c.getContext('2d');
+    const gr = x2.createRadialGradient(256, 230, 40, 256, 256, 256); gr.addColorStop(0, '#fbf6ea'); gr.addColorStop(1, '#e9dfc8');
+    x2.fillStyle = gr; x2.beginPath(); x2.arc(256, 256, 252, 0, 7); x2.fill();
+    x2.strokeStyle = '#2a2420'; x2.lineWidth = 3; x2.beginPath(); x2.arc(256, 256, 236, 0, 7); x2.stroke(); x2.beginPath(); x2.arc(256, 256, 214, 0, 7); x2.stroke();
+    for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, r0 = i % 5 ? 222 : 216; x2.lineWidth = i % 5 ? 2 : 5; x2.beginPath(); x2.moveTo(256 + Math.sin(a) * r0, 256 - Math.cos(a) * r0); x2.lineTo(256 + Math.sin(a) * 236, 256 - Math.cos(a) * 236); x2.stroke(); }
+    x2.fillStyle = '#1d1815'; x2.font = 'bold 44px Georgia, serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle';
+    ['XII', 'I', 'II', 'III', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'].forEach((n, i) => { const a = i / 12 * Math.PI * 2; x2.save(); x2.translate(256 + Math.sin(a) * 178, 256 - Math.cos(a) * 178); x2.rotate(a); x2.fillText(n, 0, 0); x2.restore(); });
+    x2.font = 'italic 22px Georgia, serif'; x2.fillText('Wien', 256, 330);
+    const dt = new THREE.CanvasTexture(c); dt.colorSpace = THREE.SRGBColorSpace; dt.anisotropy = 8;
+    const dial = new THREE.Mesh(new THREE.CircleGeometry(125, 64), new THREE.MeshStandardMaterial({ map: dt, roughness: 0.35 }));
+    dial.position.set(0, H / 2 - 175, -24); dial.rotation.y = 0; g.add(dial);
+    const bezel = new THREE.Mesh(new THREE.TorusGeometry(128, 7, 10, 64), brass); bezel.position.copy(dial.position); bezel.position.z += 2; g.add(bezel);
+    // hands: hour and minute, blued-steel spades, and a centre boss
+    const handM = new THREE.MeshStandardMaterial({ color: 0x1b2236, metalness: 0.8, roughness: 0.35 });
+    const hand = (len, w) => { const sh = new THREE.Shape(); sh.moveTo(-w * 0.35, -len * 0.15); sh.lineTo(w * 0.35, -len * 0.15); sh.lineTo(w * 0.25, len * 0.7); sh.lineTo(w, len * 0.78); sh.lineTo(0, len); sh.lineTo(-w, len * 0.78); sh.lineTo(-w * 0.25, len * 0.7); sh.closePath();
+      const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), handM); const p = new THREE.Group(); p.add(m); p.position.copy(dial.position); g.add(p); return p; };
+    this.hourHand = hand(72, 9); this.hourHand.position.z += 6; this.minHand = hand(104, 7); this.minHand.position.z += 9;
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 6, 16), brass); boss.rotation.x = Math.PI / 2; boss.position.copy(dial.position); boss.position.z += 12; g.add(boss);
+    // pendulum: wooden rod, brass lenticular bob; its period from its length, T = 2π√(L/g)
+    const Lp = 640, pivotY = H / 2 - 320;
+    this.pend = new THREE.Group(); this.pend.position.set(0, pivotY, -60); g.add(this.pend);
+    const rod = new THREE.Mesh(new THREE.BoxGeometry(12, Lp, 4), walnut); rod.position.y = -Lp / 2; this.pend.add(rod);
+    const bob = new THREE.Mesh(new THREE.SphereGeometry(62, 32, 16), brass); bob.scale.set(1, 1, 0.22); bob.position.y = -Lp; this.pend.add(bob);
+    this.pendW = Math.sqrt(9.81 / (Lp / 1000 * 0.92));            // compound pendulum, effective length ~0.92 L
+    // the driving weight on its gut line, slowly descending through the week
+    const wt = new THREE.Mesh(new THREE.CylinderGeometry(28, 28, 230, 24), brass); wt.position.set(-110, -120, -80); g.add(wt);
+    const line = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 300, 6), new THREE.MeshBasicMaterial({ color: 0x8a7a5a })); line.position.set(-110, 145, -80); g.add(line);
+    // the glazed door
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 40, H - 60), new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, transparent: true, opacity: 0.08, depthWrite: false }));
+    glass.position.set(0, 0, 8); g.add(glass);
+    for (const [w, h, x, y] of [[W, 26, 0, H / 2 - 18], [W, 26, 0, -H / 2 + 18], [26, H, -W / 2 + 13, 0], [26, H, W / 2 - 13, 0], [W, 18, 0, H / 2 - 330]]) box(w, h, 20, x, y, 0);
+  }
+
   update(dt) {
     this.t += dt;
+    if (this.minHand) {
+      const now = new Date(), m = now.getMinutes() + now.getSeconds() / 60, h = (now.getHours() % 12) + m / 60;
+      this.minHand.rotation.z = -m / 60 * Math.PI * 2;
+      this.hourHand.rotation.z = -h / 12 * Math.PI * 2;
+      this.pend.rotation.z = 0.065 * Math.sin(this.pendW * (performance.now() / 1000));
+    }
     // snow: falling, drifting in a light wind, recycled at the bottom
     // the storm: wind in gusts (a few seconds each), snow driven sideways and swirling
     if (Math.random() < dt * 0.25) this.gust = R(0.6, 1.4);

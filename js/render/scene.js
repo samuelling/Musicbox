@@ -65,7 +65,7 @@ export class MusicBoxScene {
     this.onPick = null;
     let down = null, look = null;
     this.onLook = null;
-    canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY, performance.now()]; if (this.followListener) look = [e.clientX, e.clientY]; });
+    canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY, e.timeStamp]; if (this.followListener) look = [e.clientX, e.clientY]; });
     canvas.addEventListener('pointermove', (e) => {
       if (!look || !this.followListener) return;
       const dx = e.clientX - look[0], dy = e.clientY - look[1]; look = [e.clientX, e.clientY];
@@ -79,7 +79,12 @@ export class MusicBoxScene {
     canvas.addEventListener('pointerup', (e) => {
       if (!down) return;
       const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
-      if (moved < 6 && performance.now() - down[2] < 400) this.pick(e);
+      if (moved < 6 && e.timeStamp - down[2] < 400) {
+        // a second tap close by within 320 ms is a double tap (works for mouse and touch alike)
+        const t = e.timeStamp, lt = this.lastTap;
+        if (lt && t - lt.t < 320 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 30) { this.lastTap = null; this.doubleTap(e); }
+        else { this.lastTap = { t, x: e.clientX, y: e.clientY }; this.pick(e); }
+      }
       down = null;
     });
     this.loop = this.loop.bind(this);
@@ -92,6 +97,29 @@ export class MusicBoxScene {
     const w = this.canvas.clientWidth || 300, h = this.canvas.clientHeight || 300;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+  }
+
+  // double tap: zoom into the music box (or onto the hamster's cage); again to come back out
+  doubleTap(e) {
+    if (this.followListener) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const v = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(v, this.camera);
+    const hits = this.raycaster.intersectObjects(this.root.children, true).filter((h) => h.object.visible);
+    const under = (o, root) => { for (let p = o; p; p = p.parent) if (p === root) return true; return false; };
+    let what = 'away';
+    for (const h of hits) {
+      if (this.roomOuter && under(h.object, this.roomOuter)) continue;            // walls, floor
+      if (this.candle && under(h.object, this.candle.g)) continue;
+      if (this.hamRig && under(h.object, this.hamRig.group)) { what = 'cage'; break; }
+      { const gp = h.object.geometry && h.object.geometry.parameters; if (gp && (gp.width > 1000 || gp.height > 500)) continue; }   // the table top and legs
+      what = 'box'; break;
+    }
+    const back = this.state.mode === 'auto' ? 'rig' : 'box';
+    if (what === 'box') this.frame(this.zoomed === 'closeup' ? back : 'closeup');
+    else if (what === 'cage' && this.hamRig.covered) { if (this.onUncover) this.onUncover(); }
+    else if (what === 'cage') this.frame(this.zoomed === 'hamster' ? back : 'hamster');
+    else if (this.zoomed) this.frame(back);
   }
 
   pick(e) {
@@ -352,6 +380,7 @@ export class MusicBoxScene {
       this.camera.position.copy(tgt).add(new THREE.Vector3(0.1, 0.82, 0.62).normalize().multiplyScalar(d));
     } else this.camera.position.set(tip.x + span * 0.75, tip.y + span * 1.35, tip.z + span * 1.9);
     this.homeTarget = this.controls.target.clone(); this.homeCam = this.camera.position.clone();
+    this.combSpan = combLen; this.zoomed = null;
     this.controls.update();
   }
 
@@ -607,8 +636,11 @@ export class MusicBoxScene {
       B = [L.x + fx * 0.3 + rx * 0.06, L.y + fy * 0.3 + ry * 0.06, L.z - 0.36]; yaw = L.yaw + Math.PI / 2;
       yRef = this.boxCenterY - B[2] * 1000;
     } else yRef = this.bottomYv - r.tableTop * 1000;
-    this.roomOuter.rotation.y = yaw;
-    this.roomInner.position.set(-B[0] * 1000, yRef, -B[1] * 1000);
+    // room (x east, y north, z up) -> scene (x, z up, -y): a proper rotation, so the 3D view is not
+    // a mirror image of the room you hear (the cabin is built in (x, z, y) and flipped by the scale)
+    this.roomOuter.rotation.y = yaw + Math.PI;
+    this.roomInner.scale.set(1, 1, -1);
+    this.roomInner.position.set(-B[0] * 1000, yRef, B[1] * 1000);
     this.roomOuter.updateMatrixWorld(true);
   }
   toScene(x, y, z) { return this.roomInner.localToWorld(new THREE.Vector3(x * 1000, z * 1000, y * 1000)); }
@@ -675,10 +707,15 @@ export class MusicBoxScene {
       pos = tgt.clone().add(new THREE.Vector3(0.0, 0.42, 0.91).normalize().multiplyScalar(d));
     } else if (what === 'hamster' && this.hamRig) {
       tgt = this.hamRig.focus(); tgt.y -= 15;
-      pos = tgt.clone().add(new THREE.Vector3(0.3, 0.25, 0.92).normalize().multiplyScalar(340));
+      pos = tgt.clone().add(new THREE.Vector3(-0.42, 0.42, 0.8).normalize().multiplyScalar(360));
       this.follow = true;
+    } else if (what === 'closeup') {
+      // right in on the comb and cylinder, from in front and a little above
+      tgt = this.tipWorld.clone();
+      pos = tgt.clone().add(new THREE.Vector3(0.12, 0.62, 0.78).normalize().multiplyScalar(Math.max(150, this.combSpan * 1.9)));
     } else { tgt = this.homeTarget.clone(); pos = this.homeCam.clone(); }
     if (what !== 'hamster') this.follow = false;
+    this.zoomed = what === 'closeup' || what === 'hamster' ? what : null;
     this.camAnim = { t: 0, t0: performance.now(), fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos };
   }
 
@@ -727,7 +764,7 @@ export class MusicBoxScene {
     const rigOn = !!this.hamRig;
     if (rigOn) {
       const th = s.theta + s.omega * Math.min(0.06, (now - s.t) / 1000);
-      if (this.hamLife) this.hamLife.update(dt, this.hamRig.st, this.audioOn);
+      if (this.hamLife && !this.hamRig.covered) this.hamLife.update(dt, this.hamRig.st, this.audioOn);
       this.hamRig.update(dt, th * (s.gCrank || 1), this.hamLife);
       if (this.follow && !this.camAnim) {
         // keep her centred while orbiting is still yours

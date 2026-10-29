@@ -19,7 +19,7 @@ const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
 
 // ------------------------------------------------------------------ state
-const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 1, lover: false }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
+const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 1, lover: false, covered: true }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
 let song = null;            // compiled tune (onsets)
 let songId = 'brahms';
 let built = null;           // last build result (info, arrangement, combNotes, geom, drive, room)
@@ -171,7 +171,17 @@ const pad = new CrankPad($('pad'), $('padCanvas'), {
   onRelease: ({ total }) => { if (cfg.mode === 'crank') engine.send({ type: 'hand', angle: total, active: false }); },
 });
 
+// the cage under its blanket: hamster hidden, silent, and the belt unhooked
+function setCovered(on) {
+  cfg.ham.covered = on;
+  if (scene.hamRig) scene.hamRig.setCovered(on);
+  if (on && life && life.where === 'wheel') { life.where = 'cage'; life.act = 'sleep'; life.timer = 60; life.x = life.cage.house.bed.x; life.z = life.cage.house.bed.z; life.y = 0; }
+  engine.send({ type: 'hamster', silent: on, ...(on ? { inWheel: false } : {}) });
+  if (on && cfg.mode === 'auto') setMode('crank');
+}
+scene.onUncover = () => setCovered(false);
 function setMode(mode) {
+  if (mode === 'auto' && cfg.ham.covered) setCovered(false);   // hooking her up lifts the blanket
   cfg.mode = mode;
   document.querySelectorAll('.modeSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
   $('windInfo').classList.toggle('hidden', mode !== 'spring');
@@ -197,7 +207,7 @@ $('lever').addEventListener('click', () => {
 // ------------------------------------------------------------------ hamster drive
 const fillH = (id, obj, val) => { const el = $(id); el.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; el.appendChild(o); } el.value = val; };
 fillH('hamWheel', WHEELS, cfg.ham.wheel); fillH('hamTread', SURFACES_H, cfg.ham.surface); fillH('hamAxle', AXLES, cfg.ham.axle);
-function sendHam() { engine.send({ type: 'hamster', opts: { ...cfg.ham } }); }
+function sendHam() { engine.send({ type: 'hamster', opts: { ...cfg.ham }, silent: cfg.ham.covered }); }
 let life = null;
 function buildRig() {
   if (!built) return;
@@ -208,6 +218,7 @@ function buildRig() {
   else life.setCage(scene.hamRig.layout);
   life.mode = cfg.ham.lover ? 'lover' : 'real';
   scene.hamLife = life;
+  scene.hamRig.setCovered(cfg.ham.covered);
   const M = cfg.ham.mass;
   $('hamDriveInfo').textContent = [
     `belt       ${(rw * 2e3).toFixed(0)} mm hub pulley → ${(rc * 2e3).toFixed(0)} mm crank pulley (×${(rw / rc).toFixed(2)}), quarter-twist O-ring`,
@@ -217,6 +228,7 @@ function buildRig() {
 }
 $('hamMass').addEventListener('input', (e) => { cfg.ham.mass = +e.target.value / 1000; $('hamMassv').textContent = e.target.value + ' g'; sendHam(); clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 250); });
 for (const [id, key] of [['hamWheel', 'wheel'], ['hamTread', 'surface'], ['hamAxle', 'axle']]) $(id).addEventListener('change', (e) => { cfg.ham[key] = e.target.value; sendHam(); buildRig(); });
+$('hamCover').addEventListener('click', () => setCovered(true));
 $('hamPlace').addEventListener('click', () => { ensureStarted(); if (life) life.placeInWheel(); });
 $('hamGear').addEventListener('input', (e) => {
   cfg.ham.gear = +e.target.value; $('hamGearv').textContent = '×' + cfg.ham.gear.toFixed(2); sendHam();
@@ -225,6 +237,8 @@ $('hamGear').addEventListener('input', (e) => {
 $('hamLover').addEventListener('change', (e) => { cfg.ham.lover = e.target.checked; if (life) life.mode = cfg.ham.lover ? 'lover' : 'real'; sendHam(); });
 $('hamWatch').addEventListener('click', () => {
   const on = !$('hamWatch').classList.contains('on');
+  // the camera can't fly to her while it is your eyes
+  if (on && $('follow').checked) { $('follow').checked = false; scene.setFollow(false); }
   $('hamWatch').classList.toggle('on', on); $('hamWatch').textContent = on ? 'Whole rig' : 'Watch her';
   scene.frame(on ? 'hamster' : 'rig');
 });
@@ -265,6 +279,10 @@ function hamText(h) {
   if (inW && h.state === 'run') what = `<b>${({ walk: 'Walking', trot: 'Trotting', bound: 'Half-bounding' })[h.gait]}</b> in the wheel, ${(Math.abs(h.v) * 3.6).toFixed(1)} km/h${h.slip ? ' · paws slipping' : ''}`;
   else if (inW) what = `<b>Pausing</b> in the wheel`;
   else what = `<b>${life ? life.desc : 'Asleep in her nest'}</b>`;
+  if (life && !inW && (life.act === 'sleep' || life.act === 'nap') && life.activity < 0.5) {
+    const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    what += ` — it's ${t}; Syrian hamsters sleep through the day and wake around dusk`;
+  }
   const hooked = cfg.mode === 'auto' ? (inW ? '' : ' — the box is waiting for her') : '';
   return `${what}${hooked}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} tonight`;
 }

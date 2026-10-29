@@ -82,6 +82,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         if (m.opts) { this.ham.set(m.opts); if (this.p) this.setupBelt(); }
         if (m.hour !== undefined) this.hamHour = m.hour;
         if (m.inWheel !== undefined) this.ham.setInWheel(m.inWheel);
+        if (m.silent !== undefined) this.ham.silent = m.silent;
         if (m.wake) this.ham.wake();
         break;
       case 'seek': d.theta = m.theta; d.thetaMod = ((m.theta % TWO_PI) + TWO_PI) % TWO_PI; this.initPointers(); break;
@@ -766,7 +767,8 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const d = this.drv, dp = p.drive;
     const fanNom = dp.G_fan * dp.omegaNom;
     const auto = d.mode === 'auto', ham = this.ham;
-    ham.behave(n * dt, this.hamHour ?? 22);      // it is night in the cabin
+    if (!this.hourT || (this.hourT -= n) <= 0) { const now = new Date(); this.hourNow = now.getHours() + now.getMinutes() / 60; this.hourT = sr * 30; }
+    ham.behave(n * dt, this.hamHour ?? this.hourNow);      // her body clock follows your local time
     const gain = 4.0 * this.userGain * (p.gain || 1);
     const lidA = this.lidA, leak = p.lid.leak;
     const tableUnb = p.table && p.table.unbaffled;
@@ -826,7 +828,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
           ty = leak * ty + (1 - leak) * z[0]; tz = leak * tz + (1 - leak) * z[1]; fan = leak * fan + (1 - leak) * z[2];
         }
         Dy += ty; Dz += tz; Mdot += fan;
-        Mdot += ham.sound(noise);   // the wheel: paws, rungs, axle (radiated from beside the box)
+        if (!ham.silent) Mdot += ham.sound(noise);   // the wheel: paws, rungs, axle (radiated from beside the box)
         const pd = this.prevDdot;
         const Ddx = (Dx - pd[0]) * sr, Ddy = (Dy - pd[1]) * sr, Ddz = (Dz - pd[2]) * sr;
         pd[0] = Dx; pd[1] = Dy; pd[2] = Dz;

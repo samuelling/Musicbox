@@ -166,6 +166,29 @@ export class PinRoll {
       }
     }
     c.restore();
+    // horizontal: the tune runs on past the edge, so say so — fades and chevrons at the edges,
+    // a scrollbar along the bottom and which bars are showing
+    if (this.maxX() > 1) {
+      const vis = W - lw, total = this.steps * cw, edge = 34 * d, barLen2 = (this.meter[0] * 16) / this.meter[1];
+      const chevron = (x, dir) => {
+        c.fillStyle = '#e3b45a'; c.beginPath(); const y = top + (H - top) / 2, s2 = 9 * d;
+        c.moveTo(x - dir * s2 * 0.5, y - s2); c.lineTo(x + dir * s2 * 0.5, y); c.lineTo(x - dir * s2 * 0.5, y + s2); c.lineTo(x - dir * s2 * 0.1, y); c.closePath(); c.fill();
+      };
+      if (this.sx < this.maxX() - 1) {
+        const gR = c.createLinearGradient(W - edge * 1.6, 0, W, 0); gR.addColorStop(0, 'rgba(13,10,8,0)'); gR.addColorStop(1, 'rgba(13,10,8,0.92)');
+        c.fillStyle = gR; c.fillRect(W - edge * 1.6, top, edge * 1.6, H - top); chevron(W - 12 * d, 1);
+      }
+      if (this.sx > 1) {
+        const gL = c.createLinearGradient(lw, 0, lw + edge * 1.6, 0); gL.addColorStop(0, 'rgba(13,10,8,0.92)'); gL.addColorStop(1, 'rgba(13,10,8,0)');
+        c.fillStyle = gL; c.fillRect(lw, top, edge * 1.6, H - top); chevron(lw + 12 * d, -1);
+      }
+      const tw = Math.max(28 * d, vis * vis / total), tx = lw + (this.sx / this.maxX()) * (vis - tw);
+      c.fillStyle = '#ffffff14'; c.fillRect(lw, H - 5 * d, vis, 4 * d);
+      c.fillStyle = '#e3b45a99'; c.fillRect(tx, H - 5 * d, tw, 4 * d);
+      const b0 = Math.floor(this.sx / cw / barLen2) + 1, b1 = Math.min(Math.ceil(this.steps / barLen2), Math.floor((this.sx + vis) / cw / barLen2) + 1), bn = Math.ceil(this.steps / barLen2);
+      c.font = `${10 * d}px sans-serif`; c.textAlign = 'right'; c.fillStyle = '#b5a58f';
+      c.fillText(`bars ${b0}–${b1} of ${bn} · drag ⇆`, W - 6 * d, 12 * d); c.textAlign = 'left';
+    }
     // scroll hints
     if (this.maxY() > 0) {
       const frac = this.sy / this.maxY(), hgt = Math.max(20 * d, (H - top) * (H - top) / (this.rows.length * rh));

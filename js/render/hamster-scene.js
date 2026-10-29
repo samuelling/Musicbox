@@ -594,6 +594,8 @@ export class HamsterRig {
     this.crankPulley.rotation.x = -crankAngle;
     const inWheel = life && life.where === 'wheel' && st && st.inWheel;
     const root = this.ham.root;
+    root.visible = !this.covered;
+    if (this.covered) return;
     if (inWheel) {
       if (root.parent !== this.hamPivot) this.hamPivot.add(root);
       root.position.set(0, -this.treadR, 0); root.rotation.set(0, 0, 0);
@@ -613,6 +615,54 @@ export class HamsterRig {
     }
   }
   setHooked(on) { this.belt.visible = on; }
+
+  // a heavy wool blanket draped over the whole cage: flat on the lid, folding over the edges and
+  // hanging in loose folds down the sides
+  makeCover() {
+    const { L, D, Hc, cx0, cz0 } = this.dims, yTop = this.dims.yB - 40 + 15 + Hc + 4;
+    const hang = Hc * 0.72, pad = 30;
+    const W = L + 2 * (hang + pad), Dd = D + 2 * (hang + pad), NX = 90, NZ = 70;
+    const g = new THREE.PlaneGeometry(W, Dd, NX, NZ); g.rotateX(-Math.PI / 2);
+    const P = g.attributes.position, hx = L / 2 + 14, hz = D / 2 + 14;
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i), z = P.getZ(i);
+      const ox = Math.max(0, Math.abs(x) - hx), oz = Math.max(0, Math.abs(z) - hz);
+      const o = Math.hypot(ox, oz);
+      let X = x, Y = 0, Z = z;
+      // over the edge: the excess becomes drop, the cloth bowing slightly outwards in folds
+      const along = ox > oz ? z : x;
+      const fold = Math.sin(along * 0.045 + (ox > oz ? 1.3 : 0)) * 0.6 + Math.sin(along * 0.11) * 0.4;
+      if (o > 0) {
+        const r = Math.min(o, 18);                                  // rolls over the rim
+        const drop = Math.max(0, o - 12);
+        const out = 10 + 14 * Math.sin(Math.min(1, drop / 120) * 1.4) + fold * (6 + drop * 0.08);
+        const k = out / o;
+        X = Math.sign(x) * (Math.min(Math.abs(x), hx) + ox * k * (ox / o));
+        Z = Math.sign(z) * (Math.min(Math.abs(z), hz) + oz * k * (oz / o));
+        Y = -r * 0.4 - drop + (ox > 0 && oz > 0 ? Math.min(ox, oz) * 0.5 : 0);   // corners hang a little shorter
+      } else Y = 2 * Math.sin(x * 0.02) * Math.sin(z * 0.03) - 1.5;           // a slight sag on the mesh lid
+      P.setXYZ(i, X, Y, Z);
+    }
+    g.computeVertexNormals();
+    // loden-red wool with a dark green and black check, slightly fuzzy (sheen)
+    const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+    x.fillStyle = '#7a1e1c'; x.fillRect(0, 0, 256, 256);
+    x.globalAlpha = 0.55; x.fillStyle = '#1f3a2a'; for (let k = 0; k < 256; k += 64) { x.fillRect(k + 20, 0, 22, 256); x.fillRect(0, k + 20, 256, 22); }
+    x.globalAlpha = 0.5; x.fillStyle = '#0d0b0a'; for (let k = 0; k < 256; k += 64) { x.fillRect(k + 28, 0, 6, 256); x.fillRect(0, k + 28, 256, 6); }
+    x.globalAlpha = 0.35; x.fillStyle = '#d8b46a'; for (let k = 0; k < 256; k += 64) { x.fillRect(k + 52, 0, 2, 256); x.fillRect(0, k + 52, 256, 2); }
+    x.globalAlpha = 1;
+    const img = x.getImageData(0, 0, 256, 256), d = img.data; for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * 22; d[i] += n; d[i + 1] += n; d[i + 2] += n; } x.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(W / 260, Dd / 260); t.anisotropy = 8;
+    const m = new THREE.MeshPhysicalMaterial({ map: t, roughness: 0.95, sheen: 1, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xc87060), side: THREE.DoubleSide });
+    const cover = new THREE.Mesh(g, m); cover.castShadow = true; cover.receiveShadow = true;
+    cover.position.set(cx0 + L / 2, yTop, cz0 + D / 2);
+    this.cover = cover; this.group.add(cover);
+  }
+  setCovered(on) {
+    if (on && !this.cover) this.makeCover();
+    if (this.cover) this.cover.visible = on;
+    this.covered = on;
+  }
 
   // world position of the hamster's head, for a close-up camera
   focus() { const v = new THREE.Vector3(); this.ham.head.getWorldPosition(v); return v; }
