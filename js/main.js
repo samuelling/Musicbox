@@ -345,6 +345,17 @@ $('hamWatch').addEventListener('click', () => {
   $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch him';
   scene.frame(on ? 'hamster' : 'rig');
 });
+// the footfall diagram folds to a paw button (remembered)
+{
+  const setMini = (on) => {
+    $('gaitCard').classList.toggle('mini', on); $('gaitMin').setAttribute('aria-expanded', String(!on));
+    $('gaitMin').textContent = on ? '🐾' : '–'; $('gaitMin').title = on ? "Show Frisky's footfall diagram" : 'Fold the footfall diagram away';
+    try { localStorage.setItem('frisky.gaitMini', on ? '1' : ''); } catch (e) { /* private mode */ }
+  };
+  let on = false; try { on = !!localStorage.getItem('frisky.gaitMini'); } catch (e) { /* private mode */ }
+  setMini(on);
+  $('gaitMin').addEventListener('click', () => setMini(!$('gaitCard').classList.contains('mini')));
+}
 // footfall (Hildebrand) diagram: stance bars for each paw scrolling right to left
 const gaitCv = $('gaitCanvas'), gaitHist = [];
 let lastHam = null, lastHamT = 0;
