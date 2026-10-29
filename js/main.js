@@ -13,7 +13,7 @@ import { SCALE_GROUPS, SCALES, ROOTS, scaleSet, degreeOf, snapToScale } from './
 import { arrange } from './melody/arranger.js';
 import { parseMidi } from './melody/midi.js';
 import { DEFAULT_CONFIG } from './physics/model.js';
-import { COMBS, TINE_MATERIALS, ENCLOSURES, SURFACES, ROOMS, FEET, PLATE_MATERIALS, noteName } from './physics/constants.js';
+import { COMBS, TINE_MATERIALS, ENCLOSURES, SURFACES, ROOMS, FEET, PLATE_MATERIALS, BOX_PRESETS, PIN, noteName } from './physics/constants.js';
 
 const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
@@ -547,6 +547,34 @@ bindRange('combTilt', 'combTilt', (v) => v + '°');
 bindRange('a4', 'a4', (v) => v + ' Hz');
 bindRange('detune', 'detune', (v) => v + ' ¢');
 $('dampers').addEventListener('change', (e) => { cfg.dampers = e.target.checked; requestBuild(); });
+
+// ---- box presets: set every box control at once; touching any of them afterwards makes it "Custom"
+const PRESET_DEFAULTS = { comb: 'c30', enclosure: 'classic', material: 'steel', surface: 'oak', lid: 'open', dampers: true,
+  thickness: 1, length: 1, engage: PIN.engage, pinEdge: PIN.edge, combTilt: PIN.combTilt, a4: 440, detune: 0 };
+const PRESET_CONTROLS = { comb: 'sel', enclosure: 'sel', material: 'sel', surface: 'sel', lid: 'sel', dampers: 'chk',
+  thickness: 1, length: 1, engage: 1e-3, pinEdge: 1e-3, combTilt: 1, a4: 1, detune: 1 };
+let applyingPreset = false;
+{
+  const sel = $('boxPreset');
+  for (const [k, p] of Object.entries(BOX_PRESETS)) { const o = document.createElement('option'); o.value = k; o.textContent = p.name; sel.appendChild(o); }
+  const custom = document.createElement('option'); custom.value = 'custom'; custom.textContent = 'Custom (your own settings)'; sel.appendChild(custom);
+  sel.value = 'keepsake'; $('presetDesc').textContent = BOX_PRESETS.keepsake.desc;
+  sel.addEventListener('change', () => {
+    const p = BOX_PRESETS[sel.value];
+    if (!p) { $('presetDesc').textContent = 'Your own combination of comb, box, table and tuning.'; return; }
+    $('presetDesc').textContent = p.desc;
+    applyingPreset = true;
+    const want = { ...PRESET_DEFAULTS, ...p.set };
+    for (const [key, kind] of Object.entries(PRESET_CONTROLS)) {
+      const el = $(key); if (!el) continue;
+      if (kind === 'sel') { if (el.value !== want[key]) { el.value = want[key]; el.dispatchEvent(new Event('change')); } }
+      else if (kind === 'chk') { if (el.checked !== want[key]) { el.checked = want[key]; el.dispatchEvent(new Event('change')); } }
+      else { const v = want[key] / kind; if (Math.abs(+el.value - v) > 1e-9) { el.value = v; el.dispatchEvent(new Event('input')); } }
+    }
+    applyingPreset = false;
+  });
+  for (const key of Object.keys(PRESET_CONTROLS)) { const el = $(key); if (el) el.addEventListener(PRESET_CONTROLS[key] === 'sel' || PRESET_CONTROLS[key] === 'chk' ? 'change' : 'input', () => { if (!applyingPreset && sel.value !== 'custom') { sel.value = 'custom'; $('presetDesc').textContent = 'Your own combination of comb, box, table and tuning.'; } }); }
+}
 $('noise').addEventListener('input', (e) => engine.send({ type: 'noise', value: +e.target.value }));
 $('airBrake').addEventListener('input', (e) => { cfg.airBrake = +e.target.value; $('airBrakev').textContent = '×' + cfg.airBrake.toFixed(2); engine.send({ type: 'airBrake', value: cfg.airBrake }); });
 
@@ -566,6 +594,7 @@ function showPanel(name) {
   const tab = sub ? 'musicbox' : name;
   document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));
   document.querySelector('.subtabs').classList.toggle('hidden', tab !== 'musicbox');
+  document.querySelector('.presetRow').classList.toggle('hidden', tab !== 'musicbox');
   document.querySelectorAll('.subtabs button').forEach((x) => x.classList.toggle('on', x.dataset.sub === subTab));
   const panel = tab === 'musicbox' ? subTab : tab;
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('on', p.dataset.panel === panel));

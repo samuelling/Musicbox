@@ -53,6 +53,7 @@
       <div id="padLabel" class="padLabel">Circle clockwise<br>to crank</div>
     </div>
     <div id="navCtl" class="navCtl" aria-label="Move around the room">
+      <div class="navLabel">Movement controls:</div>
       <div class="zoomBtns"><button id="zoomIn" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zoomOut" aria-label="Zoom out" title="Zoom out (−)">−</button></div>
       <!-- desktop: keyboard keys you can also click; they light up as you press them -->
       <div class="keys">
@@ -158,6 +159,10 @@
     </section>
 
     <!-- TINES / COMB -->
+    <div class="presetRow hidden">
+      <label>Box type <select id="boxPreset"></select></label>
+      <p id="presetDesc" class="small"></p>
+    </div>
     <div class="subtabs hidden" role="tablist" aria-label="Music box">
       <button data-sub="comb" class="on">Tines</button><button data-sub="box">Box</button><button data-sub="physics">Physics</button>
     </div>

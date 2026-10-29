@@ -22,7 +22,10 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   for tempo. Her gait (walk, trot, half-bound), the forces from her paws, how
   far up the wheel she rides, her bouts and rests (she's nocturnal), heart rate and metabolic
   power are all simulated. Her pace is the tempo. "Watch her" zooms in; "Tap the cage" wakes her.
-* **Music Box** (Tines · Box · Physics) — **Tines**: 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
+* **Music Box** (Tines · Box · Physics) — start from a **box type**: keepsake 30-note, child's plastic
+  toy, wooden jewellery box, bare movement, pocket movement in your hand, Swiss 50-note cabinet, grand
+  72-note on a resonance box, a century-old antique (worn pins, A = 435) or a brass-comb vintage box —
+  then change anything. **Tines**: 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
   bass, or combs built to fit the tune (18 or 72 tines). Steel, brass, phosphor
   bronze, beryllium copper, titanium, aluminium or glass. Adjust the tine length (thickness follows to stay
   in tune), the thickness, the pin engagement, how worn the pins are, the comb tilt, A4 and how "aged"
