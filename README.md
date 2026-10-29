@@ -95,3 +95,5 @@ Vendored: three.js r170 (MIT) in `vendor/`, loaded through an import map.
 * **Compose in a scale** — the pin roll can be quantised to 24 scales (major/minor, modes,
   pentatonics and blues, Freygish and other Jewish and Middle Eastern modes, Japanese and
   symmetric scales) on any root; "Match tune's key" and "Snap notes to scale" help.
+
+- **Holiday tunes, dug deep:** 25 Christmas carols (from Adeste Fideles, Mendelssohn's Hark! and Holst's Cranham to the Coventry Carol, Arbeau's Ding Dong Merrily and the Wexford Carol), a new *World Carols* shelf (O Tannenbaum, Alle Jahre wieder, Leise rieselt der Schnee, Es wird scho glei dumpa, Still Still Still, Es ist ein Ros, In Dulci Jubilo, Il est né, Bring a Torch, Fum Fum Fum, Tu scendi dalle stelle, Jul jul strålande jul, the Huron Carol…), and Hanukkah's Ma'oz Tzur, Oy Khanike, I Have a Little Dreidel, S'vivon and Hanerot Halalu. Melodies are public domain, transcribed from flutetunes.com scores (melody only); the music box harmonises them itself.
