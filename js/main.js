@@ -224,6 +224,7 @@ function renderSongs() {
 function loadSong(compiled, id) {
   song = JSON.parse(JSON.stringify(compiled));
   songId = id;
+  $('tuneName').value = song.title || '';
   $('bpm').value = song.bpm; $('bars').value = Math.round(song.steps / ((song.meter[0] * 16) / song.meter[1]));
   $('meterSel').value = song.meter.join(',');
   requestBuild(0);
@@ -233,7 +234,7 @@ $('bars').addEventListener('change', (e) => { const bl = (song.meter[0] * 16) / 
 $('meterSel').addEventListener('change', (e) => { song.meter = e.target.value.split(',').map(Number); requestBuild(); });
 $('newTune').addEventListener('click', () => { loadSong({ id: 'new', title: 'Untitled tune', credit: 'Composed here', bpm: 100, meter: [4, 4], steps: 128, notes: [] }, 'new'); });
 $('saveTune').addEventListener('click', () => {
-  const title = prompt('Name this tune', song.title || 'My tune'); if (!title) return;
+  const title = ($('tuneName').value || song.title || 'My tune').trim();
   const id = 'mine-' + Date.now();
   const s = { ...song, id, title, credit: song.credit || 'My tune' };
   store.set([...store.get(), s]); songId = id; song = s; cat = 'My tunes'; renderCats(); renderSongs();
@@ -242,7 +243,7 @@ $('importMidi').addEventListener('click', () => $('midiFile').click());
 $('midiFile').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
   try { const s = parseMidi(await f.arrayBuffer(), f.name); loadSong(s, s.id); }
-  catch (err) { alert('Could not read that MIDI file: ' + err.message); }
+  catch (err) { $('arrInfo').textContent = '— could not read that MIDI file: ' + err.message; }
   e.target.value = '';
 });
 $('retune').addEventListener('click', () => requestBuild(0));
@@ -252,7 +253,7 @@ $('shareTune').addEventListener('click', async () => {
   const pack = { t: song.title, b: song.bpm, m: song.meter, s: song.steps, n: song.notes.map((n) => [n.step, n.midi, n.voice || 0]).flat(), c: cfg.comb };
   const url = location.href.split('#')[0] + '#tune=' + b64.enc(JSON.stringify(pack));
   history.replaceState(null, '', url);
-  try { await navigator.clipboard.writeText(url); $('arrInfo').textContent = 'Link copied'; } catch (e) { prompt('Copy this link', url); }
+  try { await navigator.clipboard.writeText(url); $('arrInfo').textContent = '— link copied'; } catch (e) { $('arrInfo').textContent = '— share link: ' + url; }
 });
 function fromHash() {
   const m = /#tune=([\w-]+)/.exec(location.hash); if (!m) return null;
