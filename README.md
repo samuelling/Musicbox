@@ -51,4 +51,4 @@ node tools/render-song.mjs brahms c30 classic oak living 30 out.wav spring
 `tools/render-song.mjs` runs the exact AudioWorklet code offline in Node, which is
 how the model was checked for stability and level.
 
-Vendored: three.js r170 (MIT) in `vendor/`.
+Vendored: three.js r170 (MIT) in `vendor/`, loaded through an import map.

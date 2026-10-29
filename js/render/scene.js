@@ -2,9 +2,9 @@
 // Units: millimetres. Box coords (x along comb, y toward the comb side, z up) -> three (x, z, y),
 // so the comb faces the camera and the pinned cylinder sits behind it. The mapping is a
 // reflection, so a box-frame counter-clockwise rotation (y->z) is a negative three.js X rotation.
-import * as THREE from '../../vendor/three.module.min.js';
-import { OrbitControls } from '../../vendor/OrbitControls.js';
-import { RoomEnvironment } from '../../vendor/RoomEnvironment.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TINE_MATERIALS, PLATE_MATERIALS, ENCLOSURES, SURFACES, PIN } from '../physics/constants.js';
 
 const MM = 1000;
