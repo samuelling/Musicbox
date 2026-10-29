@@ -555,9 +555,9 @@ window.addEventListener('keydown', (e) => {
   const t = e.target;
   if (ARROWS.has(e.code) && t && (t.tagName === 'SELECT' || t.type === 'range') && t.matches(':focus-visible')) return;
   if (WALK_KEYS.has(e.code)) { e.preventDefault(); walk.keys.add(e.code); lean = null; litKey(e.code, true); walkLoop(); return; }
-  // Q zooms out, E zooms in (hold to keep zooming), as do − and +
-  if (e.code === 'KeyQ' || e.code === 'Minus' || e.code === 'NumpadSubtract') { scene.dolly(1.12); litKey(e.code, true); return; }
-  if (e.code === 'KeyE' || e.code === 'Equal' || e.code === 'NumpadAdd') { scene.dolly(0.89); litKey(e.code, true); return; }
+  // Q zooms in, E zooms out (hold to keep zooming), as do + and −
+  if (e.code === 'KeyQ' || e.code === 'Equal' || e.code === 'NumpadAdd') { scene.dolly(0.89); litKey(e.code, true); return; }
+  if (e.code === 'KeyE' || e.code === 'Minus' || e.code === 'NumpadSubtract') { scene.dolly(1.12); litKey(e.code, true); return; }
   if (e.repeat) return;
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON') { e.preventDefault(); posture(+1); }
   else if (e.code === 'KeyC') posture(-1);
@@ -574,6 +574,7 @@ document.querySelectorAll('button[data-move]').forEach((b) => {
 $('standBtn').addEventListener('click', () => posture(+1));
 $('crouchBtn').addEventListener('click', () => posture(-1));
 $('zoomIn').addEventListener('click', () => scene.dolly(0.8));
+document.querySelectorAll('.keys [data-zoom]').forEach((b) => b.addEventListener('click', () => scene.dolly(b.dataset.zoom === 'in' ? 0.8 : 1.25)));
 $('zoomOut').addEventListener('click', () => scene.dolly(1.25));
 $('faceBtn').addEventListener('click', () => { map.faceBox = true; $('faceBox').checked = true; scene.lookPitch = null; map.emit(); });
 postureLabel();

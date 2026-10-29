@@ -174,6 +174,7 @@ a { color: var(--accent2); }
 .kc { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .krow { display: flex; gap: 3px; }
 .kc button { width: 32px; height: 30px; padding: 0; font: 600 13px/1 -apple-system, system-ui, sans-serif; border-radius: 6px; border-bottom-width: 3px; background: #241a12e6; }
+.kc button small { font-size: 9px; margin-left: 1px; opacity: .75; }
 .kc span, .padName { font-size: 10px; color: var(--dim); letter-spacing: .04em; text-transform: uppercase; }
 .dpad { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 34px); gap: 3px; }
 .dpad button { width: 34px; height: 34px; padding: 0; }
@@ -188,9 +189,11 @@ a { color: var(--accent2); }
 .lookPad .mid { font-size: 16px; }
 /* keyboard and mouse: keys, no pads */
 .walkPad, .lookPad { display: none; }
+.zoomBtns { display: none; }       /* desktop zooms with the Q and E keys beside W */
 @media (hover: none), (pointer: coarse) {
   .keys, .posture kbd, .navLabel, .zoomBtns kbd, .zoomName { display: none; }
   .walkPad { display: grid; }
+  .zoomBtns { display: flex; }
   .lookPad { display: grid; }
 }
 @media (max-width: 420px) { .dpad { grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 30px); } .dpad button, .zoomBtns button { width: 30px; height: 30px; } .posture button { min-width: 54px; padding: 5px 6px; } }
