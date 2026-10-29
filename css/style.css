@@ -180,6 +180,9 @@ a { color: var(--accent2); }
 .krow { display: flex; gap: 3px; }
 .kc button { width: 32px; height: 30px; padding: 0; font: 600 13px/1 -apple-system, system-ui, sans-serif; border-radius: 6px; border-bottom-width: 3px; background: #241a12e6; }
 .kc button small { font-size: 9px; margin-left: 1px; opacity: .75; }
+/* Q and E (zoom) are quieter keys, so the W A S D triangle still stands out */
+.kc button.zk { background: transparent; border-style: dashed; border-color: #5a463299; color: var(--dim); font-weight: 500; transform: scale(.88); }
+.kc button.zk.held, .kc button.zk:active { background: #3a2d22; color: var(--ink); border-style: solid; }
 .kc span, .padName { font-size: 10px; color: var(--dim); letter-spacing: .04em; text-transform: uppercase; }
 .dpad { display: grid; grid-template-columns: repeat(3, 34px); grid-template-rows: repeat(3, 34px); gap: 3px; }
 .dpad button { width: 34px; height: 34px; padding: 0; }

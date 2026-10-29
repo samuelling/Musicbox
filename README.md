@@ -43,7 +43,7 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   (a longcase clock with the real phase of the moon), a stone chapel (a great painted dial) or an
   anechoic chamber (a lab clock). Every clock shows the real time. Walk with W A S D or the on-screen
   keys on screen (or two thumb pads on a phone), turn with ← →, look up and down with ↑ ↓, stand (Space) or crouch (C),
-  zoom in with Q and out with E (or + −). The view is your own eyes by default (👁 toggles it); double-tap the box to lean over
+  zoom in with E and out with Q (or + −). The view is your own eyes by default (👁 toggles it); double-tap the box to lean over
   the table and look in, and again to sit back. Esc (or a tap on the room) hands the keys back from the menus.
   Sound is rendered binaurally with a structural HRTF (head, pinna, shoulder) on every path — choose in-ear (AirPods), over-ear or speakers, set your head and ear size, and turn your device to turn your head. Or drag your head on the room map; turn it with two fingers. Distance, direction,
   reflections, Doppler and head shadow are all simulated. The header shows the dB

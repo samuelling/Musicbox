@@ -555,9 +555,9 @@ window.addEventListener('keydown', (e) => {
   const t = e.target;
   if (ARROWS.has(e.code) && t && (t.tagName === 'SELECT' || t.type === 'range') && t.matches(':focus-visible')) return;
   if (WALK_KEYS.has(e.code)) { e.preventDefault(); walk.keys.add(e.code); lean = null; litKey(e.code, true); walkLoop(); return; }
-  // Q zooms in, E zooms out (hold to keep zooming), as do + and −
-  if (e.code === 'KeyQ' || e.code === 'Equal' || e.code === 'NumpadAdd') { scene.dolly(0.89); litKey(e.code, true); return; }
-  if (e.code === 'KeyE' || e.code === 'Minus' || e.code === 'NumpadSubtract') { scene.dolly(1.12); litKey(e.code, true); return; }
+  // E zooms in, Q zooms out (hold to keep zooming), as do + and −
+  if (e.code === 'KeyE' || e.code === 'Equal' || e.code === 'NumpadAdd') { scene.dolly(0.89); litKey(e.code, true); return; }
+  if (e.code === 'KeyQ' || e.code === 'Minus' || e.code === 'NumpadSubtract') { scene.dolly(1.12); litKey(e.code, true); return; }
   if (e.repeat) return;
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON') { e.preventDefault(); posture(+1); }
   else if (e.code === 'KeyC') posture(-1);
