@@ -266,7 +266,13 @@ function toast(text) {
 }
 $('hamTap').addEventListener('click', () => { ensureStarted(); tapCage(); });
 scene.onTapCage = () => { ensureStarted(); tapCage(); };
-$('hamVol').addEventListener('input', (e) => { cfg.ham.vol = +e.target.value; $('hamVolv').textContent = Math.round(cfg.ham.vol * 100) + '%'; engine.send({ type: 'hamster', vol: cfg.ham.vol }); });
+// wheel sound volume: one setting, shown both in the hamster panel and under Music Box → Cage
+function setHamVol(v) {
+  cfg.ham.vol = v; const pct = Math.round(v * 100) + '%';
+  for (const id of ['hamVol', 'hamVolCage']) { $(id).value = v; $(id + 'v').textContent = pct; }
+  engine.send({ type: 'hamster', vol: v });
+}
+for (const id of ['hamVol', 'hamVolCage']) $(id).addEventListener('input', (e) => setHamVol(+e.target.value));
 $('hamPlace').addEventListener('click', () => { ensureStarted(); if (life) life.placeInWheel(); });
 $('hamGear').addEventListener('input', (e) => {
   cfg.ham.gear = +e.target.value; $('hamGearv').textContent = '×' + cfg.ham.gear.toFixed(2); sendHam();
