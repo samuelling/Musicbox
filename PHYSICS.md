@@ -63,6 +63,14 @@ fundamental. That is part of why music-box bass sounds rounder.
 
 Combs with `grade > 0` thin the bass tines, $t \propto (f/f_{top})^{grade}$, which shortens them.
 
+**Tine length slider.** Because $f \propto t/L^2$, scaling every tine's length by k at
+constant pitch means scaling its thickness by k² (and the comb's maximum free length
+by k, so the lead-weighted bass stays lead-weighted). The consequences are physical:
+mass ∝ k³ and tip stiffness ∝ k³. Long tines store more energy per pluck (louder,
+longer ring; ×1.6 is about 15 dB louder), and short ones are quiet with brief treble.
+A maker fitting a heavier comb fits a stronger mainspring, so the spring torque scales
+with k³ too; otherwise a long comb stalls the motor on chords.
+
 **Inharmonicity is the sound.** The overtones at 6.27× and 17.5× are not harmonics.
 That metallic shimmer is the music box.
 

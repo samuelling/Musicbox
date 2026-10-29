@@ -15,8 +15,8 @@ build step). On a phone, draw circles on the round pad to crank it.
   fan governor keeps time, and the tune slows as the spring runs down.
 * **Tines** — 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
   bass, or combs built to fit the tune (18 or 72 tines). Steel, brass, phosphor
-  bronze, beryllium copper, titanium, aluminium or glass. Adjust the thickness, the
-  pin engagement, how worn the pins are, the comb tilt, A4 and how "aged"
+  bronze, beryllium copper, titanium, aluminium or glass. Adjust the tine length (thickness follows to stay
+  in tune), the thickness, the pin engagement, how worn the pins are, the comb tilt, A4 and how "aged"
   (detuned) the comb is. Tap any tine to see its mode shapes, overtone ratios and
   what makes it stop ringing.
 * **Box** — bare movement, plastic toy, walnut jewelry box, maple box with a spruce

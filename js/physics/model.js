@@ -43,7 +43,7 @@ function gauss(rnd) { return Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(
 export const DEFAULT_CONFIG = {
   sr: 48000, comb: 'c30', material: 'steel', enclosure: 'classic', surface: 'oak', room: 'living',
   lid: 'open', dampers: true, engage: PIN.engage, pinEdge: PIN.edge, tipAngle: PIN.tipAngle, combTilt: PIN.combTilt,
-  thickness: 1, a4: 440, detune: 0, quality: 'high', airBrake: 1, noise: 1, gain: 1,
+  thickness: 1, length: 1, a4: 440, detune: 0, quality: 'high', airBrake: 1, noise: 1, gain: 1,
 };
 
 // Geometry of tine tip and pins in the cylinder cross-section (y,z), cylinder axis at origin.
@@ -101,8 +101,10 @@ export function buildModel(cfgIn, combNotes, arrangement) {
     const f0 = midiToHz(midi, cfg.a4) * Math.pow(2, cents / 1200);
     const grade = Math.pow(f0 / fTopNote, comb.grade);
     const base = {
-      w: comb.w, t0: comb.t0 * grade * cfg.thickness, t1: comb.t1 * grade * cfg.thickness,
-      E: mat.E, rho: mat.rho, Lmax: comb.Lmax, nel: 14,
+      // Length scale k at constant pitch: f ∝ t/L², so L -> kL needs t -> k²t (and the
+      // comb's maximum free length scales with it, so lead-weighting is preserved).
+      w: comb.w, t0: comb.t0 * grade * cfg.thickness * cfg.length ** 2, t1: comb.t1 * grade * cfg.thickness * cfg.length ** 2,
+      E: mat.E, rho: mat.rho, Lmax: comb.Lmax * cfg.length, nel: 14,
     };
     const model = tunedTine(f0, base);
     const { integrals, mass } = modalIntegrals(model);
@@ -144,7 +146,10 @@ export function buildModel(cfgIn, combNotes, arrangement) {
   }
 
   // ---------- drive ----------
-  const drive = driveParams({ R, cylLen: combLen + 8e-3, Trev: arrangement.Trev, comb, airBrake: cfg.airBrake });
+  // A stiffer comb needs a stronger mainspring: pluck work ∝ tip stiffness ∝ length³ at
+  // constant lift (t ∝ L², k_tip ∝ t³/L³), so the maker fits a spring scaled to match.
+  const springScale = Math.pow(cfg.length, 3) * Math.pow(cfg.thickness, 1.5);
+  const drive = driveParams({ R, cylLen: combLen + 8e-3, Trev: arrangement.Trev, comb: { ...comb, springTorque: comb.springTorque * springScale }, airBrake: cfg.airBrake });
 
   // ---------- bedplate (comb bar + cylinder + cast bedplate as one rigid body) ----------
   const steel = 7850, zinc = 6700;

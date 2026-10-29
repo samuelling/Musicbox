@@ -175,6 +175,7 @@ const bindRange = (id, key, fmt, rebuild = true, scale = 1) => {
   el.value = cfg[key] / scale; show();
   el.addEventListener('input', () => { show(); cfg[key] = +el.value * scale; if (rebuild) requestBuild(350); });
 };
+bindRange('length', 'length', (v) => `×${v.toFixed(2)} (thickness ×${(v * v).toFixed(2)} to stay in tune)`);
 bindRange('thickness', 'thickness', (v) => '×' + v.toFixed(2));
 bindRange('engage', 'engage', (v) => v.toFixed(2) + ' mm', true, 1e-3);
 bindRange('pinEdge', 'pinEdge', (v) => v.toFixed(3) + ' mm', true, 1e-3);
