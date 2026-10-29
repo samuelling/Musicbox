@@ -703,6 +703,18 @@ document.addEventListener('pointerlockchange', () => {
   if (!on) { walk.keys.clear(); document.querySelectorAll('.navCtl [data-key].held').forEach((k) => k.classList.remove('held')); }
 });
 document.addEventListener('pointerlockerror', () => scene.onGrabFail());
+// fold the movement controls away (remembered)
+{
+  const setMini = (on) => {
+    $('navCtl').classList.toggle('mini', on); $('navMin').setAttribute('aria-expanded', String(!on));
+    $('navMin').textContent = on ? '👣 Move ▸' : '▾ hide';
+    $('navMin').title = on ? 'Show the movement controls' : 'Hide the movement controls (they still work)';
+    try { localStorage.setItem('frisky.navMini', on ? '1' : ''); } catch (e) { /* private mode */ }
+  };
+  let mini = false; try { mini = !!localStorage.getItem('frisky.navMini'); } catch (e) { /* private mode */ }
+  setMini(mini);
+  $('navMin').addEventListener('click', () => setMini(!$('navCtl').classList.contains('mini')));
+}
 $('standBtn').addEventListener('click', () => posture(+1));
 $('crouchBtn').addEventListener('click', () => posture(-1));
 $('zoomIn').addEventListener('click', () => scene.dolly(0.8));

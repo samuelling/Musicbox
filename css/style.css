@@ -284,3 +284,14 @@ body:not(.ham-tried) .modeSwitch button[data-mode="auto"]:not(.on)::after { cont
 .escBadge .sep { width: 1px; height: 18px; background: #5a4632; margin: 0 4px; }
 body.mouse-held .escBadge { opacity: 1; transform: translate(-50%, 0); animation: escPulse 1.4s ease-out 1; }
 @keyframes escPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent), 0 6px 22px #000a; } 100% { box-shadow: 0 0 0 18px transparent, 0 6px 22px #000a; } }
+
+/* the movement controls fold down to a small pill (the keys and the thumbstick still work; on a phone the stick
+   still appears under your thumb when you walk) */
+.navHead { display: flex; align-items: center; gap: 6px; }
+.navMin { font-size: 10px !important; padding: 3px 8px !important; border-radius: 8px !important; color: var(--dim) !important; background: #000a !important; border-color: #5a463288 !important; white-space: nowrap; }
+.navCtl.mini { flex-direction: column-reverse; }
+.navCtl.mini .navLabel { display: none; }
+.navCtl.mini .navRow { visibility: hidden; }
+.navCtl.mini .stick.held { visibility: visible; }
+.navCtl.mini .stick.held .padName { display: none; }
+.navCtl.mini .navMin { font-size: 12px !important; padding: 5px 10px !important; color: var(--ink) !important; border-color: #8a6a40 !important; }
