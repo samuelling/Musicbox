@@ -164,10 +164,8 @@ export const BOX_PRESETS = {
   keepsake: { name: 'Keepsake box — 30-note, maple & spruce', desc: 'The modern wooden gift box: a chromatic comb on a spruce soundboard.', set: { comb: 'c30', enclosure: 'classic', material: 'steel', surface: 'oak' } },
   toy:      { name: "Child's plastic toy — 15-note", desc: 'A ballerina box: a small diatonic comb in a thin ABS case, a little out of tune.', set: { comb: 'c15', enclosure: 'toy', material: 'steel', surface: 'oak', detune: 6, engage: 0.3e-3 } },
   jewelry:  { name: 'Wooden jewellery box — 18-note', desc: 'A small comb arranged for its one tune, in a walnut box.', set: { comb: 'c18t', enclosure: 'jewelry', material: 'steel', surface: 'oak' } },
-  bare:     { name: 'Bare 18-note movement on the table', desc: 'No box at all: the zinc bedplate, sitting on the table top.', set: { comb: 'c18t', enclosure: 'bare', material: 'steel', surface: 'oakHard' } },
-  pocket:   { name: 'Pocket movement, held in your hand', desc: 'A tiny movement cupped in your palm, right in front of you.', set: { comb: 'c15', enclosure: 'bare', material: 'steel', surface: 'hand' } },
   swiss:    { name: 'Swiss cylinder box — 50-note', desc: 'A 19th-century style rosewood cabinet with a lead-weighted bass.', set: { comb: 'c50', enclosure: 'swiss', material: 'steel', surface: 'oak' } },
-  grand:    { name: 'Grand Swiss — 72-note on a resonance box', desc: 'The big parlour instrument, standing on a spruce resonance box.', set: { comb: 'c72t', enclosure: 'swiss', material: 'steel', surface: 'resonator' } },
+  grand:    { name: 'Grand Swiss — 72-note', desc: 'The big parlour instrument: a 72-note comb in a long rosewood cabinet.', set: { comb: 'c72t', enclosure: 'swiss', material: 'steel', surface: 'oak' } },
   antique:  { name: 'Antique, a century on', desc: 'The Swiss box after a hundred years: worn pins, a slipped tuning, old pitch (A = 435).', set: { comb: 'c50', enclosure: 'swiss', material: 'steel', surface: 'oak', detune: 9, pinEdge: 0.09e-3, engage: 0.27e-3, a4: 435 } },
   brass:    { name: 'Brass-comb vintage box', desc: 'A softer, darker voice from a brass comb in a walnut box.', set: { comb: 'c30', enclosure: 'jewelry', material: 'brass', surface: 'oak' } },
 };

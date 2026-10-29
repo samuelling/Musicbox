@@ -26,15 +26,14 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   power are all simulated. His pace is the tempo. "Watch him" leans you in close; "Tap his cage" (or tap the glass) wakes him, and then he does as he likes:
   maybe the wheel, maybe a snack, maybe a pee in his toilet corner. He keeps a toilet corner away from his nest and food.
 * **Music Box** (Tines · Box · Physics) — start from a **box type**: keepsake 30-note, child's plastic
-  toy, wooden jewellery box, bare movement, pocket movement in your hand, Swiss 50-note cabinet, grand
-  72-note on a resonance box, a century-old antique (worn pins, A = 435) or a brass-comb vintage box —
+  toy, wooden jewellery box, Swiss 50-note cabinet, grand 72-note, a century-old antique (worn pins, A = 435) or a brass-comb vintage box —
   then change anything. **Tines**: 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
   bass, or combs built to fit the tune (18 or 72 tines). Steel, brass, phosphor
   bronze, beryllium copper, titanium, aluminium or glass. Adjust the tine length (thickness follows to stay
   in tune), the thickness, the pin engagement, how worn the pins are, the comb tilt, A4 and how "aged"
   (detuned) the comb is. Tap any tine to see its mode shapes, overtone ratios and
   what makes it stop ringing.
-* **Box** — lacquered woods with real grain, velvet lining and a mother-of-pearl inlaid lid. Bare movement, plastic toy, walnut jewelry box, maple box with a spruce
+* **Box** — lacquered woods with real grain, velvet lining and a mother-of-pearl inlaid lid. Plastic toy, walnut jewelry box, maple box with a spruce
   soundboard, or a Swiss rosewood cabinet. Lid open or closed. Set it on oak (with
   or without felt feet), glass, marble or a spruce resonance box, or hold it in
   your hand.

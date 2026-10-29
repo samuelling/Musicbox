@@ -596,7 +596,7 @@ function fillSelect(sel, obj, val) {
 fillSelect($('room'), ROOMS, cfg.room);
 fillSelect($('comb'), COMBS, cfg.comb);
 fillSelect($('material'), TINE_MATERIALS, cfg.material);
-fillSelect($('enclosure'), ENCLOSURES, cfg.enclosure);
+fillSelect($('enclosure'), Object.fromEntries(Object.entries(ENCLOSURES).filter(([k]) => k !== 'bare')), cfg.enclosure);
 fillSelect($('surface'), SURFACES, cfg.surface);
 const bindSel = (id, key, after) => $(id).addEventListener('change', (e) => { cfg[key] = e.target.value; after && after(); requestBuild(); });
 bindSel('room', 'room', () => { placeListenerNextBuild = true; });
