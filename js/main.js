@@ -81,19 +81,30 @@ const scene = new MusicBoxScene($('view'));
 scene.onPick = (i) => selectTine(i, true);
 
 // ------------------------------------------------------------------ audio start
-async function ensureStarted() {
-  if (started) { if (engine.ctx && engine.ctx.state !== 'running') engine.ctx.resume(); return; }
-  started = true;
-  $('startHint').classList.add('gone');
-  try {
-    await engine.start();
-  } catch (e) { console.error(e); $('startHint').textContent = 'Audio failed to start: ' + e.message; $('startHint').classList.remove('gone'); return; }
-  engine.onState = onState;
-  pushAll();
-  if (engine.sampleRate !== cfg.sr) { cfg.sr = engine.sampleRate; requestBuild(0); }
+// Audio start. iOS only allows audio from a *completed* tap (click / touchend), and
+// only for work done synchronously in that handler, so the unlock happens right there.
+let wired = false;
+function ensureStarted() {
+  const p = engine.unlock();
+  if (!wired) {
+    wired = true; started = true;
+    engine.onState = onState;
+    engine.onRunning = (on) => setOverlay(!on);
+    p.then(() => {
+      pushAll();
+      if (engine.sampleRate !== cfg.sr) { cfg.sr = engine.sampleRate; requestBuild(0); }
+    }).catch((e) => { console.error(e); $('playOverlay').querySelector('.playSub').textContent = 'Audio failed to start: ' + e.message; setOverlay(true); });
+  }
+  setOverlay(!engine.running);
 }
-document.addEventListener('pointerdown', () => ensureStarted(), { capture: true });
-
+function setOverlay(show) { $('playOverlay').classList.toggle('gone', !show); }
+$('playOverlay').addEventListener('click', (e) => {
+  e.stopPropagation(); ensureStarted(); setOverlay(false);
+  // if the browser still refused, bring the button back so the next tap can retry
+  setTimeout(() => setOverlay(!engine.running), 900);
+});
+// any later completed tap also revives audio that iOS suspended (screen lock, calls, other apps)
+for (const ev of ['click', 'touchend']) document.addEventListener(ev, () => { if (started && !engine.running) ensureStarted(); }, { capture: true });
 function pushAll() {
   engine.send({ type: 'mode', mode: cfg.mode });
   engine.send({ type: 'noise', value: +$('noise').value });
@@ -224,6 +235,7 @@ function renderSongs() {
 }
 function loadSong(compiled, id) {
   song = JSON.parse(JSON.stringify(compiled));
+  song.notes = song.notes.filter((n) => Number.isFinite(n.step) && Number.isFinite(n.midi)); // drop any corrupt saved notes
   songId = id;
   $('tuneName').value = song.title || '';
   $('bpm').value = song.bpm; $('bars').value = Math.round(song.steps / ((song.meter[0] * 16) / song.meter[1]));
@@ -268,7 +280,7 @@ function fromHash() {
 
 // ------------------------------------------------------------------ pin roll
 const roll = new PinRoll($('editor'), (step, combPitch) => {
-  if (!built) return;
+  if (!built || !Number.isFinite(step) || !Number.isFinite(combPitch)) return;
   const t = built.arrangement.transpose;
   const here = built.arrangement.placed.filter((p) => p.step === step && p.midi === combPitch);
   if (here.length) {

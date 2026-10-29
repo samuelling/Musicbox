@@ -19,7 +19,11 @@
 
   <section id="stage">
     <canvas id="view"></canvas>
-    <div id="startHint" class="hint">Tap the crank pad to start the sound</div>
+    <button id="playOverlay" class="playOverlay" aria-label="Tap to play">
+      <span class="playDisc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+      <span class="playText">Tap to play</span>
+      <span class="playSub">sound is computed live from the physics</span>
+    </button>
     <div class="modeSwitch">
       <button data-mode="crank" class="on">Hand crank</button>
       <button data-mode="spring">Wind-up</button>
@@ -83,7 +87,7 @@
         <button id="retune" title="Rebuild the comb so it matches this tune">Re-tune comb</button>
       </div>
       <div class="editorWrap"><canvas id="editor"></canvas></div>
-      <p class="small">Tap a cell to add or remove a pin. Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
+      <p class="small">Tap a cell to add or remove a pin; drag to scroll. Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
     </section>
 
     <!-- TINES / COMB -->

@@ -1,91 +1,143 @@
 // Pin-roll editor: rows are the comb's distinct pitches, columns are 16ths.
+// Tap a cell to add/remove a pin; drag to pan in both directions.
 import { noteName } from '../physics/constants.js';
+
+const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 export class PinRoll {
   constructor(canvas, onToggle) {
     this.cv = canvas; this.ctx = canvas.getContext('2d'); this.onToggle = onToggle;
-    this.rows = []; this.steps = 64; this.cell = 12; this.scroll = 0; this.placed = []; this.play = -1; this.meter = [4, 4];
-    this.drag = null; this.lastUser = 0;
-    canvas.addEventListener('pointerdown', (e) => { try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ } this.drag = { x: e.clientX, y: e.clientY, s: this.scroll, moved: false }; });
+    this.rows = []; this.steps = 64; this.placed = []; this.play = -1; this.meter = [4, 4];
+    this.sx = 0; this.sy = 0; this.dpr = Math.min(2, devicePixelRatio || 1);
+    this.drag = null; this.lastUser = 0; this.flash = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic pointer */ }
+      this.drag = { x: e.clientX, y: e.clientY, sx: this.sx, sy: this.sy, moved: false };
+    });
     canvas.addEventListener('pointermove', (e) => {
       if (!this.drag) return;
-      const dx = e.clientX - this.drag.x;
-      if (Math.abs(dx) > 6) this.drag.moved = true;
-      if (this.drag.moved) { this.scroll = Math.max(0, Math.min(this.maxScroll(), this.drag.s - dx * this.dpr)); this.lastUser = performance.now(); this.draw(); }
+      const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
+      if (Math.hypot(dx, dy) > (coarse ? 10 : 6)) this.drag.moved = true;
+      if (this.drag.moved) {
+        this.sx = this.clampX(this.drag.sx - dx * this.dpr);
+        this.sy = this.clampY(this.drag.sy - dy * this.dpr);
+        this.lastUser = performance.now(); this.draw();
+      }
     });
-    canvas.addEventListener('pointerup', (e) => {
-      if (this.drag && !this.drag.moved) this.tap(e);
-      this.drag = null;
-    });
-    canvas.addEventListener('wheel', (e) => { this.scroll = Math.max(0, Math.min(this.maxScroll(), this.scroll + (e.deltaX || e.deltaY))); this.lastUser = performance.now(); this.draw(); e.preventDefault(); }, { passive: false });
+    const end = (e) => { if (this.drag && !this.drag.moved && e.type === 'pointerup') this.tap(e); this.drag = null; };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('wheel', (e) => {
+      this.sx = this.clampX(this.sx + (e.shiftKey ? e.deltaY : e.deltaX) * this.dpr);
+      if (!e.shiftKey) this.sy = this.clampY(this.sy + e.deltaY * this.dpr);
+      this.lastUser = performance.now(); this.draw(); e.preventDefault();
+    }, { passive: false });
     this.resize(); window.addEventListener('resize', () => this.resize());
   }
+  // geometry, all in device pixels
+  get top() { return 16 * this.dpr; }
+  get lw() { return 44 * this.dpr; }
+  cellW() { return (coarse ? 22 : 14) * this.dpr; }
+  rowH() {
+    const fit = (this.cv.height - this.top) / Math.max(1, this.rows.length);
+    return Math.max((coarse ? 24 : 14) * this.dpr, fit);
+  }
+  maxX() { return Math.max(0, this.steps * this.cellW() - (this.cv.width - this.lw)); }
+  maxY() { return Math.max(0, this.rows.length * this.rowH() - (this.cv.height - this.top)); }
+  clampX(v) { return Number.isFinite(v) ? Math.max(0, Math.min(this.maxX(), v)) : 0; }
+  clampY(v) { return Number.isFinite(v) ? Math.max(0, Math.min(this.maxY(), v)) : 0; }
   resize() {
     const r = this.cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
-    if (!r.width) return;
-    this.cv.width = r.width * d; this.cv.height = r.height * d; this.dpr = d; this.draw();
+    if (!r.width || !r.height) return;          // hidden tab: keep the last good size
+    this.cv.width = Math.round(r.width * d); this.cv.height = Math.round(r.height * d); this.dpr = d;
+    this.sx = this.clampX(this.sx); this.sy = this.clampY(this.sy);
+    this.draw();
   }
-  labelW() { return 40 * this.dpr; }
-  rowH() { return Math.max(6 * this.dpr, (this.cv.height - 14 * this.dpr) / Math.max(1, this.rows.length)); }
-  maxScroll() { return Math.max(0, this.steps * this.cell * this.dpr - (this.cv.width - this.labelW())); }
   set(rows, steps, placed, meter) {
+    const firstRows = this.rows.length === 0;
     this.rows = rows; this.steps = steps; this.placed = placed; this.meter = meter;
-    this.cell = Math.max(8, Math.min(16, 900 / steps * 2));
-    this.scroll = Math.min(this.scroll, this.maxScroll()); this.draw();
+    this.sx = this.clampX(this.sx);
+    // start scrolled to the middle of the comb (where the melody usually lives)
+    this.sy = firstRows ? this.clampY(this.maxY() / 2) : this.clampY(this.sy);
+    this.draw();
   }
   setPlayhead(step) {
     this.play = step;
-    const x = step * this.cell * this.dpr;
-    const vis = this.cv.width - this.labelW();
-    if (performance.now() - this.lastUser > 2500 && (x < this.scroll || x > this.scroll + vis * 0.85)) this.scroll = Math.max(0, Math.min(this.maxScroll(), x - vis * 0.15));
+    const x = step * this.cellW(), vis = this.cv.width - this.lw;
+    if (performance.now() - this.lastUser > 2500 && (x < this.sx || x > this.sx + vis * 0.85)) this.sx = this.clampX(x - vis * 0.15);
     this.draw();
   }
-  tap(e) {
+  cellAt(e) {
     const r = this.cv.getBoundingClientRect();
     const px = (e.clientX - r.left) * this.dpr, py = (e.clientY - r.top) * this.dpr;
-    if (px < this.labelW() || py < 14 * this.dpr) return;
-    const step = Math.floor((px - this.labelW() + this.scroll) / (this.cell * this.dpr));
-    const row = Math.floor((py - 14 * this.dpr) / this.rowH());
-    if (row < 0 || row >= this.rows.length || step < 0 || step >= this.steps) return;
-    this.onToggle && this.onToggle(step, this.rows[row]);
+    if (px < this.lw || py < this.top) return null;
+    const step = Math.floor((px - this.lw + this.sx) / this.cellW());
+    const row = Math.floor((py - this.top + this.sy) / this.rowH());
+    if (!Number.isFinite(step) || !Number.isFinite(row) || row < 0 || row >= this.rows.length || step < 0 || step >= this.steps) return null;
+    return { step, row };
+  }
+  tap(e) {
+    const c = this.cellAt(e);
+    if (!c) return;
+    this.flash = { ...c, t: performance.now() };
+    this.onToggle && this.onToggle(c.step, this.rows[c.row]);
+    this.draw();
   }
   draw() {
     const c = this.ctx, W = this.cv.width, H = this.cv.height, d = this.dpr;
-    if (!W) return;
+    if (!W || !H) return;
     c.clearRect(0, 0, W, H);
-    const lw = this.labelW(), rh = this.rowH(), top = 14 * d, cw = this.cell * d;
+    const lw = this.lw, rh = this.rowH(), top = this.top, cw = this.cellW();
     const rowOf = new Map(this.rows.map((m, i) => [m, i]));
-    // rows
-    this.rows.forEach((m, i) => {
-      const y = top + i * rh;
-      const black = [1, 3, 6, 8, 10].includes(m % 12);
-      c.fillStyle = black ? '#120e0b' : '#1a1410'; c.fillRect(lw, y, W - lw, rh);
-      if (rh > 9 * d) { c.fillStyle = '#b5a58f'; c.font = `${Math.min(10 * d, rh * 0.8)}px ui-monospace, monospace`; c.fillText(noteName(m), 3 * d, y + rh * 0.78); }
-    });
-    // beat & bar lines
+    const r0 = Math.max(0, Math.floor(this.sy / rh)), r1 = Math.min(this.rows.length - 1, Math.ceil((this.sy + H - top) / rh));
+    const yOf = (i) => top + i * rh - this.sy;
+    c.save(); c.beginPath(); c.rect(lw, top, W - lw, H - top); c.clip();
+    for (let i = r0; i <= r1; i++) {
+      const black = [1, 3, 6, 8, 10].includes(((this.rows[i] % 12) + 12) % 12);
+      c.fillStyle = black ? '#120e0b' : '#1a1410'; c.fillRect(lw, yOf(i), W - lw, rh);
+      c.fillStyle = '#ffffff08'; c.fillRect(lw, yOf(i) + rh - 1, W - lw, 1);
+    }
     const barLen = (this.meter[0] * 16) / this.meter[1], beat = 16 / this.meter[1];
-    const s0 = Math.floor(this.scroll / cw), s1 = Math.min(this.steps, Math.ceil((this.scroll + W - lw) / cw) + 1);
+    const s0 = Math.max(0, Math.floor(this.sx / cw)), s1 = Math.min(this.steps, Math.ceil((this.sx + W - lw) / cw) + 1);
     for (let s = s0; s <= s1; s++) {
-      const x = lw + s * cw - this.scroll;
-      if (s % barLen === 0) { c.strokeStyle = '#e3b45a66'; c.lineWidth = 1.5 * d; c.fillStyle = '#e3b45a'; c.font = `${9 * d}px sans-serif`; c.fillText(String(s / barLen + 1), x + 2 * d, 10 * d); }
-      else if (s % beat === 0) { c.strokeStyle = '#ffffff1c'; c.lineWidth = 1; }
-      else continue;
+      const x = lw + s * cw - this.sx;
+      if (s % barLen === 0) { c.strokeStyle = '#e3b45a66'; c.lineWidth = 1.5 * d; }
+      else if (s % beat === 0) { c.strokeStyle = '#ffffff22'; c.lineWidth = 1; }
+      else { c.strokeStyle = '#ffffff0a'; c.lineWidth = 1; }
       c.beginPath(); c.moveTo(x, top); c.lineTo(x, H); c.stroke();
     }
-    // pins
     for (const p of this.placed) {
       if (p.step < s0 - 1 || p.step > s1) continue;
-      const r = rowOf.get(p.midi); if (r === undefined) continue;
-      const x = lw + p.step * cw - this.scroll, y = top + r * rh;
+      const r = rowOf.get(p.midi); if (r === undefined || r < r0 - 1 || r > r1 + 1) continue;
+      const x = lw + p.step * cw - this.sx, y = yOf(r);
       c.fillStyle = p.how === 'sub' ? '#d9705a' : p.voice === 0 ? '#e3b45a' : '#8fc1d9';
-      c.fillRect(x + 1, y + 1, Math.max(2, cw - 2), Math.max(2, rh - 2));
+      const pad = Math.min(3 * d, cw * 0.15);
+      c.beginPath(); c.roundRect ? c.roundRect(x + pad, y + pad, cw - 2 * pad, rh - 2 * pad, 3 * d) : c.rect(x + pad, y + pad, cw - 2 * pad, rh - 2 * pad); c.fill();
     }
-    // playhead
+    if (this.flash && performance.now() - this.flash.t < 300) {
+      const x = lw + this.flash.step * cw - this.sx, y = yOf(this.flash.row);
+      c.strokeStyle = '#ffffffaa'; c.lineWidth = 2 * d; c.strokeRect(x + 1, y + 1, cw - 2, rh - 2);
+      setTimeout(() => this.draw(), 320);
+    }
     if (this.play >= 0) {
-      const x = lw + this.play * cw - this.scroll;
+      const x = lw + this.play * cw - this.sx;
       c.strokeStyle = '#ffffffcc'; c.lineWidth = 1.5 * d; c.beginPath(); c.moveTo(x, top); c.lineTo(x, H); c.stroke();
     }
-    c.fillStyle = '#0d0a08'; c.fillRect(0, 0, lw, H);
-    this.rows.forEach((m, i) => { const y = top + i * rh; if (rh > 9 * d) { c.fillStyle = '#b5a58f'; c.font = `${Math.min(10 * d, rh * 0.8)}px ui-monospace, monospace`; c.fillText(noteName(m), 3 * d, y + rh * 0.78); } });
+    c.restore();
+    // header: bar numbers
+    c.fillStyle = '#0d0a08'; c.fillRect(0, 0, W, top);
+    c.fillStyle = '#e3b45a'; c.font = `${10 * d}px sans-serif`;
+    for (let s = Math.ceil(s0 / barLen) * barLen; s <= s1; s += barLen) { const x = lw + s * cw - this.sx; if (x >= lw) c.fillText(String(s / barLen + 1), x + 3 * d, 12 * d); }
+    // note-name gutter
+    c.fillStyle = '#0d0a08'; c.fillRect(0, top, lw, H - top);
+    c.save(); c.beginPath(); c.rect(0, top, lw, H - top); c.clip();
+    c.font = `${Math.min(11 * d, rh * 0.6)}px ui-monospace, monospace`;
+    for (let i = r0; i <= r1; i++) { c.fillStyle = '#b5a58f'; c.fillText(noteName(this.rows[i]), 4 * d, yOf(i) + rh * 0.68); }
+    c.restore();
+    // scroll hints
+    if (this.maxY() > 0) {
+      const frac = this.sy / this.maxY(), hgt = Math.max(20 * d, (H - top) * (H - top) / (this.rows.length * rh));
+      c.fillStyle = '#ffffff30'; c.fillRect(W - 4 * d, top + frac * (H - top - hgt), 3 * d, hgt);
+    }
   }
 }

@@ -32,7 +32,7 @@ export function chooseTranspose(song, combNotes) {
       else if (mapPitch(m, set, lo, hi)) sc += w * FOLD_SCORE;
       else sc += w * (Math.abs(nearest(combNotes, m) - m) <= 1 ? SUB_SCORE : 0);
     }
-    sc -= Math.abs(t) * 0.002 * song.notes.length; // mild preference for small shifts
+    sc -= Math.abs(t) * 0.002 * Math.max(1, song.notes.length); // mild preference for small shifts (and none for an empty tune)
     if (sc > best.score) best = { t, score: sc };
   }
   return best.t;
