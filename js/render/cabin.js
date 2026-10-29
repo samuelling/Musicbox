@@ -2,6 +2,7 @@
 // a frosted window onto a moonlit, snowy valley with snow falling.  Built in "room space":
 // millimetres with x = room x, y = height, z = room y (so it lines up with the acoustic room).
 import * as THREE from 'three';
+import { lockedDoor, mountDoor } from './doors.js';
 import { woodMaterial } from './materials.js';
 import { regulator, wallMount } from './clocks.js';
 
@@ -444,6 +445,8 @@ export class Cabin {
       back.position.set(alongX ? x : x + (x < RX / 2 ? -190 : 190), 690, alongX ? z + (z < RY / 2 ? -190 : 190) : z); back.rotation[alongX ? 'x' : 'z'] = (alongX ? (z < RY / 2 ? -1 : 1) : (x < RX / 2 ? 1 : -1)) * 0.12; g.add(back);
     };
     bench(2200, RX - 1100, RY - 210, true); bench(1900, RX - 210, RY - 420 - 950, false);
+    // the door, barred with a beam
+    mountDoor(g, RX, RY, lockedDoor('cabin'), 'x1', 1150);
     const woodM = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.95 }), endM = new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.9 });
     for (let row = 0; row < 5; row++) for (let k = 0; k < 6 - (row % 2); k++) {
       const rr = R(55, 70), lg = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, 420, 9), [woodM, endM, endM]);

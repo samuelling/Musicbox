@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { woodMaterial } from './materials.js';
 import { Cabin, valleyTexture, flakeTexture, stoneTexture } from './cabin.js';
 import { cuckoo, mantel, longcase, chapelDial, labClock, wallMount } from './clocks.js';
+import { lockedDoor, mountDoor, sealedHatch } from './doors.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
@@ -181,6 +182,8 @@ class Nursery extends Room {
     this.rockingHorse(700, 600);
     // the cuckoo clock above the crib
     this.clock(cuckoo(), 'y1', RX - 750, 1900);
+    // the door, chained, bolted and a chair wedged under the knob
+    mountDoor(this.group, RX, RY, lockedDoor('nursery'), 'x1', 850);
   }
   rockingHorse(x, z) {
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = 0.6; this.group.add(g);
@@ -231,6 +234,8 @@ class Living extends Room {
     pic.position.set(1000, 1650, RY - 30); pic.rotation.y = Math.PI; this.group.add(pic);
     const gilt = new THREE.MeshStandardMaterial({ color: 0xb08a3a, metalness: 0.9, roughness: 0.35 });
     for (const [w, h, x, y] of [[800, 50, 1000, 1945], [800, 50, 1000, 1355], [50, 640, 620, 1650], [50, 640, 1380, 1650]]) this.box(w, h, 40, x, y, RY - 22, gilt);
+    // the door beside the bookcase: chained, double-deadbolted and bolted at the top
+    mountDoor(this.group, RX, RY, lockedDoor('living'), 'x0', RY - 850);
     // a soft rug in front of the sofa
     const rug = this.mesh(new THREE.PlaneGeometry(1400, 2000), new THREE.MeshStandardMaterial({ color: 0x8a6448, roughness: 1 }), RX - 1500, 4, 2000, false); rug.rotation.x = -Math.PI / 2;
   }
@@ -283,6 +288,8 @@ class Parlor extends Room {
     this.box(420, 2500, 3600, RX - 210, 1250, 2600, walnut);
     const cols = [0x5a1a14, 0x1e2a44, 0x2a442a, 0x6a4a22, 0x3a1a3a, 0x141414];
     for (let sh = 0; sh < 6; sh++) { let z = 900; while (z < 4320) { const bw = R(35, 70), bh = R(260, 360); this.box(300, bh, bw, RX - 240, 140 + sh * 400 + bh / 2, z + bw / 2, new THREE.MeshStandardMaterial({ color: cols[Math.floor(R(0, cols.length))], roughness: 0.75 })).castShadow = false; z += bw + 2; } }
+    // the door, bolted top and bottom, the key turned and left in the lock
+    mountDoor(this.group, RX, RY, lockedDoor('parlor'), 'x0', 1000);
     // the longcase clock against the back wall, right of the window
     const lc = longcase(); lc.g.position.set(5400, 0, -(RY - 20)); const um = new THREE.Group(); um.scale.z = -1; um.add(lc.g); this.group.add(um); this.clocks.push(lc);
   }
@@ -340,6 +347,8 @@ class Chapel extends Room {
     // roof: dark timber trusses
     const truss = new THREE.MeshStandardMaterial({ color: 0x2a1c12, roughness: 0.85 });
     for (let x = 1500; x < RX; x += 3000) { this.box(300, 300, RY, x, RZ - 150, RY / 2, truss); this.box(200, 1600, 200, x, RZ - 800, RY / 2, truss); }
+    // the great west doors, barred and chained
+    mountDoor(this.group, RX, RY, lockedDoor('chapel'), 'x0', RY / 2);
     // the great clock high on the north wall, over the box
     this.clock(chapelDial(), 'y1', bx, 5600);
   }
@@ -376,8 +385,8 @@ class Anechoic extends Room {
     const wire = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 1, roughness: 0.4 });
     for (let x = 0; x <= RX; x += 60) this.box(4, 4, RY, x, 0, RY / 2, wire).castShadow = false;
     for (let y = 0; y <= RY; y += 60) this.box(RX, 4, 4, RX / 2, 0, y, wire).castShadow = false;
-    // a door, the work light and a measuring microphone on a boom
-    this.box(1100, 2100, 60, 600, 1050, -30, new THREE.MeshStandardMaterial({ color: 0x5a6068, metalness: 0.5, roughness: 0.5 }));
+    // no door: a ladder up to a sealed hatch in the ceiling; the work light and a measuring microphone on a boom
+    this.group.add(sealedHatch(900, RZ));
     this.mesh(new THREE.CylinderGeometry(140, 180, 90, 20), new THREE.MeshStandardMaterial({ color: 0xf4f6ff, emissive: 0xdde6ff, emissiveIntensity: 0.6 }), RX / 2, RZ - 45, RY / 2, false);
     this.lamp(RX / 2, RZ - 200, RY / 2, 0xe8eeff, 2.2e6);
     const bx = box ? box[0] * 1000 : RX / 2, by = box ? box[1] * 1000 : RY / 2;
