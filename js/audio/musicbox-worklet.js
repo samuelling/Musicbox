@@ -60,7 +60,10 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
       case 'patch': this.load(m.patch); break;
       case 'pins': if (this.p) { this.p.tines.pins = m.pins; this.initPointers(); } break;
       case 'listener': Object.assign(this.listener, m.listener); this.listenerDirty = true; break;
-      case 'mode': d.mode = m.mode; break;
+      case 'mode':
+        // hooking the belt up: seat it with no stretch where the wheel and crank are now
+        if (m.mode === 'auto' && d.mode !== 'auto' && this.p && this.ham.belt) { const H = this.ham; H.belt.off = (H.rw * H.thw) / H.rc - this.p.drive.G_crank * d.theta; H.belt.x = 0; }
+        d.mode = m.mode; break;
       case 'hand':
         d.handFrom = d.hand; d.handTo = m.angle; d.handRamp = 0; d.handActive = m.active;
         if (m.reset) { d.hand = d.handFrom = d.handTo = d.handPrev = m.angle; d.offset = 0; }
@@ -74,6 +77,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
       case 'hamster':
         if (m.opts) { this.ham.set(m.opts); if (this.p) this.setupBelt(); }
         if (m.hour !== undefined) this.hamHour = m.hour;
+        if (m.inWheel !== undefined) this.ham.setInWheel(m.inWheel);
         if (m.wake) this.ham.wake();
         break;
       case 'seek': d.theta = m.theta; d.thetaMod = ((m.theta % TWO_PI) + TWO_PI) % TWO_PI; this.initPointers(); break;
@@ -83,6 +87,16 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
   // ------------------------------------------------------------------ setup
   load(p) {
     const keepTheta = this.p ? this.drv.thetaMod : 0;
+    // A new tune brings a new cylinder speed and new gear ratios. Carry the drive over in
+    // proportion (same tempo fraction), and re-seat the hand, crank and belt couplings at zero
+    // stretch, so nothing has to race to catch up (that race was the "speed-run" on tune changes).
+    const old = this.p ? this.p.drive : null, d = this.drv;
+    if (old) {
+      d.omega *= p.drive.omegaNom / old.omegaNom;
+      d.offset = d.theta - d.hand / p.drive.G_crank;
+      if (this.ham.belt) { this.ham.belt.off = (this.ham.rw * this.ham.thw) / this.ham.rc - p.drive.G_crank * d.theta; this.ham.belt.x = 0; }
+      d.turns = Math.min(d.turns, p.drive.turnsMax);
+    }
     this.p = p;
     const t = p.tines;
     const total = t.A11.length;
@@ -119,7 +133,10 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
   // belt between the hamster wheel's hub pulley and a pulley on the crank shaft
   setupBelt() {
     const P = this.p.drive, H = this.ham;
+    const B0 = H.belt;
     H.setDrive(P.G_crank, P.omegaNom);
+    // keep the belt where it was, re-seated with no stretch for the new pulleys
+    H.belt.off = (H.rw * H.thw) / H.rc - P.G_crank * this.drv.theta;
     const mEff = P.Icrank / (P.G_crank * P.G_crank * H.rc * H.rc);   // crank train seen at the belt
     this.beltC = 2 * 0.12 * Math.sqrt(H.kb * mEff);                 // rubber: ζ ≈ 0.12
   }
@@ -314,6 +331,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
 
   stepDrive() {
     const d = this.drv, P = this.p.drive, dt = this.dt;
+    if (d.mode !== 'auto') this.ham.step(0);   // her wheel turns on its own when it is not belted to the box
     let tau, I;
     const sgn = d.omega > 1e-9 ? 1 : 0;
     const noise = this.noiseLevel;
@@ -716,10 +734,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const d = this.drv, dp = p.drive;
     const fanNom = dp.G_fan * dp.omegaNom;
     const auto = d.mode === 'auto', ham = this.ham;
-    if (auto) {
-      const now = new Date();
-      ham.behave(n * dt, this.hamHour ?? (now.getHours() + now.getMinutes() / 60));
-    }
+    ham.behave(n * dt, this.hamHour ?? 22);      // it is night in the cabin
     const gain = 4.0 * this.userGain * (p.gain || 1);
     const lidA = this.lidA, leak = p.lid.leak;
     const tableUnb = p.table && p.table.unbaffled;
@@ -737,7 +752,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         const y = 2 * rr * Math.cos(w) * ps[0] - rr * rr * ps[1];
         ps[1] = ps[0]; ps[0] = y; Fm += y * 0.3;
       }
-      const busy = this.activeTines || Fm !== 0 || (d.mode === 'spring' && d.omega > 0) || (d.mode !== 'spring' && d.omega > 1e-4) || (auto && (ham.f > 0 || Math.abs(ham.ww) > 2e-3));
+      const busy = this.activeTines || Fm !== 0 || (d.mode === 'spring' && d.omega > 0) || (d.mode !== 'spring' && d.omega > 1e-4) || (ham.f > 0 || Math.abs(ham.ww) > 2e-3);
       if (busy && !this.structAwake) { this.structAwake = true; }
       if (busy) this.renderLeft = this.renderTail;
       if (!this.structAwake) {
@@ -779,7 +794,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
           ty = leak * ty + (1 - leak) * z[0]; tz = leak * tz + (1 - leak) * z[1]; fan = leak * fan + (1 - leak) * z[2];
         }
         Dy += ty; Dz += tz; Mdot += fan;
-        if (auto) Mdot += ham.sound(noise);   // the wheel: paws, rungs, axle (radiated from beside the box)
+        Mdot += ham.sound(noise);   // the wheel: paws, rungs, axle (radiated from beside the box)
         const pd = this.prevDdot;
         const Ddx = (Dx - pd[0]) * sr, Ddy = (Dy - pd[1]) * sr, Ddz = (Dz - pd[2]) * sr;
         pd[0] = Dx; pd[1] = Dy; pd[2] = Dz;
@@ -863,7 +878,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         fanRpm: (dp.G_fan * d.omega * 60) / TWO_PI, crank: d.theta * dp.G_crank, brake: d.brake,
         amp: this.amp.slice(), defl: this.defl.slice(), splL, splR, contacts, awake,
         torque: d.tauContact, srcPos: this.srcPos,
-        ham: auto ? ham.report() : null,
+        ham: ham.report(), hooked: auto,
       });
       this.amp.fill(0);
     }

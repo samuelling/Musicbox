@@ -312,32 +312,35 @@ export class HamsterModel {
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
   }
 
-  // st: hamster report (extrapolated), Rin: tread radius (mm) for foot placement
-  update(dt, st, Rin) {
+  // st: gait/behaviour (wheel physics report, or her life in the cage); Rin: radius of the ground
+  // under her (the wheel's tread, or effectively flat); pose: what she is doing with her body
+  update(dt, st, Rin, pose = {}) {
     this.t += dt;
     const t = this.t, s = this.scale;
     const running = st && st.f > 0 && Math.abs(st.v) > 0.04;
     const groundY = (x) => { const X = x * s; return (Rin - Math.sqrt(Math.max(1, Rin * Rin - X * X))) / s; };
-    // ---- body motion ----
+    // ---- body ----
     let bob = 0, pitch = 0, flex = 0;
     const ph = st ? st.phase : 0;
+    const groom = pose.groom || (st && st.act === 'groom' && !running);
     if (running) {
       const v = Math.abs(st.v), k = Math.min(1, v / 0.6);
       if (st.gait === 'bound') { pitch = 0.1 * Math.sin(2 * Math.PI * ph); flex = 0.07 * Math.sin(2 * Math.PI * ph + 0.6); bob = 3.2 * Math.max(0, Math.sin(2 * Math.PI * ph + 1.2)); }
       else if (st.gait === 'trot') { bob = 1.6 * k * Math.abs(Math.sin(2 * Math.PI * ph)); pitch = 0.025 * Math.sin(4 * Math.PI * ph); }
-      else { bob = 0.8 * Math.sin(4 * Math.PI * ph); }
-      this.body.position.y = bob - 4 * k;            // runs low and long
-      this.pose.rear += (0 - this.pose.rear) * Math.min(1, dt * 6);
-    } else {
-      const groom = st && st.act === 'groom';
-      this.pose.rear += ((groom ? 0.42 : 0) - this.pose.rear) * Math.min(1, dt * 3);
-      this.body.position.y = 0;
-    }
+      else bob = 0.8 * Math.sin(4 * Math.PI * ph);
+      this.body.position.y = bob - 4 * k;
+    } else this.body.position.y = pose.curl ? -5 : 0;
+    const rearT = running ? 0 : (pose.rear ?? (groom ? 0.42 : 0));
+    this.pose.rear += (rearT - this.pose.rear) * Math.min(1, dt * 4);
+    this.pose.curl = (this.pose.curl || 0) + ((pose.curl ? 1 : 0) - (this.pose.curl || 0)) * Math.min(1, dt * 2);
+    const curl = this.pose.curl, stretch = pose.stretch || 0;
     const breath = Math.sin(2 * Math.PI * ((st ? st.br : 70) / 60) * t);
-    this.spine.rotation.z = pitch + this.pose.rear;
-    this.torso.scale.set(1 + flex - (running ? 0 : 0.03), 1 - flex * 0.6 + 0.012 * breath + (running ? -0.04 : 0.03), 1 + 0.015 * breath);
+    this.spine.rotation.z = pitch + this.pose.rear + (pose.dig ? -0.12 : 0) - 0.12 * curl;
+    this.torso.scale.set(1 + flex - (running ? 0 : 0.03) - 0.16 * curl + 0.12 * stretch,
+      1 - flex * 0.6 + 0.012 * breath * (1 + curl) + (running ? -0.04 : 0.03) + 0.06 * curl - 0.06 * stretch,
+      1 + 0.015 * breath + 0.06 * curl);
 
-    // ---- head: gaze stabilised against body pitch; looking around and grooming when resting ----
+    // ---- head ----
     this.nextLook -= dt;
     if (this.nextLook <= 0) {
       this.nextLook = running ? 0.6 + Math.random() * 1.2 : 0.8 + Math.random() * 2.5;
@@ -345,52 +348,64 @@ export class HamsterModel {
     }
     this.look.lerp(this.lookT, Math.min(1, dt * 5));
     let hp = -pitch * 0.85 - this.pose.rear * 0.5 + this.look.y, hy = this.look.x;
-    const grooming = !running && st && st.act === 'groom';
-    if (grooming) { hp = -0.55 + 0.08 * Math.sin(t * 9); hy = 0.1 * Math.sin(t * 2.3); }
+    if (groom) { hp = -0.55 + 0.08 * Math.sin(t * 9); hy = 0.1 * Math.sin(t * 2.3); }
+    if (pose.eat) { hp = -0.15 + 0.06 * Math.sin(t * 2 * Math.PI * 5); hy = 0; }          // chewing
+    if (pose.peck) { hp = -0.45 + 0.3 * Math.max(0, Math.sin(t * 2 * Math.PI * 1.6)); hy = 0.15 * Math.sin(t * 1.3); }
+    if (pose.drink) { hp = 0.35 + 0.04 * Math.sin(t * 2 * Math.PI * 6); hy = 0; }        // lapping at the spout
+    if (pose.sniff) { hp = 0.25 + this.look.y * 0.5; }
+    if (pose.dig) { hp = -0.35 + 0.05 * Math.sin(t * 30); }
+    if (pose.empty) { hp = -0.2; }
+    if (stretch) hp = 0.25 * stretch;
+    hp = hp * (1 - curl) - 0.75 * curl; hy *= 1 - curl;
     this.head.rotation.set(0, hy, hp);
-    // whisking (5–12 Hz when exploring), blinking, ear twitches
-    const whisk = (!running && st && st.act === 'look') ? 0.22 * Math.sin(2 * Math.PI * 8 * t) : running ? 0.06 * Math.sin(2 * Math.PI * 6 * t) : 0.03 * Math.sin(t * 3);
-    this.whiskerPivot.rotation.y = whisk;
+    const pch = pose.pouch || 0;
+    this.head.scale.set(1.14, 1.14 * (1 + 0.07 * pch), 1.14 * (1 + 0.32 * pch));   // cheek pouches swell out to the shoulders
+    const whisk = (pose.sniff || (!running && st && st.act === 'look')) ? 0.22 * Math.sin(2 * Math.PI * 8 * t) : running ? 0.06 * Math.sin(2 * Math.PI * 6 * t) : 0.03 * Math.sin(t * 3);
+    this.whiskerPivot.rotation.y = whisk * (1 - curl);
     this.nextBlink -= dt;
     if (this.nextBlink <= 0) { this.blink = 0.14; this.nextBlink = 1.5 + Math.random() * 5; }
     this.blink = Math.max(0, this.blink - dt);
-    const lid = this.blink > 0 ? Math.max(0.12, Math.abs(this.blink - 0.07) / 0.07) : 1;
+    let lid = this.blink > 0 ? Math.max(0.12, Math.abs(this.blink - 0.07) / 0.07) : 1;
+    lid = Math.min(lid, 1 - 0.88 * curl);                                              // asleep: eyes shut
     for (const e of this.eyes) e.scale.set(1, lid, 1);
     for (let i = 0; i < 2; i++) {
       if (Math.random() < dt * 0.25) this.earTw[i] = 0.25;
       this.earTw[i] = Math.max(0, this.earTw[i] - dt);
-      this.ears[i].rotation.x = (i ? -1 : 1) * 0.35 * Math.sin(this.earTw[i] * 40) * (this.earTw[i] > 0 ? 1 : 0) + (running ? (i ? 0.25 : -0.25) : 0);
+      this.ears[i].rotation.x = (i ? -1 : 1) * (0.35 * Math.sin(this.earTw[i] * 40) * (this.earTw[i] > 0 ? 1 : 0) + (running ? -0.25 : 0) - 0.5 * curl);
     }
 
     // ---- limbs ----
     const off = GAITS[(st && st.gait) || 'walk'], D = st ? st.D : 0.7;
     const stride = running ? Math.min(75, (Math.abs(st.v) / Math.max(0.5, st.f)) * 1000) / s : 0;
-    const rearPose = this.pose.rear;
+    const handsUp = !running && (groom || pose.eat || pose.empty || pose.sniff) && this.pose.rear > 0.1;
     for (let k = 0; k < 4; k++) {
-      const L = this.limbs[k];
-      const hip = L.hipV;
-      let fx, fy, pawPitch = 0;
+      const L = this.limbs[k], hip = L.hipV;
+      let fx, fy, pawPitch = 0, bodySpace = true;
       const neutral = hip.x + (L.fore ? 6 : 2);
-      if (running) {
+      if (pose.dangle) { fx = hip.x + 4; fy = hip.y - L.L1 - L.L2 + 6; pawPitch = -0.9; bodySpace = false; }
+      else if (running) {
         let u = ph - off[k]; u -= Math.floor(u);
         const reach = stride * D;
         if (u < D) { const a = u / D; fx = neutral + reach * (0.5 - a); fy = 0; pawPitch = L.fore ? 0 : -0.15 * a; }
         else { const a = (u - D) / (1 - D); fx = neutral + reach * (-0.5 + a); fy = (L.fore ? 7 : 9) * Math.sin(Math.PI * a); pawPitch = L.fore ? -0.9 * Math.sin(Math.PI * a) : -0.7 * Math.sin(Math.PI * a); }
-      } else if (L.fore && rearPose > 0.1) {
-        // sitting up to wash: forepaws to the muzzle, rubbing
-        fx = 36 + 2 * Math.sin(t * 8 + k); fy = 34 + 3 * Math.cos(t * 8 + k * 1.3); pawPitch = -1.2;
-      } else { fx = neutral; fy = 0; }
-      // feet live on the curved tread, in body coordinates (undo the spine rotation for planted feet)
-      const target = new THREE.Vector3(fx, fy + groundY(fx) - this.body.position.y / s, L.hip[2]);
-      if (!(L.fore && rearPose > 0.1)) {
-        // planted/swinging feet are given in body space; express them in torso space
+      } else if (L.fore && handsUp) {
+        // forepaws up to the muzzle: washing, nibbling a seed, pushing food out of the pouches, or held to the chest when sniffing
+        const sp = pose.sniff ? 0.3 : pose.eat ? 2.5 : 8;
+        fx = (pose.sniff ? 26 : 36) + 2 * Math.sin(t * sp + k); fy = (pose.sniff ? 26 : 34) + 3 * Math.cos(t * sp + k * 1.3); pawPitch = -1.2; bodySpace = false;
+      } else if (L.fore && pose.dig) { const a = t * 2 * Math.PI * 7 + k * Math.PI; fx = neutral + 9 * Math.sin(a); fy = 3 * Math.max(0, Math.cos(a)); pawPitch = -0.6; }
+      else if (L.fore && pose.drink) { fx = neutral + 14; fy = 22; pawPitch = -0.8; }
+      else if (curl) { fx = neutral * (1 - 0.3 * curl) + (L.fore ? -6 : 8) * curl; fy = 0; }
+      else { fx = neutral; fy = 0; }
+      const target = new THREE.Vector3(fx, fy, L.hip[2]);
+      if (bodySpace) {
+        target.y += groundY(fx) - this.body.position.y / s;
+        // planted feet are in body space; express them in torso space
         const pv = this.spine.position, a = this.spine.rotation.z, ca = Math.cos(-a), sa = Math.sin(-a);
         const dx = target.x - pv.x, dy = target.y - pv.y;
         target.x = (dx * ca - dy * sa - this.torso.position.x) / this.torso.scale.x;
         target.y = (dx * sa + dy * ca - this.torso.position.y) / this.torso.scale.y;
       }
       const ankle = target.clone().add(new THREE.Vector3(0, L.fore ? 3 : 4, 0));
-      // two-bone IK in the sagittal plane
       const dx = ankle.x - hip.x, dy = ankle.y - hip.y;
       let d = Math.hypot(dx, dy); const dmax = L.L1 + L.L2 - 0.5, dmin = Math.abs(L.L1 - L.L2) + 1;
       d = Math.max(dmin, Math.min(dmax, d));
@@ -426,17 +441,21 @@ export class HamsterRig {
     const wire = new THREE.MeshStandardMaterial({ color: 0xd2d6da, metalness: 0.85, roughness: 0.3 });
     const brass = new THREE.MeshStandardMaterial({ color: 0xc19a4c, metalness: 1, roughness: 0.3 });
     const plastic = new THREE.MeshStandardMaterial({ color: 0x8fb8a8, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.88 });
-    const xp = anchor.boxRight + Rs - rw + 24;             // belt plane on the crank side
-    const xw = xp + rw, yw = anchor.bottomY + Rs + 22;      // wheel centre
-    const zc = anchor.z, yc = anchor.y, zwp = zc + rc, zw = zwp + 16 + Wd / 2;
-    this.dims = { Rs, rw, rc, xp, xw, yw, zw, zwp, Wd };
+    // her cage: a glass tank on the table beside the box; the wheel stands at the back, its axle
+    // passes out through the back glass to the hub pulley
+    const zc = anchor.z, yc = anchor.y, zwp = zc + rc;
+    const L = Math.max(640, 2 * Rs + 380), D = Wd + 300, Hc = 2 * Rs + 130;
+    const cx0 = anchor.boxRight + 170, cz0 = zwp + 10, yT = anchor.bottomY, yB = yT + 40;   // inner corner; bedding top
+    const xw = cx0 + 30 + Rs, yw = yB + 12 + Rs, zw = cz0 + 8 + Wd / 2;                    // wheel centre
+    const xp = xw - rw;                                                                      // belt plane on the crank side
+    this.dims = { Rs, rw, rc, xp, xw, yw, zw, zwp, Wd, cx0, cz0, yB, L, D, Hc };
     const cyl = (r, h, mat, seg = 12) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat); m.castShadow = true; m.receiveShadow = true; return m; };
 
     // crank extension shaft through the box wall to a pulley, with a pillow block on a post
     const shaftLen = xp + 4 - anchor.x;
     const shaft = cyl(1.6, shaftLen, steel); shaft.rotation.z = Math.PI / 2; shaft.position.set(anchor.x + shaftLen / 2, yc, zc); g.add(shaft);
     const hub = cyl(3.6, 5, brass, 16); hub.rotation.z = Math.PI / 2; hub.position.set(anchor.x, yc, zc); g.add(hub);
-    for (const x of [anchor.boxRight + 6, xp - 16]) {
+    for (const x of [anchor.boxRight + 6, (anchor.boxRight + xp) / 2, xp - 16]) {
       const blk = new THREE.Mesh(new THREE.BoxGeometry(8, 9, 12), brass); blk.position.set(x, yc, zc); blk.castShadow = true; g.add(blk);
       const post = cyl(2, yc - anchor.bottomY, steel); post.position.set(x, (yc + anchor.bottomY) / 2 - 4, zc); g.add(post);
       const foot = cyl(7, 2, steel, 20); foot.position.set(x, anchor.bottomY + 1, zc); g.add(foot);
@@ -473,44 +492,127 @@ export class HamsterRig {
     // axle and A-frame stands
     const axleLen = zw + Wd / 2 + 12 - (zwp - 10);
     const axle = cyl(2.2, axleLen, steel); axle.rotation.x = Math.PI / 2; axle.position.set(xw, yw, zwp - 10 + axleLen / 2); g.add(axle);
-    for (const z of [zwp - 8, zw + Wd / 2 + 9]) {
+    for (const [z, yf] of [[zwp - 8, yT], [zw + Wd / 2 + 9, yB]]) {
       for (const sx of [-1, 1]) {
-        const a = new THREE.Vector3(xw, yw, z), b = new THREE.Vector3(xw + sx * Rs * 0.62, anchor.bottomY + 2, z);
+        const a = new THREE.Vector3(xw, yw, z), b = new THREE.Vector3(xw + sx * Rs * 0.62, yf + 2, z);
         const leg = cyl(1.8, 1, wire, 8); HamsterModel.bone(leg, a, b); g.add(leg);
       }
-      const base = cyl(1.8, Rs * 1.5, wire, 8); base.rotation.z = Math.PI / 2; base.position.set(xw, anchor.bottomY + 2, z); g.add(base);
+      const base = cyl(1.8, Rs * 1.5, wire, 8); base.rotation.z = Math.PI / 2; base.position.set(xw, yf + 2, z); g.add(base);
     }
+    this.buildCage({ L, D, Hc, cx0, cz0, yT, yB, xw, zw, Wd, Rs });
     // quarter-twist round belt: down the crank pulley, up to the hub pulley
     const pts = [];
     for (let i = 0; i <= 24; i++) { const a = Math.PI - (i / 24) * Math.PI; pts.push(new THREE.Vector3(xp, yc - rc * Math.sin(a), zc + rc * Math.cos(a))); }  // back → under → front
     for (let i = 0; i <= 32; i++) { const b = Math.PI - (i / 32) * Math.PI; pts.push(new THREE.Vector3(xw + rw * Math.cos(b), yw + rw * Math.sin(b), zwp)); } // left → over → right
     pts.push(pts[0].clone());
     const belt = new THREE.Mesh(new THREE.TubeGeometry(new PolyCurve(pts), 220, 1.3, 8, true), new THREE.MeshStandardMaterial({ color: 0xb2402b, roughness: 0.55 }));
-    belt.castShadow = true; g.add(belt);
+    belt.castShadow = true; g.add(belt); this.belt = belt;
 
-    // the hamster, on the tread at angle φ from the bottom
+    // the hamster: either on the tread at angle φ from the bottom, or about her business in the cage
     this.ham = new HamsterModel({ mass: o.mass, shells: o.shells });
     this.hamPivot = new THREE.Group(); this.hamPivot.position.set(xw, yw, zw); g.add(this.hamPivot);
-    this.hamPivot.add(this.ham.root);
-    this.ham.root.position.set(0, -this.treadR, 0);
+    this.cageCarrier = new THREE.Group(); this.cageCarrier.position.set(cx0, yB, cz0); g.add(this.cageCarrier);
+    this.cageCarrier.add(this.ham.root);
     this.st = null; this.stT = 0; this.thw = 0; this.phase = 0;
+    // the layout her life plays out in (cage millimetres: x right, z forward, bedding at y = 0)
+    const hx = L - 100, hz = 85;
+    this.layout = {
+      L, D,
+      wheel: { x: xw - cx0, z: zw - cz0, y: yw - this.treadR - yB, entry: { x: xw - cx0, z: zw - cz0 + Wd / 2 + 60 } },
+      house: { door: { x: hx, z: hz + 115 }, bed: { x: hx, z: hz + 10 } },
+      bowl: { x: this.bowlAt.x, z: this.bowlAt.z }, drink: { x: L - 80, z: this.bottleZ }, dig: { x: (xw - cx0 + Rs + hx - 75) / 2, z: 80 },
+    };
+  }
+
+  buildCage({ L, D, Hc, cx0, cz0, yT, yB, xw, zw, Wd, Rs }) {
+    const g = this.group, X = (x) => cx0 + x, Z = (z) => cz0 + z;
+    const wood = new THREE.MeshStandardMaterial({ color: 0x9a7350, roughness: 0.7 });
+    const box = (w, h, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
+    // floor, glass walls, wooden corner posts and rim, wire-mesh lid
+    box(L + 24, 8, D + 24, X(L / 2), yT + 4, Z(D / 2), wood);
+    const glassM = new THREE.MeshPhysicalMaterial({ color: 0xe8f2f2, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.5 });
+    const pane = (w, h, x, z, ry) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassM); p.position.set(x, yT + 8 + h / 2, z); p.rotation.y = ry; p.renderOrder = 5; g.add(p); };
+    pane(L, Hc, X(L / 2), Z(D + 2), 0); pane(L, Hc, X(L / 2), Z(-2), 0); pane(D, Hc, X(-2), Z(D / 2), Math.PI / 2); pane(D, Hc, X(L + 2), Z(D / 2), Math.PI / 2);
+    for (const [x, z] of [[-6, -6], [L + 6, -6], [L + 6, D + 6], [-6, D + 6]]) box(12, Hc, 12, X(x), yT + 8 + Hc / 2, Z(z), wood);
+    for (const [w, d, x, z] of [[L + 24, 12, L / 2, -6], [L + 24, 12, L / 2, D + 6], [12, D + 24, -6, D / 2], [12, D + 24, L + 6, D / 2]]) {
+      box(w, 14, d, X(x), yT + 8 + Hc, Z(z), wood); box(w, 30, d, X(x), yT + 15, Z(z), wood);
+    }
+    const [mc, mx] = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; return [c, c.getContext('2d')]; })();
+    mx.strokeStyle = '#fff'; mx.lineWidth = 3; for (let i = 0; i <= 128; i += 16) { mx.beginPath(); mx.moveTo(i, 0); mx.lineTo(i, 128); mx.moveTo(0, i); mx.lineTo(128, i); mx.stroke(); }
+    const meshT = new THREE.CanvasTexture(mc); meshT.wrapS = meshT.wrapT = THREE.RepeatWrapping; meshT.repeat.set(L / 96, D / 96);
+    const lid = new THREE.Mesh(new THREE.PlaneGeometry(L, D), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.4, alphaMap: meshT, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+    lid.rotation.x = -Math.PI / 2; lid.position.set(X(L / 2), yT + 15 + Hc, Z(D / 2)); g.add(lid);
+    // aspen bedding: pale shavings, with a mound where she digs
+    const bc = document.createElement('canvas'); bc.width = bc.height = 512; const bx = bc.getContext('2d');
+    bx.fillStyle = '#c9b48c'; bx.fillRect(0, 0, 512, 512);
+    for (let i = 0; i < 2600; i++) { const v = 170 + Math.random() * 70; bx.fillStyle = `rgba(${v + 20},${v},${v - 40},0.8)`; bx.save(); bx.translate(Math.random() * 512, Math.random() * 512); bx.rotate(Math.random() * 6.3); bx.fillRect(-9, -2, 18 + Math.random() * 10, 3 + Math.random() * 3); bx.restore(); }
+    for (let i = 0; i < 500; i++) { bx.fillStyle = 'rgba(90,70,45,0.35)'; bx.fillRect(Math.random() * 512, Math.random() * 512, 6, 2); }
+    const bt = new THREE.CanvasTexture(bc); bt.colorSpace = THREE.SRGBColorSpace; bt.wrapS = bt.wrapT = THREE.RepeatWrapping; bt.repeat.set(L / 260, D / 260);
+    const bedM = new THREE.MeshStandardMaterial({ map: bt, roughness: 1 });
+    box(L, yB - yT - 8, D, X(L / 2), (yB + yT + 8) / 2, Z(D / 2), bedM);
+    this.pile = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), bedM); this.pile.scale.set(60, 1, 45);
+    this.pileAt = { x: (xw - cx0 + Rs + L - 175) / 2, z: 70 }; this.pile.position.set(X(this.pileAt.x + 20), yB, Z(this.pileAt.z - 15)); g.add(this.pile);
+    // her house: a little wooden hut with a gabled roof and a round door, hay inside
+    const hx = L - 100, hz = 85;
+    const hut = new THREE.Group(); hut.position.set(X(hx), yB, Z(hz)); g.add(hut);
+    const pine = new THREE.MeshStandardMaterial({ color: 0xc89a62, roughness: 0.75 });
+    const shell = (w, h, d, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pine); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; hut.add(b); };
+    shell(150, 110, 10, 0, 55, -55); shell(10, 110, 120, -70, 55, 0); shell(10, 110, 120, 70, 55, 0);
+    // front with a round door: two jambs, a lintel, and a dark doorway disc
+    shell(45, 110, 10, -52, 55, 60); shell(45, 110, 10, 52, 55, 60); shell(60, 34, 10, 0, 93, 60);
+    const doorway = new THREE.Mesh(new THREE.CircleGeometry(31, 24, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 1, side: THREE.DoubleSide }));
+    doorway.position.set(0, 46, 56); hut.add(doorway);
+    for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.BoxGeometry(170, 10, 100), pine); r.position.set(0, 140, s * 35); r.rotation.x = s * 0.6; r.castShadow = true; hut.add(r); }
+    const hay = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xc8b060, roughness: 1 })); hay.scale.set(60, 18, 45); hay.position.set(0, 4, -5); hut.add(hay);
+    this.hut = hut;
+    // ceramic bowl with seeds; water bottle clipped to the right-hand glass
+    this.bowlAt = { x: Math.min(L - 230, xw - cx0 + Rs + 110), z: D - 80 };
+    const bowl = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [38, 0], [46, 22], [42, 24], [33, 6], [0, 6]].map(([a, b]) => new THREE.Vector2(a, b)), 32), new THREE.MeshStandardMaterial({ color: 0x5f7d9a, roughness: 0.25 }));
+    bowl.position.set(X(this.bowlAt.x), yB, Z(this.bowlAt.z)); bowl.castShadow = true; g.add(bowl);
+    const seedG = new THREE.SphereGeometry(1, 6, 4), seedM = [new THREE.MeshStandardMaterial({ color: 0x2b2622, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0xd6c08a, roughness: 0.8 })];
+    for (let i = 0; i < 46; i++) { const a = Math.random() * 6.28, r = Math.random() * 30; const sd = new THREE.Mesh(seedG, seedM[i % 3 === 0 ? 1 : 0]); sd.scale.set(5.5, 1.6, 2.6); sd.rotation.y = Math.random() * 6; sd.position.set(X(this.bowlAt.x) + Math.cos(a) * r, yB + 8 + Math.random() * 6, Z(this.bowlAt.z) + Math.sin(a) * r); g.add(sd); }
+    this.bottleZ = 255;
+    const bottle = new THREE.Group(); bottle.position.set(X(L - 26), yB, Z(this.bottleZ)); g.add(bottle);
+    const plas = new THREE.MeshPhysicalMaterial({ color: 0xeaf4f8, roughness: 0.1, transparent: true, opacity: 0.3, depthWrite: false });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 150, 20), plas); body.position.y = 170; bottle.add(body);
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(20, 20, 110, 20), new THREE.MeshPhysicalMaterial({ color: 0x9cc8dc, roughness: 0.05, transparent: true, opacity: 0.45, depthWrite: false })); water.position.y = 150; bottle.add(water);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(14, 22, 18, 20), new THREE.MeshStandardMaterial({ color: 0x3a6a4a, roughness: 0.5 })); cap.position.y = 88; bottle.add(cap);
+    const spout = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 50, 10), new THREE.MeshStandardMaterial({ color: 0xc9ced4, metalness: 0.9, roughness: 0.25 }));
+    spout.position.set(-14, 66, 0); spout.rotation.z = 0.75; bottle.add(spout);
+    this.bubble = new THREE.Mesh(new THREE.SphereGeometry(3, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })); this.bubble.visible = false; bottle.add(this.bubble);
   }
 
   setState(st) { this.st = st; this.stT = performance.now(); this.thw = st.thw; this.phase = st.phase; }
 
-  update(dt, crankAngle) {
+  update(dt, crankAngle, life) {
     const st = this.st;
-    let view = null;
     if (st) {
       const age = Math.min(0.08, (performance.now() - this.stT) / 1000);
-      view = { ...st, phase: (st.phase + st.f * age) % 1 };
       this.wheel.rotation.z = -(st.thw + st.ww * age);
-      const phi = st.phi + 0;
-      this.hamPivot.rotation.z = phi;
+      this.view = { ...st, phase: (st.phase + st.f * age) % 1 };
     }
     this.crankPulley.rotation.x = -crankAngle;
-    this.ham.update(dt, view || { f: 0, v: 0, phase: 0, D: 0.7, gait: 'walk', act: 'sit', br: 70 }, this.treadR);
+    const inWheel = life && life.where === 'wheel' && st && st.inWheel;
+    const root = this.ham.root;
+    if (inWheel) {
+      if (root.parent !== this.hamPivot) this.hamPivot.add(root);
+      root.position.set(0, -this.treadR, 0); root.rotation.set(0, 0, 0);
+      this.hamPivot.rotation.z = st.phi;
+      this.ham.update(dt, this.view, this.treadR);
+    } else {
+      if (root.parent !== this.cageCarrier) this.cageCarrier.add(root);
+      const L = life || { x: this.layout.house.bed.x, z: this.layout.house.bed.z, y: 0, h: Math.PI, pose: { curl: 1 }, gaitState: () => ({ f: 0, v: 0, phase: 0, D: 0.7, gait: 'walk', act: 'sit', br: 45 }) };
+      root.position.set(L.x, L.y, L.z); root.rotation.set(0, -L.h, 0);
+      this.ham.update(dt, L.gaitState(), 1e6, L.pose);
+    }
+    if (life) {
+      const p = Math.min(1, 0.15 + life.digPile * 0.85); this.pile.scale.set(60 * (0.6 + 0.4 * p), 2 + 26 * p, 45 * (0.6 + 0.4 * p));
+      // the bottle's ball valve lets a bubble up while she drinks
+      if (life.act === 'drink') { this.bubble.visible = true; this.bubbleY = ((this.bubbleY || 95) + dt * 140); if (this.bubbleY > 205) this.bubbleY = 95; this.bubble.position.set(Math.sin(this.bubbleY) * 4, this.bubbleY, 0); }
+      else this.bubble.visible = false;
+    }
   }
+  setHooked(on) { this.belt.visible = on; }
 
   // world position of the hamster's head, for a close-up camera
   focus() { const v = new THREE.Vector3(); this.ham.head.getWorldPosition(v); return v; }

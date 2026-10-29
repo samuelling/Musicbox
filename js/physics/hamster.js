@@ -82,7 +82,8 @@ export class Hamster {
   constructor(sr) {
     this.sr = sr; this.dt = 1 / sr;
     this.rng = 0x2545f491;
-    this.opts = { mass: HAMSTER.mass, wheel: 'd28', surface: 'rungs', axle: 'bearing' };
+    this.opts = { mass: HAMSTER.mass, wheel: 'd28', surface: 'rungs', axle: 'bearing', lover: false };
+    this.inWheel = false; this.restT = 0; this.bouts = 0;
     this.derive();
     // state
     this.thw = 0; this.ww = 0; this.phi = 0; this.dphi = 0;
@@ -118,14 +119,31 @@ export class Hamster {
 
   // belt pulleys: the crank must turn at its design rate when the hamster runs at its usual pace
   setDrive(Gcrank, omegaNom) {
-    [this.rw, this.rc] = pulleyRadii(Gcrank, omegaNom, this.R);
+    [this.rw, this.rc] = pulleyRadii(Gcrank, omegaNom, this.R, this.opts.gear || 1);
     this.kb = 140; this.Fslip = 1.68;                         // silicone O-ring, 1 N pretension, μ 0.8, half wrap
     this.belt = { x: 0, off: 0, back: 0 };
   }
 
   // ------------------------------------------------------------- behaviour (block rate)
+  // she climbs in or out (decided by her life in the cage, js/sim/hamster-life.js)
+  setInWheel(on) {
+    if (on === this.inWheel) return;
+    this.inWheel = on;
+    this.phi = 0; this.dphi = 0; this.vCmd = 0; this.vGoal = 0; this.vEst = this.R * this.ww;
+    this.state = 'rest'; this.act = 'sit'; this.restT = 0;
+    this.timer = on ? 0.6 + 1.2 * this.rand() : 1e9;
+  }
+
   behave(dt, hour) {
     const H = HAMSTER;
+    if (!this.inWheel) {
+      this.state = 'out'; this.vGoal = this.vCmd = 0;
+      this.Emet += (bmrW(this.m) * 1.8 - this.Emet) * (1 - Math.exp(-dt / 20));
+      const x = Math.max(0, Math.min(1, (this.Emet - bmrW(this.m)) / (vo2maxW(this.m) - bmrW(this.m))));
+      this.hr = H.hrRest + (H.hrMax - H.hrRest) * Math.sqrt(x); this.br = H.brRest + (H.brMax - H.brRest) * x;
+      return;
+    }
+    const lover = this.opts.lover;
     // nocturnal: most running happens in the dark phase
     const night = (hour >= 19.5 || hour < 5.5) ? 1 : (hour >= 17.5 || hour < 7.5) ? 0.85 : 0.55;
     this.dayFactor = night;
@@ -134,8 +152,9 @@ export class Hamster {
     this.timer -= dt;
     if (this.state === 'rest') {
       this.vGoal = 0;
+      this.restT += dt;
       if (this.timer <= 0) {
-        this.state = 'run'; this.timer = 8 + (-Math.log(this.rand() + 1e-9)) * 40 * A;
+        this.state = 'run'; this.restT = 0; this.bouts++; this.timer = 8 + (-Math.log(this.rand() + 1e-9)) * (lover ? 90 : 40) * A;
         const med = 0.46 * (0.85 + 0.15 * A) * (0.8 + 0.2 * this.reserve);
         this.vBout = Math.min(1.05, Math.max(0.22, med * Math.exp(0.22 * this.gauss())));
         this.act = 'run';
@@ -151,7 +170,7 @@ export class Hamster {
       if (this.reserve < 0.25) g *= 0.6 + 1.6 * this.reserve;   // tiring: slows down
       this.vGoal = Math.min(1.15, Math.max(0.12, g));
       if (this.timer <= 0 || this.reserve < 0.03) {
-        this.state = 'rest'; this.timer = 1.5 + (-Math.log(this.rand() + 1e-9)) * 7 / A * (1.6 - this.reserve);
+        this.state = 'rest'; this.restT = 0; this.timer = 1.5 + (-Math.log(this.rand() + 1e-9)) * (lover ? 2.5 : 7) / A * (1.6 - this.reserve);
         this.act = 'sit';
       }
     }
@@ -173,12 +192,21 @@ export class Hamster {
     this.br = H.brRest + (H.brMax - H.brRest) * x;
   }
 
-  wake() { this.motiv = Math.min(0.8, this.motiv + 0.5); if (this.state === 'rest') this.timer = Math.min(this.timer, 0.4 + 0.8 * this.rand()); }
+  wake() { this.motiv = Math.min(0.8, this.motiv + 0.5); if (this.state === 'rest') { this.timer = Math.min(this.timer, 0.4 + 0.8 * this.rand()); this.restT = 0; } }
 
   // ------------------------------------------------------------- mechanics (audio rate)
   // Fb: belt force pulling the rim pulley back (N). Returns nothing; updates state.
   step(Fb) {
     const H = HAMSTER, dt = this.dt, m = this.m, R = this.R, Rc = this.Rc;
+    if (!this.inWheel) {
+      // an empty wheel just coasts down on its axle
+      this.f = 0; this.F = 0; this.phi = 0; this.dphi = 0; this.vEst = 0;
+      for (let k = 0; k < 4; k++) this.stance[k] = -1;
+      const ax = this.axle;
+      const dw = (-(ax.c * this.ww + ax.tauC * Math.tanh(this.ww / 0.05)) - Fb * this.rw) / this.Iw;
+      this.ww += dw * dt; this.thw += this.ww * dt;
+      return;
+    }
     const vRel = Rc * this.dphi + R * this.ww;
     // stride clock runs on the actual speed over the surface
     this.vEst += (vRel - this.vEst) * 0.0015;
@@ -285,7 +313,7 @@ export class Hamster {
       thw: this.thw, ww: this.ww, phi: this.phi, phase: this.phase, f: this.f, D: this.D, gait: this.gait,
       v: this.vEst, vCmd: this.vCmd, state: this.state, act: this.act, slip: this.slip, F: this.F,
       Emet: this.Emet, hr: this.hr, br: this.br, dist: this.dist, kJ: this.kJ, reserve: this.reserve,
-      day: this.dayFactor, rw: this.rw, rc: this.rc, R: this.R, mass: this.m, stance: this.stance.slice(),
+      day: this.dayFactor, inWheel: this.inWheel, restT: this.restT, bouts: this.bouts, rw: this.rw, rc: this.rc, R: this.R, mass: this.m, stance: this.stance.slice(),
       belt: this.belt ? this.belt.x * this.kb : 0, vmaxAer: this.vmaxAer,
     };
   }
@@ -293,9 +321,10 @@ export class Hamster {
 
 // Belt pulleys sized so the crank turns at its design rate when she runs at her usual
 // pace (~0.44 m/s): r_wheel / r_crank = ω_crank / ω_wheel.
-export function pulleyRadii(Gcrank, omegaNom, R) {
+// `gear` scales the hub pulley: ×2 makes the tune run twice as fast for the same pace.
+export function pulleyRadii(Gcrank, omegaNom, R, gear = 1) {
   const rc = 0.012, wCrank = Gcrank * omegaNom, wWheel = 0.44 / R;
-  return [Math.min(0.06, Math.max(0.006, rc * wCrank / wWheel)), rc];
+  return [Math.min(0.09, Math.max(0.005, gear * rc * wCrank / wWheel)), rc];
 }
 
 function smooth(x, a, b) { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }

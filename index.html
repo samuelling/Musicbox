@@ -30,7 +30,9 @@
     </div>
     <div id="hamInfo" class="hamInfo hidden">
       <div id="hamTxt" class="hamTxt">She's waking up…</div>
-      <div class="hamBtns"><button id="hamWake">Tap the cage</button><button id="hamWatch">Watch her</button></div>
+      <div class="hamBtns"><button id="hamPlace">Place her in the wheel</button><button id="hamWatch">Watch her</button></div>
+      <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="1"><span id="hamGearv">×1.00</span></label>
+      <label class="hamLover"><input type="checkbox" id="hamLover"> Wheel lover <span class="small">(off = a real hamster's night)</span></label>
     </div>
     <div id="gaitCard" class="gaitCard hidden" aria-label="Footfall diagram"><canvas id="gaitCanvas"></canvas></div>
     <div id="windInfo" class="windInfo hidden">
@@ -59,9 +61,12 @@
       <div class="row">
         <label>Room <select id="room"></select></label>
         <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
+        <label class="chk"><input type="checkbox" id="follow"> Follow perspective <span class="small">(see from where you stand)</span></label>
+        <span id="fireRow" style="display:contents"><label class="chk"><input type="checkbox" id="fireOn" checked> Fire crackling</label>
+        <label class="chk"><input type="checkbox" id="stormOn" checked> Storm outside</label></span>
       </div>
       <div class="mapWrap"><canvas id="map"></canvas></div>
-      <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
+      <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. With Follow perspective on, the 3D view is your eyes: drag on it to look around. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
       <div class="row">
         <label class="grow">Ear height <input type="range" id="earH" min="0.3" max="1.9" step="0.01" value="1.2"><span id="earHv">1.20 m</span></label>
         <label class="grow">Facing <input type="range" id="yaw" min="-180" max="180" step="1" value="90"><span id="yawv">90°</span></label>
@@ -76,29 +81,36 @@
     <section class="panel on" data-panel="tunes">
       <div class="cats" id="cats"></div>
       <ul id="songList" class="songs"></ul>
-      <div class="row">
-        <button id="importMidi">Import MIDI…</button>
-        <input type="file" id="midiFile" accept=".mid,.midi,audio/midi" hidden>
-        <button id="newTune">Compose new</button>
-        <button id="shareTune">Share link</button>
-      </div>
-      <h3>Pin roll <span id="arrInfo" class="small"></span></h3>
-      <div class="row">
-        <label>BPM <input type="number" id="bpm" min="30" max="240" step="1" value="100"></label>
-        <label>Bars <input type="number" id="bars" min="1" max="64" step="1" value="8"></label>
-        <label>Beats/bar <select id="meterSel"><option value="4,4">4/4</option><option value="3,4">3/4</option><option value="6,8">6/8</option><option value="2,4">2/4</option></select></label>
-        <input type="text" id="tuneName" placeholder="Tune name" style="background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:14px;min-width:120px">
-        <button id="saveTune">Save to My tunes</button>
-        <button id="retune" title="Rebuild the comb so it matches this tune">Re-tune comb</button>
-      </div>
-      <div class="row">
-        <label>Scale <select id="scaleSel"></select></label>
-        <label>Root <select id="rootSel"></select></label>
-        <button id="matchKey" title="Use the key of this tune">Match tune's key</button>
-        <button id="snapScale" title="Move notes outside the scale to the nearest scale note">Snap notes to scale</button>
-      </div>
-      <div class="editorWrap"><canvas id="editor"></canvas></div>
-      <p class="small">Tap a cell to add or remove a pin; drag to scroll. With a scale chosen, only its notes are offered (numbers are scale degrees; the root is gold). Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
+      <details id="makeOwn" class="makeOwn">
+        <summary><span class="moT">Make your own melody</span><span class="moS">Compose on the pin roll, import a MIDI file, or share a tune</span></summary>
+        <div class="moBody">
+          <div class="row">
+            <button id="newTune">Compose new</button>
+            <button id="importMidi">Import MIDI…</button>
+            <input type="file" id="midiFile" accept=".mid,.midi,audio/midi" hidden>
+            <button id="shareTune">Share link</button>
+          </div>
+          <h3>Pin roll <span id="arrInfo" class="small"></span></h3>
+          <div class="row">
+            <label>BPM <input type="number" id="bpm" min="30" max="240" step="1" value="100"></label>
+            <label>Bars <input type="number" id="bars" min="1" max="64" step="1" value="8"></label>
+            <label>Beats/bar <select id="meterSel"><option value="4,4">4/4</option><option value="3,4">3/4</option><option value="6,8">6/8</option><option value="2,4">2/4</option></select></label>
+          </div>
+          <div class="row">
+            <label>Scale <select id="scaleSel"></select></label>
+            <label>Root <select id="rootSel"></select></label>
+            <button id="matchKey" title="Use the key of this tune">Match tune's key</button>
+            <button id="snapScale" title="Move notes outside the scale to the nearest scale note">Snap notes to scale</button>
+          </div>
+          <div class="editorWrap"><canvas id="editor"></canvas></div>
+          <p class="small">Tap a cell to add or remove a pin; drag to scroll. With a scale chosen, only its notes are offered (numbers are scale degrees; the root is gold). Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
+          <div class="row">
+            <input type="text" id="tuneName" placeholder="Tune name">
+            <button id="saveTune">Save to My tunes</button>
+            <button id="retune" title="Rebuild the comb so it matches this tune">Re-tune comb</button>
+          </div>
+        </div>
+      </details>
     </section>
 
     <!-- TINES / COMB -->

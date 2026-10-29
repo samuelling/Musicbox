@@ -15,8 +15,11 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   through a ratchet; turn faster and the tune runs faster.
 * **Wind-up** — circle to wind the key (the ratchet clicks), then pull the lever. A
   fan governor keeps time, and the tune slows as the spring runs down.
-* **Hamster** — a golden hamster runs in a wire wheel that drives the crank through a
-  quarter-twist O-ring belt. Her gait (walk, trot, half-bound), the forces from her paws, how
+* **Hamster** — a golden hamster lives in a glass tank beside the box. She sleeps, eats,
+  stuffs her cheek pouches and hoards, drinks, grooms, digs, explores and runs. "Hamster" mode
+  belts her wheel to the crank through a quarter-twist O-ring; "Place her in the wheel" when
+  she isn't in the mood, "Wheel lover" for a hamster who'd rather run, and a belt-ratio slider
+  for tempo. Her gait (walk, trot, half-bound), the forces from her paws, how
   far up the wheel she rides, her bouts and rests (she's nocturnal), heart rate and metabolic
   power are all simulated. Her pace is the tempo. "Watch her" zooms in; "Tap the cage" wakes her.
 * **Tines** — 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted
@@ -29,7 +32,8 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   soundboard, or a Swiss rosewood cabinet. Lid open or closed. Set it on oak (with
   or without felt feet), glass, marble or a spruce resonance box, or hold it in
   your hand.
-* **Listen** — drag your head around a nursery, living room, parlour, stone chapel,
+* **Listen** — by default you're in a timber hut in the Alps, snowed in by a storm (fire
+  crackling, wind outside). "Follow perspective" makes the 3D view your eyes. Or drag your head around a nursery, living room, parlour, stone chapel,
   garden or anechoic chamber; turn it with two fingers. Distance, direction,
   reflections, Doppler and head shadow are all simulated. The header shows the dB
   SPL at your ears.

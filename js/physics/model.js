@@ -313,7 +313,7 @@ export function buildModel(cfgIn, combNotes, arrangement) {
     drive,
     room: {
       dims: room.dims, alpha: room.alpha, floor: room.floor, walls: room.walls, reverb: room.reverb,
-      boxPos, tableTop: surf.plate ? surf.height : null, held, boxYaw: cfg.boxYaw || 0,
+      boxPos, tableTop: surf.plate ? surf.height : null, held, boxYaw: cfg.boxYaw ?? Math.PI,   // the box faces into the room (towards −y)
     },
     noise: cfg.noise, gain: cfg.gain,
   };

@@ -310,6 +310,36 @@ belly. She also has the grey-black cheek flash and the white crescent behind it,
 eyes, thin grey-pink ears, orange incisors and whiskers that twitch. Her legs are two-bone
 IK chains whose paws follow the same footfall pattern that drives the physics.
 
+
+**Her life in the cage** (`js/sim/hamster-life.js`). She always lives in a glass tank on the
+table. The Hamster mode only decides whether her wheel is belted to the crank. Off the wheel
+she follows an ethogram, a time budget of behaviours:
+
+- **Wheel:** she goes to the wheel and runs in bouts.
+- **Food:** she nibbles seeds held in her forepaws, or stuffs her cheek pouches at the bowl.
+  The pouches swell back to her shoulders. She then carries the haul to her house and pushes
+  it out with her forepaws, which is larder hoarding.
+- **Drinking:** she rears up to lick the bottle's ball valve, and a bubble rises.
+- **Grooming:** she washes her face sitting up.
+- **Digging:** she digs in the bedding, and the pile grows.
+- **Exploring:** she pauses to rear up on her hind legs, whisking and sniffing.
+- **Napping:** she curls up in her nest.
+
+**Time budgets.**
+
+- **Real hamster:** about 40 % wheel and 15 % naps, with the rest split among foraging,
+  hoarding, grooming, digging, drinking and exploring.
+- **Wheel lover:** close to 100 % wheel, the setting for when the music matters most.
+
+**Leaving the wheel.** She climbs out after a pause in her running, and the wheel coasts down
+on its axle. "Place her in the wheel" lifts her in and wakes her up.
+
+**Time of night.** The cabin is always night, so she keeps hamster night hours. Before the
+candle is lit she is asleep in her nest.
+
+**Belt ratio.** The hub pulley can be resized from ×0.5 to ×2. That changes how fast the tune
+plays for the same running pace: ×1 plays the written tempo at 0.44 m/s.
+
 **Sources.** Hamster mass 100–150 g, and heart and breathing rates, are from veterinary
 references. The 0.16 m/s treadmill gait is from Hamill et al. (gait of dystrophic and
 control hamsters, 2011). Hamsters' preference for larger, fully circular wheels is from
@@ -318,6 +348,11 @@ Taylor, Heglund & Maloiy (1982) and Weibel et al. (2004).
 
 The muscle parameters, controller gain and behavioural constants are estimates chosen to
 match those observations. They are not measurements from hamsters.
+
+**Changing tunes while it plays.** Each tune sets its own cylinder speed and gear ratios. On
+a change, the drive carries over in proportion: the same fraction of the written tempo. The
+hand, crank and belt couplings are re-seated at zero stretch, so nothing has to race to
+catch up.
 
 ## 6. From comb to wood
 
@@ -419,6 +454,36 @@ All radiators are written into 8 delay lines (Ṁ, Ḋ_xyz, D̈_xyz, table-botto
 * **The SPL meter** in the header is the actual simulated sound pressure at your
   ears, in dB re 20 µPa. Expect roughly 45–70 dB at a metre, about what a real music
   box measures.
+
+
+## 8b. The cabin, and hearing from where you stand
+
+The default room is a farmer's hut in the Alps on a stormy night: 5.8 × 4.6 × 2.5 m. Its
+walls are square-hewn larch timbers caulked with oakum, and the floor is old boards with no
+rug.
+
+**Acoustics.** The boundary absorption is set for bare timber: α ≈ 0.11 low and 0.14 high on
+the walls, 0.09–0.11 on the floor. That gives a small, warm, fairly live room. It is treated
+exactly as the other rooms are, with first-order image sources and an FDN tail.
+
+**Facing.** The box sits on the table facing into the room, towards −y. Its dipoles are
+rotated accordingly (`boxYaw = π`).
+
+**Follow perspective.** The 3D camera becomes your eyes. The listener's position and yaw
+from the room map are mapped into the scene through the same room → box transform the
+acoustics use. So what you see and what you hear come from the same place. Dragging the
+view turns your head, which updates the acoustic listener; with "face the box" on, your
+gaze tilts to the box.
+
+**Ambient sounds.**
+
+- **Fire:** a synthesised crackle (resin pops, gas hiss, flame roar) through an HRTF panner
+  at the hearth.
+- **Storm:** gusting wind with a howl whose pitch follows the gusts, and sleet ticking on the
+  glass. It is low-passed by the walls and panned at the window.
+
+Both are Web Audio sources outside the physical model. They are atmosphere, not part of the
+box's radiation.
 
 ## 9. Melodies on a cylinder
 

@@ -86,6 +86,10 @@ export const SONGS = [
     id: 'maoz', key: 'F', cat: 'Hanukkah', title: "Ma'oz Tzur (Rock of Ages)", credit: 'Traditional Ashkenazi melody', bpm: 104, meter: [4, 4], accomp: 'broken',
     voices: ['F4:4 C4:4 F4:4 Bb4:4 | A4:4 G4:4 F4:8 | C5:4 D5:4 G4:4 Bb4:4 | A4:4 G4:4 F4:8 | F4:4 C4:4 F4:4 Bb4:4 | A4:4 G4:4 F4:8 | C5:4 D5:4 G4:4 Bb4:4 | A4:4 G4:4 F4:8 | C5:4 C5:4 D5:4 E5:4 | F5:8 C5:8 | F5:4 E5:4 D5:4 C5:4 | C5:2 Bb4:2 A4:2 Bb4:2 G4:8 | A4:6 Bb4:2 C5:8 | G4:6 A4:2 Bb4:8 | A4:4 G4:4 F4:4 Bb4:4 | A4:4 G4:4 F4:8 | C5:4 C5:4 D5:4 E5:4 | F5:8 C5:8 | F5:4 E5:4 D5:4 C5:4 | C5:2 Bb4:2 A4:2 Bb4:2 G4:8 | A4:6 Bb4:2 C5:8 | G4:6 A4:2 Bb4:8 | A4:4 G4:4 F4:4 Bb4:4 | A4:8 G4:6 F4:2 | F4:16'],
   },
+  {
+    id: 'ohchanukah', key: 'Dm', cat: 'Hanukkah', title: 'Oh Chanukah (Oy Khanike)', credit: 'Yiddish folk song, pub. 1912 (M. Rivesman)', bpm: 120, meter: [4, 4], pickup: 2, accomp: 'broken',
+    voices: ['D4:2 | A4:2 A4 A4 A4 D5 A4 A4 A4 | A4:4 G4:2 F4 G4:4 E4:2 E4 | A4:2 A4 A4 A4 D5 D5 A4 A4 | A4:4 G4:2 F4 G4:4 E4:4 | F4:2 G4 A4 G4 F4:4 F4:2 F4 | G4:4 F4:2 E4 F4:8 | F4:2 G4 A4 G4 F4:4 F4 | G4:4 F4:2 E4 D4:8 | A4:4 A4:8 D4:4 | A4:4 A4:8 D4:4 | A4:2 A4 A4 A4 G4:4 Bb4 | A4:16 | A4:2 A4 A4 A4 Bb4:4 A4:2 G4 | A4:4 A4:2 A4 Bb4:4 A4:2 G4 | F4:4 F4:2 F4 G4:4 F4:2 G4 | A4:16 | A4:2 A4 A4 A4 Bb4:4 A4:2 G4 | A4:4 A4:2 A4 Bb4:4 A4:2 G4 | F4:4 F4:2 F4 G4:4 F4:2 E4 | D4:8 r:8'],
+  },
 ];
 
 export const CATEGORIES = ['Classics', 'Christmas', 'Hanukkah', 'My tunes'];

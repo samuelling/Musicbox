@@ -1,6 +1,9 @@
 import { Engine } from './audio/engine.js';
 import { strikeMatch } from './audio/match.js';
+import { FireSound, StormSound } from './audio/fire.js';
+import { CABIN_FEATURES } from './render/cabin.js';
 import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physics/hamster.js';
+import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
 import { CrankPad } from './ui/crank.js';
 import { ListenerMap } from './ui/listener-map.js';
@@ -18,7 +21,7 @@ const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
 
 // ------------------------------------------------------------------ state
-const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing' }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'living' };
+const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 1, lover: false }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
 let song = null;            // compiled tune (onsets)
 let songId = 'brahms';
 let built = null;           // last build result (info, arrangement, combNotes, geom, drive, room)
@@ -129,15 +132,16 @@ function ensureStarted() {
     // sound (screen lock, a call, another app) and relights when the sound comes back
     engine.onRunning = (on) => {
       clearTimeout(snuffTimer);
-      if (on) { scene.lightCandle(); showPrompt(null); }
+      scene.audioOn = on;
+      if (on) { scene.lightCandle(); showPrompt(null); updateFire(); }
       else snuffTimer = setTimeout(() => { if (!engine.running) { scene.snuffCandle(); showPrompt('relight'); } }, 700);
     };
     p.then(() => {
-      pushAll();
+      pushAll(); updateFire();
       if (engine.sampleRate !== cfg.sr) { cfg.sr = engine.sampleRate; requestBuild(0); }
     }).catch((e) => { console.error(e); showPrompt('retry', 'Audio failed to start: ' + e.message); });
   }
-  if (engine.running) { scene.lightCandle(); showPrompt(null); }
+  if (engine.running) { scene.audioOn = true; scene.lightCandle(); showPrompt(null); }
 }
 prompt.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -196,20 +200,31 @@ $('lever').addEventListener('click', () => {
 const fillH = (id, obj, val) => { const el = $(id); el.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; el.appendChild(o); } el.value = val; };
 fillH('hamWheel', WHEELS, cfg.ham.wheel); fillH('hamTread', SURFACES_H, cfg.ham.surface); fillH('hamAxle', AXLES, cfg.ham.axle);
 function sendHam() { engine.send({ type: 'hamster', opts: { ...cfg.ham } }); }
+let life = null;
 function buildRig() {
   if (!built) return;
-  const R = WHEELS[cfg.ham.wheel].D / 2, [rw, rc] = pulleyRadii(built.drive.G_crank, built.drive.omegaNom, R);
+  const R = WHEELS[cfg.ham.wheel].D / 2, [rw, rc] = pulleyRadii(built.drive.G_crank, built.drive.omegaNom, R, cfg.ham.gear);
   scene.buildHamRig({ R, rw, rc, surface: cfg.ham.surface, mass: cfg.ham.mass });
+  // her life goes on across rebuilds
+  if (!life) { life = new HamsterLife(scene.hamRig.layout); life.onWheel = (on, placed) => engine.send({ type: 'hamster', inWheel: on, ...(placed ? { wake: true } : {}) }); }
+  else life.setCage(scene.hamRig.layout);
+  life.mode = cfg.ham.lover ? 'lover' : 'real';
+  scene.hamLife = life;
   const M = cfg.ham.mass;
   $('hamDriveInfo').textContent = [
     `belt       ${(rw * 2e3).toFixed(0)} mm hub pulley → ${(rc * 2e3).toFixed(0)} mm crank pulley (×${(rw / rc).toFixed(2)}), quarter-twist O-ring`,
-    `tempo      100% when she runs 0.44 m/s (${(0.44 / R * 60 / TAU).toFixed(0)} wheel rpm)`,
+    `tempo      100% when she runs ${(0.44 / cfg.ham.gear).toFixed(2)} m/s (${(0.44 / cfg.ham.gear / R * 60 / TAU).toFixed(0)} wheel rpm)`,
     `her limits VO2max ≈ ${(vo2maxW(M) / 20.1 * 60).toFixed(1)} ml O2/min, aerobic pace up to ≈ ${((0.7 * vo2maxW(M) / M - 6.03 * M ** -0.303) / (10.7 * M ** -0.316)).toFixed(2)} m/s`,
   ].join('\n');
 }
 $('hamMass').addEventListener('input', (e) => { cfg.ham.mass = +e.target.value / 1000; $('hamMassv').textContent = e.target.value + ' g'; sendHam(); clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 250); });
 for (const [id, key] of [['hamWheel', 'wheel'], ['hamTread', 'surface'], ['hamAxle', 'axle']]) $(id).addEventListener('change', (e) => { cfg.ham[key] = e.target.value; sendHam(); buildRig(); });
-$('hamWake').addEventListener('click', () => { ensureStarted(); engine.send({ type: 'hamster', wake: true }); });
+$('hamPlace').addEventListener('click', () => { ensureStarted(); if (life) life.placeInWheel(); });
+$('hamGear').addEventListener('input', (e) => {
+  cfg.ham.gear = +e.target.value; $('hamGearv').textContent = '×' + cfg.ham.gear.toFixed(2); sendHam();
+  clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 200);
+});
+$('hamLover').addEventListener('change', (e) => { cfg.ham.lover = e.target.checked; if (life) life.mode = cfg.ham.lover ? 'lover' : 'real'; sendHam(); });
 $('hamWatch').addEventListener('click', () => {
   const on = !$('hamWatch').classList.contains('on');
   $('hamWatch').classList.toggle('on', on); $('hamWatch').textContent = on ? 'Whole rig' : 'Watch her';
@@ -247,25 +262,49 @@ function drawGait() {
 }
 requestAnimationFrame(drawGait);
 function hamText(h) {
-  const hour = new Date().getHours();
-  const what = h.state === 'run'
-    ? `<b>${({ walk: 'Walking', trot: 'Trotting', bound: 'Half-bounding' })[h.gait]}</b> ${(Math.abs(h.v) * 3.6).toFixed(1)} km/h · ${h.slip ? 'paws slipping · ' : ''}${(h.phi * 57.3).toFixed(0)}° up the wheel`
-    : `<b>${({ sit: 'Resting', groom: 'Washing her face', look: 'Looking around', run: 'Pausing' })[h.act] || 'Resting'}</b>`;
-  const day = h.day < 0.7 ? ` · it's daytime and hamsters are nocturnal, so she naps more` : '';
-  return `${what}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} tonight${day}`;
+  const inW = life && life.where === 'wheel' && h.inWheel;
+  let what;
+  if (inW && h.state === 'run') what = `<b>${({ walk: 'Walking', trot: 'Trotting', bound: 'Half-bounding' })[h.gait]}</b> in the wheel, ${(Math.abs(h.v) * 3.6).toFixed(1)} km/h${h.slip ? ' · paws slipping' : ''}`;
+  else if (inW) what = `<b>Pausing</b> in the wheel`;
+  else what = `<b>${life ? life.desc : 'Asleep in her nest'}</b>`;
+  const hooked = cfg.mode === 'auto' ? (inW ? '' : ' — the box is waiting for her') : '';
+  return `${what}${hooked}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} tonight`;
 }
 
 // ------------------------------------------------------------------ listener map
 const map = new ListenerMap($('map'), (L) => {
   engine.send({ type: 'listener', listener: { x: L.x, y: L.y, z: L.z, yaw: L.yaw } });
+  scene.setListener(L); if (fire) { fire.listen(L); }
   const deg = Math.round(((L.yaw * 180) / Math.PI + 540) % 360 - 180);
   $('yaw').value = deg; $('yawv').textContent = deg + '°';
   updateDist();
 });
+// follow perspective: the 3D view is your eyes; dragging it turns your head
+$('follow').addEventListener('change', (e) => scene.setFollow(e.target.checked));
+scene.onLook = (d) => {
+  map.faceBox = false; $('faceBox').checked = false;
+  map.listener.yaw -= d; map.emit();
+};
+// the fireplace crackles (cabin only), heard through an HRTF panner from where you stand
+let fire = null;
+function updateFire() {
+  const cabin = !!ROOMS[cfg.room].cabin;
+  $('fireRow').style.display = cabin ? '' : 'none';
+  if (!engine.ctx || !engine.running) return;
+  if (!fire) { fire = new FireSound(engine.ctx); storm = new StormSound(engine.ctx); fire.listen(map.listener); }
+  const F = CABIN_FEATURES.fireplace, W = CABIN_FEATURES.window;
+  fire.place(0.35, (F.y0 + F.y1) / 2, 0.55);
+  storm.place((W.x0 + W.x1) / 2, ROOMS[cfg.room].dims[1] + 0.3, (W.z0 + W.z1) / 2);
+  fire.set(cabin && $('fireOn').checked, +$('vol').value);
+  storm.set(cabin && $('stormOn').checked, +$('vol').value);
+}
+let storm = null;
+$('fireOn').addEventListener('change', updateFire);
+$('stormOn').addEventListener('change', updateFire);
 $('faceBox').addEventListener('change', (e) => { map.faceBox = e.target.checked; map.emit(); });
 $('earH').addEventListener('input', (e) => { map.listener.z = +e.target.value; $('earHv').textContent = (+e.target.value).toFixed(2) + ' m'; map.emit(); });
 $('yaw').addEventListener('input', (e) => { map.faceBox = false; $('faceBox').checked = false; map.listener.yaw = (+e.target.value * Math.PI) / 180; $('yawv').textContent = e.target.value + '°'; map.emit(); });
-$('vol').addEventListener('input', (e) => engine.send({ type: 'gain', value: +e.target.value }));
+$('vol').addEventListener('input', (e) => { engine.send({ type: 'gain', value: +e.target.value }); updateFire(); });
 function updateDist() {
   if (!built) return;
   const L = map.listener, b = built.room.boxPos;
@@ -309,6 +348,13 @@ bindRange('detune', 'detune', (v) => v + ' ¢');
 $('dampers').addEventListener('change', (e) => { cfg.dampers = e.target.checked; requestBuild(); });
 $('noise').addEventListener('input', (e) => engine.send({ type: 'noise', value: +e.target.value }));
 $('airBrake').addEventListener('input', (e) => { cfg.airBrake = +e.target.value; $('airBrakev').textContent = '×' + cfg.airBrake.toFixed(2); engine.send({ type: 'airBrake', value: cfg.airBrake }); });
+
+// composing lives in its own section, closed until you open it (remembered)
+try { if (localStorage.getItem('musicbox.makeOwn') === '1') $('makeOwn').open = true; } catch (e) { /* private mode */ }
+$('makeOwn').addEventListener('toggle', () => {
+  try { localStorage.setItem('musicbox.makeOwn', $('makeOwn').open ? '1' : '0'); } catch (e) { /* private mode */ }
+  if ($('makeOwn').open) requestAnimationFrame(() => roll.resize());
+});
 
 // ------------------------------------------------------------------ tabs
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => {
@@ -499,6 +545,9 @@ function refreshAfterBuild() {
   const surf = SURFACES[cfg.surface];
   map.boxZ = built.room.boxPos ? built.room.boxPos[2] : 0;
   map.setRoom(room, built.room.boxPos, surf.plate ? [surf.plate.a, surf.plate.b] : null, built.room.held);
+  scene.placeRoom({ dims: room.dims, boxPos: built.room.boxPos, boxYaw: built.room.boxYaw, tableTop: built.room.tableTop, held: built.room.held, cabin: !!room.cabin });
+  scene.setListener(map.listener);
+  updateFire();
   if (placeListenerNextBuild) {
     placeListenerNextBuild = false;
     const [X, Y] = room.dims;
@@ -554,9 +603,11 @@ function applyState() {
   if (!built || !st) return;
   scene.update(st, built.drive.G_crank, built.drive.G_fan);
   if (st.ham) {
-    lastHam = st.ham; lastHamT = performance.now() / 1000; scene.hamState(st.ham);
+    scene.hamState(st.ham);
+    const inW = life && life.where === 'wheel' && st.ham.inWheel;
+    lastHam = inW ? st.ham : life ? { ...life.gaitState(), state: 'cage' } : st.ham; lastHamT = performance.now() / 1000;
     const now = performance.now();
-    if (!applyState.ht || now - applyState.ht > 400) { applyState.ht = now; $('hamTxt').innerHTML = hamText(st.ham); }
+    if (!applyState.ht || now - applyState.ht > 400) { applyState.ht = now; $('hamTxt').innerHTML = hamText(st.ham); $('hamPlace').disabled = !life || life.where === 'wheel'; }
   }
   const spl = Math.max(st.splL, st.splR);
   $('spl').textContent = isFinite(spl) && spl > 5 ? `${spl.toFixed(0)} dB SPL` : '— dB';
@@ -566,23 +617,23 @@ function applyState() {
     $('springTxt').textContent = `${st.turns.toFixed(1)} turns`;
   }
   if (cfg.mode === 'crank') pad.setShown((st.crank % TAU) - Math.PI / 2);
-  if (panelOn('tunes')) roll.setPlayhead((st.thetaMod / TAU) * song.steps);
+  if (panelOn('tunes') && $('makeOwn').open) roll.setPlayhead((st.thetaMod / TAU) * song.steps);
   if (panelOn('comb')) { strip.amp = st.amp; strip.draw(); }
   if (!panelOn('physics')) return;
   const tempo = st.omega / built.drive.omegaNom * 100;
+  const P = (v, w, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '—').padStart(w);
+  const h = st.ham;
   $('live').textContent = [
-    `cylinder   ${(st.omega * 60 / TAU).toFixed(2)} rpm   (${tempo.toFixed(0)}% of written tempo)`,
-    `crank      ${(st.omega * built.drive.G_crank * 60 / TAU).toFixed(0)} rpm`,
-    `spring     ${st.turns.toFixed(2)} turns wound`,
-    `governor   ${st.fanRpm.toFixed(0)} rpm`,
-    ...(st.ham ? [
-      `hamster    ${st.ham.state}, ${(Math.abs(st.ham.v)).toFixed(2)} m/s (wants ${st.ham.vCmd.toFixed(2)}), ${st.ham.gait} ${st.ham.f.toFixed(1)} Hz, duty ${st.ham.D.toFixed(2)}`,
-      `           φ ${(st.ham.phi * 57.3).toFixed(1)}° up the wheel, paw force ${(st.ham.F * 1e3).toFixed(0)} mN, belt ${(st.ham.belt * 1e3).toFixed(1)} mN`,
-      `           ${st.ham.Emet.toFixed(2)} W metabolic, ♥ ${st.ham.hr.toFixed(0)} bpm, reserve ${(st.ham.reserve * 100).toFixed(0)}%, ${st.ham.dist.toFixed(0)} m, ${(st.ham.kJ / 4.184).toFixed(2)} kcal`,
-    ] : []),
-    `pin load   ${(-st.torque * 1e3).toFixed(2)} mN·m on the cylinder`,
-    `contacts   ${st.contacts} pins touching tines, ${st.awake} tines ringing`,
-    `at ears    L ${st.splL.toFixed(1)} dB · R ${st.splR.toFixed(1)} dB SPL`,
+    `cylinder   ${P(st.omega * 60 / TAU, 6, 2)} rpm   (${P(tempo, 3)}% of written tempo)`,
+    `crank      ${P(st.omega * built.drive.G_crank * 60 / TAU, 6)} rpm`,
+    `spring     ${P(st.turns, 6, 2)} turns wound`,
+    `governor   ${P(st.fanRpm, 6)} rpm`,
+    `pin load   ${P(-st.torque * 1e3, 6, 2)} mN·m on the cylinder`,
+    `contacts   ${P(st.contacts, 3)} pins touching tines, ${P(st.awake, 3)} tines ringing`,
+    `at ears    L ${P(st.splL, 5, 1)} dB · R ${P(st.splR, 5, 1)} dB SPL`,
+    h ? `hamster    ${h.state.padEnd(4)} ${P(Math.abs(h.v), 5, 2)} m/s (wants ${P(h.vCmd, 4, 2)}) ${h.gait.padEnd(5)} ${P(h.f, 4, 1)} Hz duty ${P(h.D, 4, 2)}` : 'hamster    — (not in the wheel)',
+    h ? `           φ ${P(h.phi * 57.3, 5, 1)}° up the wheel · paw force ${P(h.F * 1e3, 5)} mN · belt ${P(h.belt * 1e3, 5, 1)} mN` : '',
+    h ? `           ${P(h.Emet, 5, 2)} W · ♥ ${P(h.hr, 3)} bpm · reserve ${P(h.reserve * 100, 3)}% · ${P(h.dist, 6)} m · ${P(h.kJ / 4.184, 6, 2)} kcal` : '',
   ].join('\n');
 }
 

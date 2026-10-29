@@ -12,7 +12,7 @@ const proc = await makeProcessor();
 proc.send({ type: 'patch', patch });
 const bp = patch.room.boxPos;
 proc.send({ type: 'listener', listener: { x: bp[0] + 0.3, y: bp[1] - 1.2, z: 1.2, yaw: Math.atan2(1.2, -0.3) } });
-proc.send({ type: 'hamster', opts: { wheel, axle, surface, mass: +mass }, hour: +hour });
+proc.send({ type: 'hamster', opts: { wheel, axle, surface, mass: +mass }, hour: +hour, inWheel: true });
 proc.send({ type: 'mode', mode: 'auto' });
 const rows = []; let last = -1, nanCount = 0;
 proc.port.onstate = (m) => { if (m.ham) rows.push({ t: rows.length * 1024 / 48000, om: m.omega, ...m.ham }); };

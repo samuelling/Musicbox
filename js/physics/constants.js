@@ -89,6 +89,7 @@ export const FEET = {
 // Rooms: dimensions (m), absorption coefficient at low and high frequency
 // for the boundaries, and the floor material for the ground reflection.
 export const ROOMS = {
+  cabin:    { name: 'Alpine hut (timber walls, storm outside)', dims: [5.8, 4.6, 2.5], alpha: [0.11, 0.14], floor: [0.09, 0.11], walls: true, reverb: true, cabin: true },
   anechoic: { name: 'Anechoic chamber', dims: [8, 8, 6], alpha: [1, 1], floor: [1, 1], walls: false, reverb: false },
   outdoors: { name: 'Garden (outdoors)', dims: [30, 30, 30], alpha: [1, 1], floor: [0.25, 0.55], walls: false, reverb: false },
   nursery:  { name: 'Nursery (carpet, curtains)', dims: [3.6, 3.2, 2.5], alpha: [0.22, 0.45], floor: [0.25, 0.5], walls: true, reverb: true },
