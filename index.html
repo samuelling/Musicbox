@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#15110e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Musicbox — a physically modelled music box</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">Musicbox</div>
+    <div id="nowPlaying" class="now">—</div>
+    <div id="spl" class="spl" title="Sound pressure level at your ears">— dB</div>
+  </header>
+
+  <section id="stage">
+    <canvas id="view"></canvas>
+    <div id="startHint" class="hint">Tap the crank pad to start the sound</div>
+    <div class="modeSwitch">
+      <button data-mode="crank" class="on">Hand crank</button>
+      <button data-mode="spring">Wind-up</button>
+    </div>
+    <div id="windInfo" class="windInfo hidden">
+      <div class="gauge"><div id="springBar"></div></div>
+      <span id="springTxt">0 turns</span>
+      <button id="lever" class="lever">Start</button>
+    </div>
+    <div id="pad" class="pad" aria-label="Draw circles here to turn the crank">
+      <canvas id="padCanvas"></canvas>
+      <div id="padLabel" class="padLabel">Circle clockwise<br>to crank</div>
+    </div>
+    <div id="busy" class="busy hidden">Tuning tines…</div>
+  </section>
+
+  <nav class="tabs">
+    <button data-tab="listen" class="on">Listen</button>
+    <button data-tab="tunes">Tunes</button>
+    <button data-tab="comb">Tines</button>
+    <button data-tab="box">Box</button>
+    <button data-tab="physics">Physics</button>
+  </nav>
+
+  <main id="panels">
+    <!-- LISTEN -->
+    <section class="panel on" data-panel="listen">
+      <div class="row">
+        <label>Room <select id="room"></select></label>
+        <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
+      </div>
+      <div class="mapWrap"><canvas id="map"></canvas></div>
+      <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
+      <div class="row">
+        <label class="grow">Ear height <input type="range" id="earH" min="0.3" max="1.9" step="0.01" value="1.2"><span id="earHv">1.20 m</span></label>
+        <label class="grow">Facing <input type="range" id="yaw" min="-180" max="180" step="1" value="90"><span id="yawv">90°</span></label>
+      </div>
+      <div class="row">
+        <label class="grow">Volume <input type="range" id="vol" min="0" max="4" step="0.01" value="1"></label>
+        <div id="distTxt" class="readout">—</div>
+      </div>
+    </section>
+
+    <!-- TUNES -->
+    <section class="panel" data-panel="tunes">
+      <div class="cats" id="cats"></div>
+      <ul id="songList" class="songs"></ul>
+      <div class="row">
+        <button id="importMidi">Import MIDI…</button>
+        <input type="file" id="midiFile" accept=".mid,.midi,audio/midi" hidden>
+        <button id="newTune">Compose new</button>
+        <button id="shareTune">Share link</button>
+      </div>
+      <h3>Pin roll <span id="arrInfo" class="small"></span></h3>
+      <div class="row">
+        <label>BPM <input type="number" id="bpm" min="30" max="240" step="1" value="100"></label>
+        <label>Bars <input type="number" id="bars" min="1" max="64" step="1" value="8"></label>
+        <label>Beats/bar <select id="meterSel"><option value="4,4">4/4</option><option value="3,4">3/4</option><option value="6,8">6/8</option><option value="2,4">2/4</option></select></label>
+        <button id="saveTune">Save to My tunes</button>
+        <button id="retune" title="Rebuild the comb so it matches this tune">Re-tune comb</button>
+      </div>
+      <div class="editorWrap"><canvas id="editor"></canvas></div>
+      <p class="small">Tap a cell to add or remove a pin. Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
+    </section>
+
+    <!-- TINES / COMB -->
+    <section class="panel" data-panel="comb">
+      <div class="grid">
+        <label>Comb <select id="comb"></select></label>
+        <label>Tine material <select id="material"></select></label>
+        <label>Thickness <input type="range" id="thickness" min="0.75" max="1.3" step="0.01" value="1"><span id="thicknessv">×1.00</span></label>
+        <label>Pin engagement <input type="range" id="engage" min="0.15" max="0.7" step="0.01" value="0.35"><span id="engagev">0.35 mm</span></label>
+        <label>Pin edge radius <input type="range" id="pinEdge" min="0.01" max="0.2" step="0.005" value="0.035"><span id="pinEdgev">0.035 mm</span></label>
+        <label>Comb tilt <input type="range" id="combTilt" min="0" max="45" step="1" value="25"><span id="combTiltv">25°</span></label>
+        <label>A4 <input type="range" id="a4" min="415" max="452" step="1" value="440"><span id="a4v">440 Hz</span></label>
+        <label>Age (detune) <input type="range" id="detune" min="0" max="30" step="1" value="0"><span id="detunev">0 ¢</span></label>
+        <label class="chk"><input type="checkbox" id="dampers" checked> Dampers on bass tines</label>
+        <label>Quality <select id="quality"><option value="high">High</option><option value="eco">Battery saver</option></select></label>
+      </div>
+      <h3>Tine inspector <span id="tineName" class="small">tap a tine in the 3D view or below</span></h3>
+      <div class="tineStrip"><canvas id="strip"></canvas></div>
+      <div class="inspWrap"><canvas id="insp"></canvas></div>
+      <div id="tineTable" class="small mono"></div>
+    </section>
+
+    <!-- BOX -->
+    <section class="panel" data-panel="box">
+      <div class="grid">
+        <label>Enclosure <select id="enclosure"></select></label>
+        <label>Sitting on <select id="surface"></select></label>
+        <label>Lid <select id="lid"><option value="open">Open</option><option value="closed">Closed</option></select></label>
+        <label>Mechanism noise <input type="range" id="noise" min="0" max="2" step="0.01" value="1"></label>
+        <label>Governor air brake <input type="range" id="airBrake" min="0.4" max="2.5" step="0.01" value="1"><span id="airBrakev">×1.00</span></label>
+      </div>
+      <div id="boxInfo" class="small mono"></div>
+    </section>
+
+    <!-- PHYSICS -->
+    <section class="panel" data-panel="physics">
+      <div id="live" class="live mono"></div>
+      <div id="modelInfo" class="small mono"></div>
+      <p class="small">The derivations behind every number are in <a href="https://github.com/samuelling/musicbox/blob/main/PHYSICS.md" target="_blank" rel="noopener">PHYSICS.md</a>.</p>
+    </section>
+  </main>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
