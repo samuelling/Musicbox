@@ -690,6 +690,7 @@ export class MusicBoxScene {
   // r: { dims, boxPos (m, room), boxYaw, tableTop (m) or null if held, cabin }
   // Christmas decorations (the hut has a tree and a garland)
   setXmas(on) { this.xmas = on; if (this.roomObj && this.roomObj.setXmas) this.roomObj.setXmas(on); this.dirty = 4; }
+  setHanukkah(on) { this.hanukkah = on; if (this.roomObj && this.roomObj.setHanukkah) this.roomObj.setHanukkah(on); this.dirty = 4; }
   placeRoom(r) {
     this.roomDef = r;
     const key = [r.kind, r.dims.join(), r.boxPos ? r.boxPos.map((v) => v.toFixed(2)).join() : 'held'].join('|');
@@ -704,6 +705,7 @@ export class MusicBoxScene {
       if (this.roomObj) this.roomInner.add(this.roomObj.group);
       if (this.roomObj && this.roomObj.setFire) this.roomObj.setFire(this.litTarget === 1);
       if (this.roomObj && this.roomObj.setXmas) this.roomObj.setXmas(!!this.xmas);
+      if (this.roomObj && this.roomObj.setHanukkah) this.roomObj.setHanukkah(!!this.hanukkah);
     }
     this.cabin = this.roomObj;     // (the hut and the other rooms share update/setFire)
     this.scene.fog = this.roomObj ? null : this.baseFog;

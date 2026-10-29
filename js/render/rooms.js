@@ -6,6 +6,8 @@ import { woodMaterial } from './materials.js';
 import { Cabin, valleyTexture, flakeTexture, stoneTexture } from './cabin.js';
 import { cuckoo, mantel, longcase, chapelDial, labClock, wallMount } from './clocks.js';
 import { lockedDoor, mountDoor, sealedHatch } from './doors.js';
+import { hanukkiah, dreidel, gelt, starOfDavid, flickerHanukkah } from './hanukkah.js';
+import { swissTree, garland, wreath, stocking, poinsettia, lightString, snowflake, bow, onWall } from './christmas.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
@@ -139,6 +141,22 @@ class Room {
     const l = new THREE.PointLight(color, intensity, dist, 2); l.position.set(x, y, z); this.group.add(l); return l;
   }
   clock(c, wall, u, h) { this.clocks.push(wallMount(this.group, this.dims, c, wall, u, h)); }
+  // Christmas, built the first time it's wanted by the room's own xmasBuild(group)
+  setXmas(on) {
+    if (on && !this.xmas && this.xmasBuild) { this.xmas = new THREE.Group(); this.xmasBuild(this.xmas); this.group.add(this.xmas); }
+    if (this.xmas) this.xmas.visible = on;
+  }
+  // Hanukkah: a hanukkiah on the windowsill (built by the room's hanukkahBuild, or the default below)
+  setHanukkah(on) {
+    if (on && !this.hanukkah) {
+      const h = (this.hanukkah = new THREE.Group());
+      if (this.hanukkahBuild) this.hanukkahBuild(h);
+      if (this.sill) { const m = hanukkiah(0.9); m.position.set(this.sill.x, this.sill.y, this.RY - 10); h.add(m); }
+      this.group.add(h);
+      let t = 0; this.updaters.push((dt) => { t += dt; flickerHanukkah(this.hanukkah, t); });
+    }
+    if (this.hanukkah) this.hanukkah.visible = on;
+  }
   setFire() {}
   update(dt) {
     const now = new Date(), t = performance.now() / 1000;
@@ -164,6 +182,7 @@ class Nursery extends Room {
       new THREE.MeshStandardMaterial({ map: wp, roughness: 0.85 }), new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.9 }), [{ wall: 'y1', ...W }], 900);
     const white = new THREE.MeshStandardMaterial({ color: 0xf1ede4, roughness: 0.55 });
     this.skirting(white, 110);
+    this.sill = { x: (W.x0 + W.x1) / 2, y: W.z0 };
     this.window(W.x0, W.x1, W.z0, W.z1, { frame: white, curtain: new THREE.MeshStandardMaterial({ color: 0xe7c9cf, roughness: 0.95, side: THREE.DoubleSide }) });
     // crib along the back wall to the right, spindles and a soft blanket
     const crib = new THREE.MeshStandardMaterial({ color: 0xf4efe6, roughness: 0.5 });
@@ -184,6 +203,19 @@ class Nursery extends Room {
     this.clock(cuckoo(), 'y1', RX - 750, 1900);
     // the door, chained, bolted and a chair wedged under the knob
     mountDoor(this.group, RX, RY, lockedDoor('nursery'), 'x1', 850);
+    this.hanukkahBuild = (h) => {
+      const d = dreidel(0.9); d.position.set(250, 820, 1260); h.add(d);
+      const s = onWall(starOfDavid(130), 'x1'); s.position.set(RX - 40, 1700, 850); h.add(s);
+    };
+    // Christmas: a little tree on the dresser, fairy lights along the curtain rod, paper snowflakes on the
+    // window and a stocking on the crib
+    this.xmasBuild = (x) => {
+      const t = swissTree(620, 230, { nb: 28, orn: 16, presents: false, turns: 4 }); t.position.set(240, 820, 1520); x.add(t);
+      const pts = []; for (let i = 0; i <= 48; i++) { const u = i / 48; pts.push(new THREE.Vector3(200 + u * 1900, 2370 - 140 * Math.abs(Math.sin(u * Math.PI * 3)), RY - 115)); }
+      x.add(lightString(pts));
+      for (const [fx, fy, r] of [[820, 1820, 90], [1150, 1560, 120], [1480, 1880, 80], [930, 1180, 70], [1420, 1250, 100]]) { const f = onWall(snowflake(r), 'y1'); f.position.set(fx, fy, RY + 28); f.rotation.z = R(0, 1); x.add(f); }
+      const s = onWall(stocking(0xc83030, 0.8), 'y1'); s.position.set(cx - 330, 900, cz - cd / 2 - 45); x.add(s);
+    };
   }
   rockingHorse(x, z) {
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = 0.6; this.group.add(g);
@@ -209,6 +241,7 @@ class Living extends Room {
     this.skirting(white, 160);
     // dado rail and picture rail
     for (const h of [900, 2350]) { this.box(RX, 30, 22, RX / 2, h, 11, white); this.box(RX, 30, 22, RX / 2, h, RY - 11, white); this.box(22, 30, RY, 11, h, RY / 2, white); this.box(22, 30, RY, RX - 11, h, RY / 2, white); }
+    this.sill = { x: (W.x0 + W.x1) / 2, y: W.z0 };
     this.window(W.x0, W.x1, W.z0, W.z1, { frame: white, curtain: new THREE.MeshStandardMaterial({ color: 0x5a2a2e, roughness: 0.95, side: THREE.DoubleSide }) });
     // a sofa along the right wall, facing into the room
     const fabric = new THREE.MeshStandardMaterial({ color: 0x3e5868, roughness: 0.95 });
@@ -236,6 +269,16 @@ class Living extends Room {
     for (const [w, h, x, y] of [[800, 50, 1000, 1945], [800, 50, 1000, 1355], [50, 640, 620, 1650], [50, 640, 1380, 1650]]) this.box(w, h, 40, x, y, RY - 22, gilt);
     // the door beside the bookcase: chained, double-deadbolted and bolted at the top
     mountDoor(this.group, RX, RY, lockedDoor('living'), 'x0', RY - 850);
+    this.hanukkahBuild = (h) => {
+      const g2 = gelt(); g2.position.set(bx + 120, 820, bz); h.add(g2);
+      const s = onWall(starOfDavid(150), 'x0'); s.position.set(60, 1250, RY - 850); h.add(s);
+    };
+    // Christmas: a wreath on the (thrice-locked) door, a garland along the sideboard, a poinsettia beside it
+    this.xmasBuild = (x) => {
+      const w = onWall(wreath(210), 'x0'); w.position.set(70, 1620, RY - 850); x.add(w);
+      x.add(garland(new THREE.Vector3(bx - 640, 828, bz - 250), new THREE.Vector3(bx + 640, 828, bz - 250), 3, 120));
+      const p = poinsettia(1.1); p.position.set(bx - 950, 0, RY - 320); x.add(p);
+    };
     // a soft rug in front of the sofa
     const rug = this.mesh(new THREE.PlaneGeometry(1400, 2000), new THREE.MeshStandardMaterial({ color: 0x8a6448, roughness: 1 }), RX - 1500, 4, 2000, false); rug.rotation.x = -Math.PI / 2;
   }
@@ -261,6 +304,7 @@ class Parlor extends Room {
     for (const [w, d, x, z] of [[RX, 4, RX / 2, 3], [RX, 4, RX / 2, RY - 3], [4, RY, 3, RY / 2], [4, RY, RX - 3, RY / 2]]) this.box(w, RZ - 2700, d, x, (RZ + 2700) / 2, z, frieze).castShadow = false;
     for (const [w, d, x, z] of [[RX, 60, RX / 2, 30], [RX, 60, RX / 2, RY - 30], [60, RY, 30, RY / 2], [60, RY, RX - 30, RY / 2]]) { this.box(w, 90, d, x, 2690, z, rail); this.box(w, 120, d * 1.6, x, RZ - 60, z, rail); }
     for (let k = 1; k < 4; k++) this.box(RX, 160, 180, RX / 2, RZ - 80, k * RY / 4, rail);
+    this.sill = { x: (W.x0 + W.x1) / 2, y: W.z0 };
     this.window(W.x0, W.x1, W.z0, W.z1, { frame: rail, bars: [3, 4], curtain: new THREE.MeshStandardMaterial({ color: 0x3a1a20, roughness: 0.9, side: THREE.DoubleSide }) });
     // a marble fireplace (cold tonight) on the left wall, a pair of sconces lit either side
     const marble = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.25 });
@@ -290,6 +334,17 @@ class Parlor extends Room {
     for (let sh = 0; sh < 6; sh++) { let z = 900; while (z < 4320) { const bw = R(35, 70), bh = R(260, 360); this.box(300, bh, bw, RX - 240, 140 + sh * 400 + bh / 2, z + bw / 2, new THREE.MeshStandardMaterial({ color: cols[Math.floor(R(0, cols.length))], roughness: 0.75 })).castShadow = false; z += bw + 2; } }
     // the door, bolted top and bottom, the key turned and left in the lock
     mountDoor(this.group, RX, RY, lockedDoor('parlor'), 'x0', 1000);
+    this.hanukkahBuild = (h) => {
+      for (const dz of [-380, -250]) { const d = dreidel(1); d.position.set(220, 1260, fz + dz); d.rotation.y = dz; h.add(d); }
+      const g2 = gelt(); g2.position.set(220, 1260, fz + 380); h.add(g2);
+    };
+    // Christmas: a garland and three stockings on the marble mantel, a wreath above it and one on the door
+    this.xmasBuild = (x) => {
+      x.add(garland(new THREE.Vector3(428, 1255, fz - 950), new THREE.Vector3(428, 1255, fz + 950), 3, 160));
+      for (const [z, c] of [[fz - 650, 0xa81c1c], [fz, 0x1e5a32], [fz + 650, 0xa81c1c]]) { const s = onWall(stocking(c, 1), 'x0'); s.position.set(455, 1235, z); x.add(s); }
+      const w = onWall(wreath(280), 'x0'); w.position.set(40, 1900, fz); x.add(w);
+      const d = onWall(wreath(200), 'x0'); d.position.set(75, 1750, 1000); x.add(d);
+    };
     // the longcase clock against the back wall, right of the window
     const lc = longcase(); lc.g.position.set(5400, 0, -(RY - 20)); const um = new THREE.Group(); um.scale.z = -1; um.add(lc.g); this.group.add(um); this.clocks.push(lc);
   }
@@ -349,6 +404,13 @@ class Chapel extends Room {
     for (let x = 1500; x < RX; x += 3000) { this.box(300, 300, RY, x, RZ - 150, RY / 2, truss); this.box(200, 1600, 200, x, RZ - 800, RY / 2, truss); }
     // the great west doors, barred and chained
     mountDoor(this.group, RX, RY, lockedDoor('chapel'), 'x0', RY / 2);
+    this.hanukkahBuild = (h) => { const m = hanukkiah(3.2); m.position.set(1900, 0, RY / 2 - 1800); m.rotation.y = Math.PI / 2; h.add(m); };
+    // Christmas: a great wreath on the barred doors, a garland across the altar, poinsettias on the step
+    this.xmasBuild = (x) => {
+      const w = onWall(wreath(520), 'x0'); w.position.set(110, 2500, RY / 2); x.add(w);
+      x.add(garland(new THREE.Vector3(RX - 1565, 1170, RY / 2 - 1180), new THREE.Vector3(RX - 1565, 1170, RY / 2 + 1180), 4, 200));
+      for (const s of [-1, 1]) for (const dz of [0, 420]) { const p = poinsettia(1.5); p.position.set(RX - 2500 + dz * 0.4, 180, RY / 2 + s * (1450 + dz)); x.add(p); }
+    };
     // the great clock high on the north wall, over the box
     this.clock(chapelDial(), 'y1', bx, 5600);
   }
@@ -387,6 +449,12 @@ class Anechoic extends Room {
     for (let y = 0; y <= RY; y += 60) this.box(RX, 4, 4, RX / 2, 0, y, wire).castShadow = false;
     // no door: a ladder up to a sealed hatch in the ceiling; the work light and a measuring microphone on a boom
     this.group.add(sealedHatch(900, RZ));
+    this.hanukkahBuild = (h) => { const m = hanukkiah(0.8); m.position.set(2300, 0, 560); h.add(m); const d = dreidel(0.8); d.position.set(2650, 0, 640); h.add(d); };
+    // Christmas, such as it is: a red bow on the hatch wheel and a small sad tree with one bulb
+    this.xmasBuild = (x) => {
+      const b = bow(46, new THREE.MeshStandardMaterial({ color: 0xb01818, roughness: 0.45 })); b.position.set(900, RZ - 470, 720 - 262); x.add(b);
+      const t = swissTree(420, 150, { nb: 1, orn: 0, presents: false, lamps: false, turns: 0 }); t.position.set(1650, 0, 520); x.add(t);
+    };
     this.mesh(new THREE.CylinderGeometry(140, 180, 90, 20), new THREE.MeshStandardMaterial({ color: 0xf4f6ff, emissive: 0xdde6ff, emissiveIntensity: 0.6 }), RX / 2, RZ - 45, RY / 2, false);
     this.lamp(RX / 2, RZ - 200, RY / 2, 0xe8eeff, 2.2e6);
     const bx = box ? box[0] * 1000 : RX / 2, by = box ? box[1] * 1000 : RY / 2;

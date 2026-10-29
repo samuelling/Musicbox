@@ -1,6 +1,7 @@
 import { Engine } from './audio/engine.js';
 import { strikeMatch } from './audio/match.js';
 import { christmasTime } from './render/christmas.js';
+import { hanukkahTime } from './render/hanukkah.js';
 import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physics/hamster.js';
 import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
@@ -723,6 +724,14 @@ document.addEventListener('pointerlockerror', () => scene.onGrabFail());
   try { const s = JSON.parse(localStorage.getItem('frisky.xmas') || 'null'); if (s && s.season === season) on = s.on; } catch (e) { /* none */ }
   $('xmas').checked = on; scene.setXmas(on);
   $('xmas').addEventListener('change', (e) => { scene.setXmas(e.target.checked); try { localStorage.setItem('frisky.xmas', JSON.stringify({ on: e.target.checked, season })); } catch (err) { /* private mode */ } });
+}
+// Hanukkah decorations, the same way: on by themselves for the eight days, alone or with Christmas
+{
+  const season = hanukkahTime();
+  let on = season;
+  try { const s = JSON.parse(localStorage.getItem('frisky.hanukkah') || 'null'); if (s && s.season === season) on = s.on; } catch (e) { /* none */ }
+  $('hanukkah').checked = on; scene.setHanukkah(on);
+  $('hanukkah').addEventListener('change', (e) => { scene.setHanukkah(e.target.checked); try { localStorage.setItem('frisky.hanukkah', JSON.stringify({ on: e.target.checked, season })); } catch (err) { /* private mode */ } });
 }
 $('standBtn').addEventListener('click', () => posture(+1));
 $('crouchBtn').addEventListener('click', () => posture(-1));

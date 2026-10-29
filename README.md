@@ -48,7 +48,11 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   anechoic chamber (a lab clock). Every clock shows the real time. Every door is locked from the inside (the hut's barred with a beam; the nursery's chained,
   deadbolted and a chair wedged under the knob; the chapel's barred and chained; the anechoic chamber has only a
   ladder up to a sealed, padlocked hatch). From 1 December to Epiphany the hut has a Swiss Christmas tree in the
-  corner, strung with C9 bulbs, and a garland on the mantel (Listener → 🎄 Christmas decorations, any time of year). Moving about borrows Ashland's
+  corner, strung with C9 bulbs, and a garland on the mantel (Listener → 🎄 Christmas decorations, any time of year); it's at its coziest — stockings (one tiny one for Frisky),
+  an Advent wreath lit for the Sundays so far, a paper star in the window — and the other rooms get theirs too. 🕎 Hanukkah
+  decorations come out by themselves for the eight days (from the Hebrew calendar), alone or alongside Christmas: a
+  hanukkiah in every window, lit for the night it is, dreidels and gelt, blue-and-white lights in the hut. Candles in
+  iron sconces warm the hut's far corner whenever the fire is lit. Moving about borrows Ashland's
   controls. At a desk: W A S D walks (Shift hurries), and a click on an empty part of the room hands it the mouse,
   so the mouse looks around and a click acts on whatever the dot in the middle is on; Esc frees the mouse, and Tab
   opens the settings (letting go of it) and closes them again (taking it back). ← → ↑ ↓ turn and look too, and the

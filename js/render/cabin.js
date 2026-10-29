@@ -3,7 +3,8 @@
 // millimetres with x = room x, y = height, z = room y (so it lines up with the acoustic room).
 import * as THREE from 'three';
 import { lockedDoor, mountDoor } from './doors.js';
-import { swissTree, garland } from './christmas.js';
+import { hanukkiah, dreidel, gelt, starOfDavid, flickerHanukkah } from './hanukkah.js';
+import { swissTree, garland, stocking, lightString, moravianStar, adventWreath, onWall } from './christmas.js';
 import { woodMaterial } from './materials.js';
 import { regulator, wallMount } from './clocks.js';
 
@@ -436,7 +437,7 @@ export class Cabin {
     wallMount(g, [RX, RY], { g: framedWatercolour() }, 'x0', fc, hearthH + openH + 640, fd + 2);
     const horn = alphorn(); horn.position.set(110, 0, RY - 110); horn.rotation.y = Math.PI / 4; g.add(horn);
     // where Christmas goes (built the first time it's wanted): the tree in the corner by the hearth, a garland on the mantel
-    this.xmasAt = { mantelX: fd + 105, mantelY: hearthH + openH + 135, z0: fy0 - 60, z1: fy1 + 60 };
+    this.xmasAt = { mantelX: fd + 105, mantelY: hearthH + openH + 135, z0: fy0 - 60, z1: fy1 + 60, fc, RX, RY };
 
     // ---- a corner bench (the Eckbank of a farmhouse Stube) and firewood by the hearth ----
     const benchM = timber(2); benchM.color = new THREE.Color(0x9a7a60);
@@ -448,6 +449,27 @@ export class Cabin {
       back.position.set(alongX ? x : x + (x < RX / 2 ? -190 : 190), 690, alongX ? z + (z < RY / 2 ? -190 : 190) : z); back.rotation[alongX ? 'x' : 'z'] = (alongX ? (z < RY / 2 ? -1 : 1) : (x < RX / 2 ? 1 : -1)) * 0.12; g.add(back);
     };
     bench(2200, RX - 1100, RY - 210, true); bench(1900, RX - 210, RY - 420 - 950, false);
+    // candles in iron sconces on the walls over the corner bench, to warm that dark corner (lit with the fire)
+    this.sconces = [];
+    const iron = new THREE.MeshStandardMaterial({ color: 0x1c1a18, metalness: 0.7, roughness: 0.5 });
+    const wax = new THREE.MeshStandardMaterial({ color: 0xf0e2c0, roughness: 0.6, emissive: 0x2a1a08 });
+    const glowT = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,220,150,1)'); gr.addColorStop(0.3, 'rgba(255,180,90,0.45)'); gr.addColorStop(1, 'rgba(255,160,60,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const sconce = (x, z, ry) => {
+      const s = new THREE.Group(); s.position.set(x, 1500, z); s.rotation.y = ry; g.add(s);
+      const part = (geo, m, px, py, pz) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.castShadow = true; s.add(o); return o; };
+      part(new THREE.BoxGeometry(90, 300, 10), iron, 0, 0, 5);
+      for (const y of [-130, 130]) part(new THREE.SphereGeometry(14, 10, 8), iron, 0, y, 12);
+      const arm = part(new THREE.TorusGeometry(90, 9, 8, 16, Math.PI / 2), iron, 0, -60, 100); arm.rotation.y = Math.PI / 2; arm.rotation.z = Math.PI;
+      part(new THREE.CylinderGeometry(62, 50, 14, 20), iron, 0, 30, 190);
+      part(new THREE.CylinderGeometry(24, 25, 190, 16), wax, 0, 132, 190);
+      const drip = part(new THREE.SphereGeometry(10, 8, 6), wax, 14, 210, 205); drip.scale.y = 2;
+      const flame = part(new THREE.SphereGeometry(10, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffd27a }), 0, 252, 190); flame.castShadow = false;
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.set(0, 250, 190); halo.scale.setScalar(320); s.add(halo);
+      this.sconces.push({ flame, halo, ph: R(0, 6) });
+    };
+    sconce(RX - 760, RY, Math.PI); sconce(RX, RY - 760, -Math.PI / 2);
+    this.sconceLight = new THREE.PointLight(0xffa850, 0, 0, 2); this.sconceLight.position.set(RX - 520, 1820, RY - 520); g.add(this.sconceLight);
+    this.sconceLvl = 0;
     // the door, barred with a beam
     mountDoor(g, RX, RY, lockedDoor('cabin'), 'x1', 1150);
     const woodM = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.95 }), endM = new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.9 });
@@ -457,12 +479,38 @@ export class Cabin {
     }
   }
 
-  setFire(on) { this.fireTarget = on ? 1 : 0.06; }
+  // Hanukkah in the hut: the hanukkiah on a shelf in the window, dreidels and gelt on the corner bench,
+  // blue-and-white lights along the wall over it, and a Star of David on the (barred) door
+  setHanukkah(on) {
+    if (on && !this.hanukkah) {
+      const A = this.xmasAt, wn = this.win, h = (this.hanukkah = new THREE.Group());
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(720, 30, 200), new THREE.MeshStandardMaterial({ color: 0x8a6a50, roughness: 0.8 })); shelf.position.set((wn.x0 + wn.x1) / 2, wn.y0 - 15, A.RY - 60); shelf.castShadow = true; h.add(shelf);
+      const m = hanukkiah(1); m.position.set((wn.x0 + wn.x1) / 2, wn.y0, A.RY - 60); h.add(m);
+      for (const [dx, r] of [[-1600, 0.3], [-1480, 2.1]]) { const d = dreidel(1); d.position.set(A.RX + dx, 466, A.RY - 250); d.rotation.y = r; h.add(d); }
+      const g2 = gelt(); g2.position.set(A.RX - 1300, 466, A.RY - 240); h.add(g2);
+      const lp = []; for (let i = 0; i <= 30; i++) { const u = i / 30; lp.push(new THREE.Vector3(A.RX - 2150 + u * 2000, 1270 - 90 * Math.abs(Math.sin(u * Math.PI * 3)), A.RY - 30)); }
+      h.add(lightString(lp, { cols: [0x3a70ff, 0xf4f4ff] }));
+      const s = onWall(starOfDavid(160), 'x1'); s.position.set(A.RX - 60, 1720, 1150); h.add(s);
+      this.group.add(h);
+    }
+    if (this.hanukkah) this.hanukkah.visible = on;
+  }
+  setFire(on) { this.fireTarget = on ? 1 : 0.06; this.sconceOn = on; }
   setXmas(on) {
     if (on && !this.xmas) {
       const A = this.xmasAt, x = (this.xmas = new THREE.Group());
       const tree = swissTree(2050, 620); tree.position.set(760, 0, 780); tree.rotation.y = 0.4; x.add(tree);
       x.add(garland(new THREE.Vector3(A.mantelX, A.mantelY, A.z0), new THREE.Vector3(A.mantelX, A.mantelY, A.z1), 3, 150));
+      // stockings on the mantel: two, and a tiny one for Frisky
+      for (const [dz, c, k] of [[-680, 0xa81c1c, 1], [680, 0xe8e0d0, 1], [520, 0xa81c1c, 0.45]]) { const s = onWall(stocking(c, k), 'x0'); s.position.set(A.mantelX + 30, A.mantelY - 15, A.fc + dz); x.add(s); }
+      // over the window: a garland strung with C9s, and a paper star glowing in it
+      const wn = this.win, RY = A.RY;
+      x.add(garland(new THREE.Vector3(wn.x0 - 180, wn.y1 + 150, RY - 70), new THREE.Vector3(wn.x1 + 180, wn.y1 + 150, RY - 70), 2, 120));
+      const lp = []; for (let i = 0; i <= 40; i++) { const u = i / 40; lp.push(new THREE.Vector3(wn.x0 - 180 + u * (wn.x1 - wn.x0 + 360), wn.y1 + 140 - 120 * Math.abs(Math.sin(u * Math.PI * 2)), RY - 95)); }
+      x.add(lightString(lp, { c9: true }));
+      const star = moravianStar(150); star.position.set((wn.x0 + wn.x1) / 2, wn.y1 - 40, RY - 160); x.add(star);
+      // an Advent wreath on the corner bench, its candles lit for the Sundays of Advent so far
+      const aw = adventWreath(180); aw.position.set(A.RX - 820, 466, RY - 232); x.add(aw); this.advent = aw;
       this.group.add(x);
     }
     if (this.xmas) this.xmas.visible = on;
@@ -486,6 +534,17 @@ export class Cabin {
       p[i * 3] = f.x; p[i * 3 + 1] = f.y + sway * 0.6; p[i * 3 + 2] = f.z + sway * 0.4;
     }
     this.snowGeo.attributes.position.needsUpdate = true;
+    flickerHanukkah(this.hanukkah, this.t);
+    // the corner sconces: lit with the fire (quicker than it catches), each flame flickering on its own
+    this.sconceLvl += ((this.sconceOn ? 1 : 0) - this.sconceLvl) * Math.min(1, dt * 2.5);
+    const SL = this.sconceLvl;
+    let fl = 0;
+    for (const c of this.sconces) {
+      const k = 0.85 + 0.12 * Math.sin(this.t * (7 + c.ph) + c.ph) + 0.06 * Math.sin(this.t * 19.3 + c.ph * 3);
+      c.flame.visible = c.halo.visible = SL > 0.02; c.flame.scale.set(0.9 * SL, 2.3 * k * SL, 0.9 * SL); c.flame.position.x = 2.5 * Math.sin(this.t * 5.1 + c.ph);
+      c.halo.material.opacity = 0.75 * SL * k; fl += k;
+    }
+    this.sconceLight.intensity = 1.6e5 * SL * (fl / Math.max(1, this.sconces.length));
     // fire: a smoothed random walk drives light and flames
     this.fireN += (Math.random() * 2 - 1 - this.fireN) * Math.min(1, dt * 8);
     // catching: kindling first (a few seconds), then the logs; banked back to embers when snuffed
