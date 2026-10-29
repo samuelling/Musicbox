@@ -14,10 +14,16 @@ export class CrankPad {
     el.addEventListener('pointerup', (e) => this.up(e));
     el.addEventListener('pointercancel', (e) => this.up(e));
     this.resize(); window.addEventListener('resize', () => this.resize());
+    // the pad is hidden in hamster mode and the stage changes size with the layout: keep the
+    // canvas matched to the pad whenever it is shown or resized (a 0×0 canvas draws nothing)
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => this.resize()).observe(el);
   }
   resize() {
     const r = this.el.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
-    this.cv.width = r.width * d; this.cv.height = r.height * d; this.dpr = d; this.draw();
+    if (!r.width || !r.height) return;           // hidden: keep the last good size
+    const w = Math.round(r.width * d), h = Math.round(r.height * d);
+    if (this.cv.width !== w || this.cv.height !== h) { this.cv.width = w; this.cv.height = h; }
+    this.dpr = d; this.draw(true);
   }
   angleOf(e) {
     const r = this.el.getBoundingClientRect();
@@ -47,9 +53,11 @@ export class CrankPad {
     this.onRelease && this.onRelease({ total: this.total });
     this.draw();
   }
-  setShown(angle) { if (!this.active) { this.showAngle = angle; this.draw(); } }
-  draw() {
+  setShown(angle) { if (!this.active && Number.isFinite(angle)) { this.showAngle = angle; this.draw(); } }
+  draw(sized) {
+    if (!sized && (!this.cv.width || !this.dpr)) { this.resize(); return; }
     const c = this.ctx, W = this.cv.width, H = this.cv.height, R = Math.min(W, H) / 2;
+    if (!W || !H) return;
     c.clearRect(0, 0, W, H);
     c.save(); c.translate(W / 2, H / 2);
     // ratchet teeth ring
@@ -59,7 +67,8 @@ export class CrankPad {
       const a = (i / n) * TAU;
       c.beginPath(); c.moveTo(Math.cos(a) * R * 0.86, Math.sin(a) * R * 0.86); c.lineTo(Math.cos(a) * R * 0.94, Math.sin(a) * R * 0.94); c.stroke();
     }
-    const ang = this.active ? this.fingerAngle : this.showAngle;
+    let ang = this.active ? this.fingerAngle : this.showAngle;
+    if (!Number.isFinite(ang)) ang = -Math.PI / 2;
     const hr = R * this.radius;
     if (this.mode === 'crank') {
       // crank arm + knob

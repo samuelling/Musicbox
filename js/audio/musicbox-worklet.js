@@ -83,6 +83,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         if (m.hour !== undefined) this.hamHour = m.hour;
         if (m.inWheel !== undefined) this.ham.setInWheel(m.inWheel);
         if (m.silent !== undefined) this.ham.silent = m.silent;
+        if (m.vol !== undefined) this.hamVol = m.vol;
         if (m.wake) this.ham.wake();
         break;
       case 'seek': d.theta = m.theta; d.thetaMod = ((m.theta % TWO_PI) + TWO_PI) % TWO_PI; this.initPointers(); break;
@@ -828,7 +829,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
           ty = leak * ty + (1 - leak) * z[0]; tz = leak * tz + (1 - leak) * z[1]; fan = leak * fan + (1 - leak) * z[2];
         }
         Dy += ty; Dz += tz; Mdot += fan;
-        if (!ham.silent) Mdot += ham.sound(noise);   // the wheel: paws, rungs, axle (radiated from beside the box)
+        if (!ham.silent && this.hamVol !== 0) Mdot += ham.sound(noise) * (this.hamVol ?? 1);   // the wheel: paws, rungs, axle (radiated from beside the box)
         const pd = this.prevDdot;
         const Ddx = (Dx - pd[0]) * sr, Ddy = (Dy - pd[1]) * sr, Ddz = (Dz - pd[2]) * sr;
         pd[0] = Dx; pd[1] = Dy; pd[2] = Dz;

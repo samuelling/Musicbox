@@ -34,6 +34,7 @@
     <div id="hamInfo" class="hamInfo hidden">
       <div id="hamTxt" class="hamTxt">She's waking up…</div>
       <div class="hamBtns"><button id="hamPlace"><span class="ic">🎡</span>Place her in the wheel</button><button id="hamWatch"><span class="ic">👀</span>Watch her</button><button id="hamCover"><span class="ic">🧺</span>Cover the cage</button></div>
+      <label class="hamGear">Wheel sound <input type="range" id="hamVol" min="0" max="2" step="0.05" value="1"><span id="hamVolv">100%</span></label>
       <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="0.75"><span id="hamGearv">×0.75</span></label>
       <div class="hamNature" role="group" aria-label="Her nature">
         <span>Her nature</span>
@@ -57,8 +58,8 @@
       <div class="keys">
         <div class="kc"><div class="krow"><button data-move="fwd" data-key="KeyW" title="Walk forward">W</button></div>
           <div class="krow"><button data-move="sl" data-key="KeyA" title="Step left">A</button><button data-move="back" data-key="KeyS" title="Step back">S</button><button data-move="sr" data-key="KeyD" title="Step right">D</button></div><span>walk</span></div>
-        <div class="kc"><div class="krow"><button data-move="fwd" data-key="ArrowUp" title="Walk forward">↑</button></div>
-          <div class="krow"><button data-move="tl" data-key="ArrowLeft" title="Turn left">←</button><button data-move="back" data-key="ArrowDown" title="Step back">↓</button><button data-move="tr" data-key="ArrowRight" title="Turn right">→</button></div><span>turn</span></div>
+        <div class="kc"><div class="krow"><button data-move="lu" data-key="ArrowUp" title="Look up">↑</button></div>
+          <div class="krow"><button data-move="tl" data-key="ArrowLeft" title="Turn left">←</button><button data-move="ld" data-key="ArrowDown" title="Look down">↓</button><button data-move="tr" data-key="ArrowRight" title="Turn right">→</button></div><span>look</span></div>
       </div>
       <!-- touch: a pad to walk with (left thumb) -->
       <div class="dpad walkPad" aria-label="Walk">

@@ -476,7 +476,7 @@ export class MusicBoxScene {
     if (!this.everLit) {
       // the first light: watch the flame catch, then move in to the music box
       this.everLit = true;
-      setTimeout(() => { if (this.zoomed === 'wide' && !this.followListener && !(this.onFirstLight && this.onFirstLight())) this.frame(this.state.mode === 'auto' ? 'rig' : 'box'); }, 1100);
+      setTimeout(() => { if (!this.followListener && !(this.onFirstLight && this.onFirstLight())) { this.zoomed = 'wide'; this.frame(this.state.mode === 'auto' ? 'rig' : 'box'); } }, 1100);
     }
     this.dirty = Math.max(this.dirty, 2);
   }
@@ -804,6 +804,15 @@ export class MusicBoxScene {
     const eye = this.toScene(L.x, L.y, L.z);
     this.zoomed = null; this.follow = false;
     this.camAnim = { t: 0, t0: performance.now(), dur: 2800, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt: this.tipWorld.clone(), pos: eye, fov0: this.camera.fov, fov1: 62, done };
+  }
+  // look up (+) or down (−): your eyes' pitch, or the orbiting camera's height around its target
+  tilt(da) {
+    if (this.followListener) { this.lookPitch = Math.max(-1.2, Math.min(1.2, (this.lookPitch ?? this.autoPitch ?? 0) + da)); this.dirty = 3; return; }
+    this.camAnim = null;
+    const t = this.controls.target, v = this.camera.position.clone().sub(t), r = v.length();
+    const el = Math.max(-0.2, Math.min(1.45, Math.asin(v.y / r) - da)), h = Math.hypot(v.x, v.z) || 1;
+    this.camera.position.set(t.x + v.x / h * r * Math.cos(el), t.y + r * Math.sin(el), t.z + v.z / h * r * Math.cos(el));
+    this.dirty = 3;
   }
   // zoom buttons: dolly toward or away from what you are looking at
   dolly(k) {

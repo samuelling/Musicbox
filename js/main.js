@@ -19,7 +19,7 @@ const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
 
 // ------------------------------------------------------------------ state
-const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 0.75, lover: false, covered: true }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
+const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 0.75, lover: false, covered: true, vol: 1 }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
 let song = null;            // compiled tune (onsets)
 let songId = 'brahms';
 let built = null;           // last build result (info, arrangement, combNotes, geom, drive, room)
@@ -213,7 +213,7 @@ $('lever').addEventListener('click', () => {
 // ------------------------------------------------------------------ hamster drive
 const fillH = (id, obj, val) => { const el = $(id); el.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; el.appendChild(o); } el.value = val; };
 fillH('hamWheel', WHEELS, cfg.ham.wheel); fillH('hamTread', SURFACES_H, cfg.ham.surface); fillH('hamAxle', AXLES, cfg.ham.axle);
-function sendHam() { engine.send({ type: 'hamster', opts: { ...cfg.ham }, silent: cfg.ham.covered }); }
+function sendHam() { engine.send({ type: 'hamster', opts: { ...cfg.ham }, silent: cfg.ham.covered, vol: cfg.ham.vol }); }
 let life = null;
 function buildRig() {
   if (!built) return;
@@ -235,6 +235,7 @@ function buildRig() {
 $('hamMass').addEventListener('input', (e) => { cfg.ham.mass = +e.target.value / 1000; $('hamMassv').textContent = e.target.value + ' g'; sendHam(); clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 250); });
 for (const [id, key] of [['hamWheel', 'wheel'], ['hamTread', 'surface'], ['hamAxle', 'axle']]) $(id).addEventListener('change', (e) => { cfg.ham[key] = e.target.value; sendHam(); buildRig(); });
 $('hamCover').addEventListener('click', () => setCovered(true));
+$('hamVol').addEventListener('input', (e) => { cfg.ham.vol = +e.target.value; $('hamVolv').textContent = Math.round(cfg.ham.vol * 100) + '%'; engine.send({ type: 'hamster', vol: cfg.ham.vol }); });
 $('hamPlace').addEventListener('click', () => { ensureStarted(); if (life) life.placeInWheel(); });
 $('hamGear').addEventListener('input', (e) => {
   cfg.ham.gear = +e.target.value; $('hamGearv').textContent = '×' + cfg.ham.gear.toFixed(2); sendHam();
@@ -429,12 +430,12 @@ function walkLoop() {
   const step = (now) => {
     const dt = Math.min(0.05, (now - walk.last) / 1000); walk.last = now;
     const L = map.listener, P = walk.pad;
-    const f = (held('KeyW') || held('ArrowUp') || P.has('fwd') ? 1 : 0) - (held('KeyS') || held('ArrowDown') || P.has('back') ? 1 : 0);
+    const f = (held('KeyW') || P.has('fwd') ? 1 : 0) - (held('KeyS') || P.has('back') ? 1 : 0);
     const sd = (held('KeyD') || P.has('sr') ? 1 : 0) - (held('KeyA') || P.has('sl') ? 1 : 0);
-    const look = (P.has('lu') ? 1 : 0) - (P.has('ld') ? 1 : 0);
+    const look = (P.has('lu') || held('ArrowUp') ? 1 : 0) - (P.has('ld') || held('ArrowDown') ? 1 : 0);
     const turn = (held('KeyQ') || held('ArrowLeft') || P.has('tl') ? 1 : 0) - (held('KeyE') || held('ArrowRight') || P.has('tr') ? 1 : 0);
     let moved = false;
-    if (look && scene.followListener) { scene.lookPitch = Math.max(-1.2, Math.min(1.2, (scene.lookPitch ?? scene.autoPitch ?? 0) + look * 0.8 * dt)); scene.dirty = 3; }
+    if (look) scene.tilt(look * 0.8 * dt);      // through your eyes: look up or down; otherwise tilt the view
     if (turn) { map.faceBox = false; $('faceBox').checked = false; L.yaw += turn * 1.5 * dt; moved = true; }
     if (f || sd) {
       const v = (L.z < 1.0 ? 0.45 : 1.0) * dt, n = Math.hypot(f, sd);
