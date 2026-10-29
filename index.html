@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Frisky — a physically modelled music box</title>
-<link rel="stylesheet" href="css/style.css?v=1793316119">
+<link rel="stylesheet" href="css/style.css?v=1793316660">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }</script>
 </head>
 <body>
@@ -134,6 +134,7 @@
     <!-- TUNES -->
     <section class="panel on" data-panel="tunes">
       <div class="cats" id="cats"></div>
+      <div class="plRow"><button id="plBtn" class="plBtn" aria-pressed="false" title="Shuffle through this category: each tune loops for about a minute, then another">🔀 Shuffle this category</button><button id="plNext" class="plNext hidden" title="Next tune now">⏭ Next</button><span id="plTxt" class="plTxt">each tune loops for about a minute, then another</span></div>
       <ul id="songList" class="songs"></ul>
       <details id="makeOwn" class="makeOwn">
         <summary><span class="moT">Make your own melody</span><span class="moS">Compose on the pin roll, import a MIDI file, or share a tune</span></summary>
@@ -257,6 +258,6 @@
   the code is <a href="https://github.com/samuelling/Musicbox" target="_blank" rel="noopener">on GitHub</a>.
   All tunes are public domain, traditional or original.</p>
 </dialog>
-<script type="module" src="js/main.js?v=1793316119"></script>
+<script type="module" src="js/main.js?v=1793316660"></script>
 </body>
 </html>

@@ -291,3 +291,12 @@ body.mouse-held .escBadge { opacity: 1; transform: translate(-50%, 0); animation
 .gaitCard.mini { width: 40px; height: 40px; border-radius: 50%; }
 .gaitCard.mini canvas { display: none; }
 .gaitCard.mini .gaitMin { inset: 0; width: 100%; height: 100%; border: 0; background: transparent; font-size: 18px; }
+
+/* playlist: shuffle through a category, a minute or so of each tune */
+.plRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 2px; }
+.plBtn, .plNext { border: 1px solid var(--line); background: #1a130e; color: var(--ink); border-radius: 16px; padding: 5px 12px; font-size: 13px; }
+.plBtn[aria-pressed="true"] { background: var(--accent); color: #241a0e; border-color: var(--accent); font-weight: 600; }
+.plTxt { font-size: 11px; color: var(--dim); }
+.plNext.hidden { display: none; }
+.plBar { display: inline-block; width: 60px; height: 4px; border-radius: 2px; background: #3a2d22; vertical-align: middle; margin-left: 4px; overflow: hidden; }
+.plBar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }

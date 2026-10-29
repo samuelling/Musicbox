@@ -76,6 +76,7 @@ function onBuilt(res) {
     sr: patch.sr,
   };
   engine.send({ type: 'patch', patch }, collectBuffers(patch));
+  if (playlist.seek) { playlist.seek = false; engine.send({ type: 'seek', theta: 0 }); playlist.prev = 0; }   // a new tune in the playlist starts from its beginning
   scene.build(info, { geom: built.geom }, cfg, pinsCopy);
   scene.setMode(cfg.mode);
   scene.quality = cfg.quality;
@@ -848,7 +849,7 @@ function renderCats() {
   const el = $('cats'); el.innerHTML = '';
   for (const c of CATEGORIES) {
     const b = document.createElement('button'); b.textContent = c; b.classList.toggle('on', c === cat);
-    b.addEventListener('click', () => { cat = c; renderCats(); renderSongs(); }); el.appendChild(b);
+    b.addEventListener('click', () => { cat = c; renderCats(); renderSongs(); if (playlist.on) { playlist.queue = []; plNext(); } }); el.appendChild(b);
   }
 }
 function renderSongs() {
@@ -863,7 +864,7 @@ function renderSongs() {
       x.addEventListener('click', (e) => { e.stopPropagation(); store.set(store.get().filter((t) => t.id !== s.id)); renderSongs(); });
       li.prepend(x);
     }
-    li.addEventListener('click', () => { loadSong(s.mine ? s : compileSong(s), s.id); renderSongs(); });
+    li.addEventListener('click', () => { if (playlist.on) playlist.seek = true; loadSong(s.mine ? s : compileSong(s), s.id); renderSongs(); if (playlist.on) { playlist.loops = 0; playlist.target = loopsFor(song); playlist.prev = null; plStatus(); } });
     ul.appendChild(li);
   }
 }
@@ -876,6 +877,47 @@ function loadSong(compiled, id) {
   $('meterSel').value = song.meter.join(',');
   requestBuild(0);
 }
+// ------------------------------------------------------------------ playlist: shuffle within the category
+// Each tune loops for about a minute (whole loops, so it never stops mid-phrase), then another from the same
+// category, in a shuffled order that doesn't repeat until every tune has had its turn.
+const playlist = { on: false, queue: [], loops: 0, target: 1, prev: null, seek: false, cat: null };
+const catItems = (c) => (c === 'My tunes' ? store.get().map((s) => ({ ...s, mine: true })) : SONGS.filter((s) => s.cat === c));
+function loopsFor(s) { const loopSec = s.steps * 60 / (s.bpm * 4); return Math.max(1, Math.round(60 / Math.max(1, loopSec))); }
+function plStatus() {
+  const n = playlist.target, k = Math.min(playlist.loops, n);
+  $('plTxt').innerHTML = playlist.on ? `${cat}: loop ${Math.min(k + 1, n)} of ${n} <span class="plBar"><i style="width:${(100 * k / n).toFixed(0)}%"></i></span>` : 'each tune loops for about a minute, then another';
+}
+function plNext() {
+  const items = catItems(cat); if (!items.length) return;
+  if (playlist.cat !== cat || !playlist.queue.length) {
+    playlist.cat = cat;
+    playlist.queue = items.filter((s) => s.id !== songId).map((s) => [Math.random(), s]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    if (!playlist.queue.length) playlist.queue = [items[0]];
+  }
+  const s = playlist.queue.shift();
+  playlist.seek = true;
+  loadSong(s.mine ? s : compileSong(s), s.id); renderSongs();
+  playlist.loops = 0; playlist.target = loopsFor(song); playlist.prev = null; plStatus();
+  toast(`🔀 ${s.title}`);
+}
+function playlistTick(st) {
+  if (!playlist.on || !song) return;
+  const th = st.thetaMod, pv = playlist.prev; playlist.prev = th;
+  if (pv === null || !Number.isFinite(th)) return;
+  // a loop is done when the cylinder comes round past its start (and undone if you crank it back)
+  if (pv > 4.7 && th < 1.6) { playlist.loops++; plStatus(); if (playlist.loops >= playlist.target) setTimeout(plNext, 0); }
+  else if (pv < 1.6 && th > 4.7) { playlist.loops = Math.max(0, playlist.loops - 1); plStatus(); }
+}
+function setPlaylist(on) {
+  playlist.on = on; $('plBtn').setAttribute('aria-pressed', String(on)); $('plNext').classList.toggle('hidden', !on);
+  $('plBtn').textContent = on ? '🔀 Shuffling' : '🔀 Shuffle this category';
+  playlist.queue = []; playlist.cat = null; playlist.loops = 0; playlist.prev = null;
+  // start with the tune that's on if it's in this category, otherwise jump straight in
+  if (on) { if (catItems(cat).some((s) => s.id === songId)) { playlist.target = loopsFor(song); plStatus(); } else plNext(); }
+  else plStatus();
+}
+$('plBtn').addEventListener('click', () => setPlaylist(!playlist.on));
+$('plNext').addEventListener('click', () => plNext());
 $('bpm').addEventListener('change', (e) => { song.bpm = Math.max(30, Math.min(240, +e.target.value)); requestBuild(); });
 $('bars').addEventListener('change', (e) => { const bl = (song.meter[0] * 16) / song.meter[1]; song.steps = Math.max(1, +e.target.value) * bl; song.notes = song.notes.filter((n) => n.step < song.steps); requestBuild(); });
 $('meterSel').addEventListener('change', (e) => { song.meter = e.target.value.split(',').map(Number); requestBuild(); });
@@ -1068,6 +1110,7 @@ function refreshAfterBuild() {
 let uiPending = false;
 function onState(st) {
   lastState = st;
+  playlistTick(st);
   if (!uiPending) { uiPending = true; requestAnimationFrame(applyState); }
 }
 const panelOn = (name) => document.querySelector(`.panel[data-panel="${name}"]`).classList.contains('on');
