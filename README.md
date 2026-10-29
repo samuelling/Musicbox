@@ -24,7 +24,10 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   for tempo. His gait (walk, trot, half-bound), the forces from his paws, how
   far up the wheel he rides, his bouts and rests (he's nocturnal), heart rate and metabolic
   power are all simulated. His pace is the tempo. "Watch him" leans you in close; "Tap his cage" (or tap the glass) wakes him, and then he does as he likes:
-  maybe the wheel, maybe a snack, maybe a pee in his toilet corner. He keeps a toilet corner away from his nest and food.
+  maybe the wheel, maybe a snack, maybe a pee in his toilet corner. He keeps a toilet corner away from his nest and food. He also yawns, scratches behind his ears, gnaws his
+  chew stick, rolls in his sand bath, builds up his nest with bedding, peeks out of his house, paces the glass on
+  his hind legs, scent-marks along the house, creeps about stretched out when wary, and climbs the ramp to the
+  half tier over his house to look around (or doze up there).
 * **Music Box** (Tines · Box · Physics) — start from a **box type**: keepsake 30-note, child's plastic
   toy, wooden jewellery box, Swiss 50-note cabinet, grand 72-note, a century-old antique (worn pins, A = 435) or a brass-comb vintage box —
   then change anything. **Tines**: 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted

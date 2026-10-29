@@ -333,7 +333,7 @@ export class HamsterModel {
     const rearT = running ? 0 : (pose.rear ?? (groom ? 0.42 : 0));
     this.pose.rear += (rearT - this.pose.rear) * Math.min(1, dt * 4);
     this.pose.curl = (this.pose.curl || 0) + ((pose.curl ? 1 : 0) - (this.pose.curl || 0)) * Math.min(1, dt * 2);
-    const curl = this.pose.curl, stretch = pose.stretch || 0;
+    const curl = this.pose.curl, stretch = pose.stretch || (pose.yawn ? 0.5 * Math.sin(Math.PI * Math.min(1, pose.yawn)) : 0);
     const breath = Math.sin(2 * Math.PI * ((st ? st.br : 70) / 60) * t);
     this.spine.rotation.z = pitch + this.pose.rear + (pose.dig ? -0.12 : 0) - 0.12 * curl;
     this.torso.scale.set(1 + flex - (running ? 0 : 0.03) - 0.16 * curl + 0.12 * stretch,
@@ -355,9 +355,17 @@ export class HamsterModel {
     if (pose.sniff) { hp = 0.25 + this.look.y * 0.5; }
     if (pose.dig) { hp = -0.35 + 0.05 * Math.sin(t * 30); }
     if (pose.empty) { hp = -0.2; }
+    if (pose.gnaw) { hp = -0.5 + 0.07 * Math.sin(t * 2 * Math.PI * 9); hy = 0.12 * Math.sin(t * 1.7); }   // teeth chattering on the stick
+    if (pose.yawn) { hp = 0.5 * Math.sin(Math.PI * Math.min(1, pose.yawn)); }
+    if (pose.surf) { hp = 0.35 + 0.1 * Math.sin(t * 2.1); hy = 0.35 * Math.sin(t * 1.3); }
     if (stretch) hp = 0.25 * stretch;
     hp = hp * (1 - curl) - 0.75 * curl; hy *= 1 - curl;
-    this.head.rotation.set(0, hy, hp);
+    // a hind foot scratching behind the ear: the head tips over and jiggles
+    const hr = pose.scratch ? 0.45 + 0.07 * Math.sin(t * 2 * Math.PI * 12) : 0;
+    this.head.rotation.set(hr, hy, hp);
+    // asleep, he twitches now and then (whiskers, a paw, a shiver)
+    if (curl > 0.5) { if (Math.random() < dt * 0.12) this.twitch = 0.35; }
+    if (this.twitch > 0) { this.twitch -= dt; this.body.position.y += 0.8 * Math.sin(this.twitch * 70); }
     const pch = pose.pouch || 0;
     this.head.scale.set(1.14, 1.14 * (1 + 0.07 * pch), 1.14 * (1 + 0.32 * pch));   // cheek pouches swell out to the shoulders
     const whisk = (pose.sniff || (!running && st && st.act === 'look')) ? 0.22 * Math.sin(2 * Math.PI * 8 * t) : running ? 0.06 * Math.sin(2 * Math.PI * 6 * t) : 0.03 * Math.sin(t * 3);
@@ -367,6 +375,7 @@ export class HamsterModel {
     this.blink = Math.max(0, this.blink - dt);
     let lid = this.blink > 0 ? Math.max(0.12, Math.abs(this.blink - 0.07) / 0.07) : 1;
     lid = Math.min(lid, 1 - 0.88 * curl);                                              // asleep: eyes shut
+    if (pose.yawn) lid = Math.min(lid, 0.15);
     for (const e of this.eyes) e.scale.set(1, lid, 1);
     for (let i = 0; i < 2; i++) {
       if (Math.random() < dt * 0.25) this.earTw[i] = 0.25;
@@ -377,7 +386,7 @@ export class HamsterModel {
     // ---- limbs ----
     const off = GAITS[(st && st.gait) || 'walk'], D = st ? st.D : 0.7;
     const stride = running ? Math.min(75, (Math.abs(st.v) / Math.max(0.5, st.f)) * 1000) / s : 0;
-    const handsUp = !running && (groom || pose.eat || pose.empty || pose.sniff) && this.pose.rear > 0.1;
+    const handsUp = !running && (groom || pose.eat || pose.empty || pose.sniff || pose.gnaw || pose.surf || pose.scratch) && this.pose.rear > 0.1;
     for (let k = 0; k < 4; k++) {
       const L = this.limbs[k], hip = L.hipV;
       let fx, fy, pawPitch = 0, bodySpace = true;
@@ -431,6 +440,9 @@ class PolyCurve extends THREE.Curve {
   }
 }
 
+// a half tier over his house (back right), reached by a slatted ramp that rises to the right
+export const CAGE = { L: 760, D: 440, gap: 120, tier: { x0: 470, x1: 745, z0: 15, z1: 245, h: 210 }, ramp: { x0: 170, x1: 470, z0: 190, z1: 240, up: 'x1' } };
+
 export class HamsterRig {
   // anchor: crank shaft (x, y, z), boxRight, bottomY  (mm).  o: { R, rw, rc, surface, mass, shells }
   constructor(anchor, o) {
@@ -444,8 +456,9 @@ export class HamsterRig {
     // his cage: a glass tank on the table beside the box; the wheel stands at the back, its axle
     // passes out through the back glass to the hub pulley
     const zc = anchor.z, yc = anchor.y, zwp = zc + rc;
-    const L = Math.max(640, 2 * Rs + 380), D = Wd + 300, Hc = 2 * Rs + 130;
-    const cx0 = anchor.boxRight + 170, cz0 = zwp + 10, yT = anchor.bottomY, yB = yT + 40;   // inner corner; bedding top
+    // one cage for every wheel: sized for the biggest (35 cm) wheel, with room for an upper tier and its ramp
+    const L = CAGE.L, D = CAGE.D, Hc = 2 * 175 + 130;
+    const cx0 = anchor.boxRight + CAGE.gap, cz0 = zwp + 10, yT = anchor.bottomY, yB = yT + 40;   // inner corner; bedding top
     const xw = cx0 + 30 + Rs, yw = yB + 12 + Rs, zw = cz0 + 8 + Wd / 2;                    // wheel centre
     const xp = xw - rw;                                                                      // belt plane on the crank side
     this.dims = { Rs, rw, rc, xp, xw, yw, zw, zwp, Wd, cx0, cz0, yB, L, D, Hc };
@@ -517,10 +530,12 @@ export class HamsterRig {
     // the layout his life plays out in (cage millimetres: x right, z forward, bedding at y = 0)
     const hx = L - 100, hz = 85;
     this.layout = {
+      tier: { ...CAGE.tier }, ramp: { ...CAGE.ramp },
       L, D,
       wheel: { x: xw - cx0, z: zw - cz0, y: yw - this.treadR - yB, entry: { x: xw - cx0, z: zw - cz0 + Wd / 2 + 60 } },
       house: { door: { x: hx, z: hz + 115 }, bed: { x: hx, z: hz + 10 } },
       bowl: { x: this.bowlAt.x, z: this.bowlAt.z }, drink: { x: L - 80, z: this.bottleZ }, dig: { x: (xw - cx0 + Rs + hx - 75) / 2, z: 80 },
+      chew: { ...this.chewAt }, sand: { ...this.sandAt },
     };
   }
 
@@ -562,9 +577,30 @@ export class HamsterRig {
     shell(45, 110, 10, -52, 55, 60); shell(45, 110, 10, 52, 55, 60); shell(60, 34, 10, 0, 93, 60);
     for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.BoxGeometry(170, 10, 100), pine); r.position.set(0, 140, s * 35); r.rotation.x = s * 0.6; r.castShadow = true; hut.add(r); }
     const hay = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xc8b060, roughness: 1 })); hay.scale.set(60, 18, 45); hay.position.set(0, 4, -5); hut.add(hay);
-    this.hut = hut;
+    this.hut = hut; this.hay = hay;
+    // a half tier over his house, on four legs, with a slatted ramp rising to it from the left
+    { const T = CAGE.tier, Rm = CAGE.ramp, ply = new THREE.MeshStandardMaterial({ color: 0xc9a26e, roughness: 0.8 });
+      const w = T.x1 - T.x0, d = T.z1 - T.z0;
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(w, 10, d), ply); deck.position.set(X(T.x0 + w / 2), yB + T.h - 5, Z(T.z0 + d / 2)); deck.castShadow = deck.receiveShadow = true; g.add(deck);
+      for (const [lx, lz] of [[T.x0 + 8, T.z0 + 8], [T.x1 - 8, T.z0 + 8], [T.x0 + 8, T.z1 - 8], [T.x1 - 8, T.z1 - 8]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, T.h - 10, 8), ply); leg.position.set(X(lx), yB + (T.h - 10) / 2, Z(lz)); leg.castShadow = true; g.add(leg); }
+      // a lip along the open front edge (left clear where the ramp arrives)
+      const lip = new THREE.Mesh(new THREE.BoxGeometry(w - 70, 16, 6), ply); lip.position.set(X(T.x0 + 70 + (w - 70) / 2), yB + T.h + 6, Z(T.z1 - 3)); g.add(lip);
+      const run = Rm.x1 - Rm.x0, len = Math.hypot(run, T.h), ang = Math.atan2(T.h, run), rw2 = Rm.z1 - Rm.z0;
+      const ramp = new THREE.Group(); ramp.position.set(X(Rm.x0 + run / 2), yB + T.h / 2, Z(Rm.z0 + rw2 / 2)); ramp.rotation.z = Rm.up === 'x1' ? ang : -ang; g.add(ramp);
+      const board = new THREE.Mesh(new THREE.BoxGeometry(len, 6, rw2), ply); board.position.y = -3; board.castShadow = board.receiveShadow = true; ramp.add(board);
+      for (let k = -len / 2 + 14; k < len / 2 - 8; k += 22) { const slat = new THREE.Mesh(new THREE.BoxGeometry(4, 4, rw2 - 6), ply); slat.position.set(k, 2, 0); ramp.add(slat); }
+    }
+    // an apple-wood chew stick lying in the bedding, and a ceramic dish of chinchilla sand
+    this.chewAt = { x: 560, z: 255 };
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(9, 10, 95, 10), new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: 0.85 }));
+    stick.rotation.set(0, 0.5, Math.PI / 2); stick.position.set(X(this.chewAt.x), yB + 8, Z(this.chewAt.z)); stick.castShadow = true; g.add(stick);
+    for (const s2 of [-1, 1]) { const end = new THREE.Mesh(new THREE.CircleGeometry(8.5, 10), new THREE.MeshStandardMaterial({ color: 0xc9a476, roughness: 0.9 })); end.position.set(s2 * 47.6, 0, 0); end.rotation.y = s2 * Math.PI / 2; stick.add(end); end.rotation.x = Math.PI / 2; }
+    this.sandAt = { x: 300, z: 335 };
+    const dish = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [62, 0], [68, 16], [64, 18], [58, 5], [0, 5]].map(([a, b]) => new THREE.Vector2(a, b)), 36), new THREE.MeshStandardMaterial({ color: 0xd9cdb8, roughness: 0.4 }));
+    dish.position.set(X(this.sandAt.x), yB - 2, Z(this.sandAt.z)); dish.receiveShadow = true; dish.castShadow = true; g.add(dish);
+    const sand = new THREE.Mesh(new THREE.CircleGeometry(57, 32), new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 1 })); sand.rotation.x = -Math.PI / 2; sand.position.set(X(this.sandAt.x), yB + 9, Z(this.sandAt.z)); g.add(sand);
     // ceramic bowl with seeds; water bottle clipped to the right-hand glass
-    this.bowlAt = { x: Math.min(L - 230, xw - cx0 + Rs + 110), z: D - 80 };
+    this.bowlAt = { x: 545, z: D - 70 };
     const bowl = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [38, 0], [46, 22], [42, 24], [33, 6], [0, 6]].map(([a, b]) => new THREE.Vector2(a, b)), 32), new THREE.MeshStandardMaterial({ color: 0x5f7d9a, roughness: 0.25 }));
     bowl.position.set(X(this.bowlAt.x), yB, Z(this.bowlAt.z)); bowl.castShadow = true; g.add(bowl);
     const seedG = new THREE.SphereGeometry(1, 6, 4), seedM = [new THREE.MeshStandardMaterial({ color: 0x2b2622, roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: 0xd6c08a, roughness: 0.8 })];
@@ -602,7 +638,7 @@ export class HamsterRig {
     } else {
       if (root.parent !== this.cageCarrier) this.cageCarrier.add(root);
       const L = life || { x: this.layout.house.bed.x, z: this.layout.house.bed.z, y: 0, h: Math.PI, pose: { curl: 1 }, gaitState: () => ({ f: 0, v: 0, phase: 0, D: 0.7, gait: 'walk', act: 'sit', br: 45 }) };
-      root.position.set(L.x, L.y, L.z); root.rotation.set(0, -L.h, 0);
+      root.position.set(L.x, L.y, L.z); root.rotation.order = 'YXZ'; root.rotation.set(L.pose.roll || 0, -L.h, 0);
       this.ham.update(dt, L.gaitState(), 1e6, L.pose);
     }
     if (life) {
@@ -620,6 +656,7 @@ export class HamsterRig {
       }
       const now = performance.now();
       for (const k of this.marks) if (k.src.type === 'pee') k.mesh.material.opacity = 0.5 * Math.max(0, 1 - (now - k.src.t) / 240000);
+      const nest = 1 + 0.6 * (life.nest || 0); this.hay.scale.set(60 * Math.min(1.15, nest), 18 * nest, 45 * Math.min(1.2, nest));
       const p = Math.min(1, 0.15 + life.digPile * 0.85); this.pile.scale.set(60 * (0.6 + 0.4 * p), 2 + 26 * p, 45 * (0.6 + 0.4 * p));
       // the bottle's ball valve lets a bubble up while he drinks
       if (life.act === 'drink') { this.bubble.visible = true; this.bubbleY = ((this.bubbleY || 95) + dt * 140); if (this.bubbleY > 205) this.bubbleY = 95; this.bubble.position.set(Math.sin(this.bubbleY) * 4, this.bubbleY, 0); }

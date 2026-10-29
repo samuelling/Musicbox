@@ -3,7 +3,7 @@
 // so the comb faces the camera and the pinned cylinder sits behind it. The mapping is a
 // reflection, so a box-frame counter-clockwise rotation (y->z) is a negative three.js X rotation.
 import * as THREE from 'three';
-import { HamsterRig } from './hamster-scene.js';
+import { HamsterRig, CAGE } from './hamster-scene.js';
 import { woodMaterial, boxGeo, velvetMaterial, inlayMaterial } from './materials.js';
 import { makeRoom } from './rooms.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -266,7 +266,11 @@ export class MusicBoxScene {
         : tp.mat === 'spruce' ? woodMaterial('spruce', { gloss: 0.2, mm: 300 })
         : woodMat(col, tp.mat === 'marble' ? 0.25 : 0.7);
       const top = new THREE.Mesh(boxGeo(tp.a * MM, tp.h * MM, tp.b * MM, tp.mat === 'oak' ? tp.a * MM : 300), tmat);
-      top.position.set(floorCx + (0.5 - 0.3) * tp.a * MM, bottomY - (tp.h * MM) / 2, floorCy + (0.47 - 0.5) * tp.b * MM);
+      // slide the table under the box so its candle side and the hamster's cage both fit on it
+      const A0 = tp.a * MM, bxR = enc.boxed ? floorCx + Lx / 2 : floorCx + a / 2, bxL = enc.boxed ? floorCx - Lx / 2 : floorCx - a / 2;
+      const needR = bxR + CAGE.gap + CAGE.L + 40 - A0 / 2, maxL = bxL - 230 + A0 / 2;
+      const tOff = Math.min(maxL, Math.max(floorCx + 0.2 * A0, needR));
+      top.position.set(tOff, bottomY - (tp.h * MM) / 2, floorCy + (0.47 - 0.5) * tp.b * MM);
       top.receiveShadow = true; this.root.add(top);
       // legs and apron down to the floor
       if (surf.height) {

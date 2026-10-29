@@ -253,10 +253,11 @@ function tapCage() {
   const SAY = {
     wheel: 'and he heads straight for the wheel', eat: 'and he stomps off for a snack', pee: 'and he heads for his toilet corner',
     poop: 'and he heads for his toilet corner', groom: 'and he sits up and washes his face, crossly', explore: 'and he potters about, sniffing',
-    drink: 'and he goes for a drink',
+    drink: 'and he goes for a drink', gnaw: 'and he takes it out on his chew stick', surf: 'and he paces the glass on his hind legs',
+    nest: 'and he fusses with his nest', peek: 'and he retreats to peek out of his house', sand: 'and he has a roll in his sand bath', flank: 'and he goes round marking his territory',
   };
   const msg = r.what === 'ignore' ? 'Tap! He ignores you and keeps running.' : r.what === 'hopOut' ? 'Tap! He hops out of the wheel to see what that was.'
-    : r.what === 'busy' ? 'Tap! He\'s a bit busy right now.' : (r.asleep ? 'Tap! He wakes up, grumpy, ' : 'Tap! He startles, up on his hind legs, ') + (SAY[r.what] || 'and potters about') + '.';
+    : r.what === 'freeze' ? 'Tap! He freezes, eyes wide… then bolts for his house.' : r.what === 'busy' ? 'Tap! He\'s a bit busy right now.' : (r.asleep ? 'Tap! He wakes up, grumpy, ' : 'Tap! He startles, up on his hind legs, ') + (SAY[r.what] || 'and potters about') + '.';
   toast(msg);
   return r;
 }
