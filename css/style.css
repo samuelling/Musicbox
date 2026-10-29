@@ -255,7 +255,7 @@ details.advanced[open] summary { margin-bottom: 6px; }
 
 /* Ashland-style mouse look (desktop): a dot in the middle while the room has hold of the mouse */
 .reticle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #f4e6c8e6; box-shadow: 0 0 0 1.5px #0009; pointer-events: none; z-index: 4; display: none; }
-.mouseHint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); font-size: 11px; color: var(--dim); background: #0009; padding: 4px 10px; border-radius: 10px; pointer-events: none; z-index: 4; white-space: nowrap; opacity: 0; transition: opacity .4s; }
+.mouseHint { position: absolute; left: 50%; bottom: 196px; transform: translateX(-50%); font-size: 11px; color: var(--dim); background: #0009; padding: 4px 10px; border-radius: 10px; pointer-events: none; z-index: 4; white-space: nowrap; opacity: 0; transition: opacity .4s; }
 body.mouse-held .reticle { display: block; }
 body.mouse-held .mouseHint { opacity: 1; }
 body.mouse-held .mouseHint.quiet { opacity: 0; transition: opacity 1.6s 2.5s; }
@@ -274,3 +274,13 @@ body:not(.ham-tried) .modeSwitch button[data-mode="auto"]:not(.on)::after { cont
 @keyframes hamGlint { 0% { transform: translateX(-130%); } 14% { transform: translateX(130%); } 100% { transform: translateX(130%); } }
 @keyframes hamJiggle { 0%, 72%, 100% { transform: rotate(0); } 75.5% { transform: rotate(-3deg); } 79% { transform: rotate(2.6deg); } 82.5% { transform: rotate(-2deg); } 86% { transform: rotate(1.4deg); } 89.5% { transform: rotate(-.8deg); } 93% { transform: rotate(0); } }
 @media (prefers-reduced-motion: reduce) { .modeSwitch button[data-mode="auto"], .modeSwitch button[data-mode="auto"]::after { animation: none !important; } }
+
+/* while the room has the mouse: a big, steady reminder of the way out */
+.escBadge { position: absolute; left: 50%; bottom: 140px; transform: translate(-50%, 10px); z-index: 5; display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 14px; background: #120d0aee; border: 1.5px solid var(--accent); color: var(--ink); font-size: 15px; font-weight: 600;
+  box-shadow: 0 6px 22px #000a; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; white-space: nowrap; }
+.escBadge kbd { font: 700 13px/1 -apple-system, system-ui, sans-serif; padding: 5px 8px 6px; border-radius: 6px; background: linear-gradient(#f4e6c8, #cdb48a);
+  color: #241a0e; border: 1px solid #3a2a1c; box-shadow: 0 2px 0 #3a2a1c; }
+.escBadge .sep { width: 1px; height: 18px; background: #5a4632; margin: 0 4px; }
+body.mouse-held .escBadge { opacity: 1; transform: translate(-50%, 0); animation: escPulse 1.4s ease-out 1; }
+@keyframes escPulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent), 0 6px 22px #000a; } 100% { box-shadow: 0 0 0 18px transparent, 0 6px 22px #000a; } }

@@ -302,7 +302,11 @@ export class MusicBoxScene {
       const A0 = tp.a * MM, bxR = enc.boxed ? floorCx + Lx / 2 : floorCx + a / 2, bxL = enc.boxed ? floorCx - Lx / 2 : floorCx - a / 2;
       const needR = bxR + CAGE.gap + CAGE.L + 40 - A0 / 2, maxL = bxL - 230 + A0 / 2;
       const tOff = Math.min(maxL, Math.max(floorCx + 0.2 * A0, needR));
-      top.position.set(tOff, bottomY - (tp.h * MM) / 2, floorCy + (0.47 - 0.5) * tp.b * MM);
+      // and slide it back far enough that the cage (which starts just behind the crank axle and runs CAGE.D deep)
+      // stands wholly on it, with a margin, while the box's front stays well inside the front edge
+      const B0 = tp.b * MM, cageBack = axY + 12 + 10 + CAGE.D + 14, boxFront = enc.boxed ? floorCy - Ly / 2 : floorCy - b / 2;
+      const tz = Math.min(boxFront - 60 + B0 / 2, Math.max(floorCy + (0.47 - 0.5) * B0, cageBack + 45 - B0 / 2));
+      top.position.set(tOff, bottomY - (tp.h * MM) / 2, tz);
       top.receiveShadow = true; this.root.add(top);
       // legs and apron down to the floor
       if (surf.height) {
