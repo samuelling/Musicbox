@@ -46,8 +46,8 @@
   </section>
 
   <nav class="tabs">
-    <button data-tab="listen" class="on">Listen</button>
-    <button data-tab="tunes">Tunes</button>
+    <button data-tab="tunes" class="on">Tunes</button>
+    <button data-tab="listen">Listen</button>
     <button data-tab="comb">Tines</button>
     <button data-tab="box">Box</button>
     <button data-tab="physics">Physics</button>
@@ -55,7 +55,7 @@
 
   <main id="panels">
     <!-- LISTEN -->
-    <section class="panel on" data-panel="listen">
+    <section class="panel" data-panel="listen">
       <div class="row">
         <label>Room <select id="room"></select></label>
         <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
@@ -73,7 +73,7 @@
     </section>
 
     <!-- TUNES -->
-    <section class="panel" data-panel="tunes">
+    <section class="panel on" data-panel="tunes">
       <div class="cats" id="cats"></div>
       <ul id="songList" class="songs"></ul>
       <div class="row">

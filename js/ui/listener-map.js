@@ -13,7 +13,9 @@ export class ListenerMap {
   resize() {
     const r = this.cv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1);
     if (!r.width) return;
-    this.cv.width = r.width * d; this.cv.height = r.height * d; this.dpr = d; this.draw();
+    this.cv.width = r.width * d; this.cv.height = r.height * d; this.dpr = d;
+    if (this.room) this.computeView();   // the room may have been set while this tab was hidden
+    this.draw();
   }
   setRoom(room, boxPos, tableSize, held) {
     this.room = room; this.box = boxPos; this.table = tableSize; this.held = held;
