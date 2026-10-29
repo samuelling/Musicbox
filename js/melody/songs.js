@@ -22,7 +22,7 @@ export const SONGS = [
     voices: ['E5:4 E5 F5 G5 | G5 F5 E5 D5 | C5 C5 D5 E5 | E5:6 D5:2 D5:8 | E5:4 E5 F5 G5 | G5 F5 E5 D5 | C5 C5 D5 E5 | D5:6 C5:2 C5:8 | D5:4 D5 E5 C5 | D5:4 E5:2 F5:2 E5:4 C5:4 | D5:4 E5:2 F5:2 E5:4 D5:4 | C5:4 D5:4 G4:8 | E5:4 E5 F5 G5 | G5 F5 E5 D5 | C5 C5 D5 E5 | D5:6 C5:2 C5:8'],
   },
   {
-    id: 'elise', cat: 'Classics', title: 'Für Elise (opening)', credit: 'Ludwig van Beethoven, 1810', bpm: 92, meter: [3, 8], accomp: 'none',
+    id: 'elise', cat: 'Classics', title: 'Für Elise (opening)', credit: 'Ludwig van Beethoven, 1810', bpm: 62, meter: [3, 8], accomp: 'none',
     voices: [
       'E5:1 D#5:1 | E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 | A4:3 C4:1 E4:1 A4:1 | B4:3 E4:1 G#4:1 B4:1 | C5:3 E4:1 E5:1 D#5:1 | E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 | A4:3 C4:1 E4:1 A4:1 | B4:3 E4:1 C5:1 B4:1 | A4:4',
       'r:2 | r:6 | A2:1 E3:1 A3:1 r:3 | E2:1 E3:1 G#3:1 r:3 | A2:1 E3:1 A3:1 r:3 | r:6 | A2:1 E3:1 A3:1 r:3 | E2:1 E3:1 G#3:1 r:3 | A2:1 E3:1 A3:1 r:1',
