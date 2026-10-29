@@ -89,7 +89,12 @@ scene.onPick = (i) => selectTine(i, true);
 
 // ---- the settings drawer: slides over the room when you want it, out of the way when you don't
 const drawer = $('drawer');
-function setDrawer(open) {
+const wideScreen = () => matchMedia('(min-width: 640px) and (min-aspect-ratio: 5/4)').matches;
+let heldBeforeDrawer = false;
+function setDrawer(open, viaKey) {
+  // the settings want a free mouse: opening them lets go of it; closing them with Tab takes it back
+  if (open && scene.mouseHeld && scene.mouseHeld()) { heldBeforeDrawer = true; document.exitPointerLock(); }
+  else if (!open) { if (viaKey && heldBeforeDrawer && scene.grabMouse) scene.grabMouse(); heldBeforeDrawer = false; }
   drawer.classList.toggle('open', open); document.body.classList.toggle('drawer-open', open); $('menuBtn').setAttribute('aria-expanded', String(open));
   document.documentElement.style.setProperty('--hdr', document.querySelector('header').getBoundingClientRect().height + 'px');
   // the room's canvas follows the stage as it widens or narrows
@@ -117,10 +122,11 @@ $('drawerClose').addEventListener('click', () => setDrawer(false));
     else setDrawer(drag.off < drag.w * 0.5);
     drag = null;
   };
-  tab.addEventListener('pointerup', end); tab.addEventListener('pointercancel', end);
+  tab.addEventListener('pointerup', end); tab.addEventListener('pointercancel', () => { if (drag) { drawer.classList.remove('dragging'); drawer.style.transform = ''; drag = null; } });
+  tab.addEventListener('click', (e) => { if (e.detail === 0) setDrawer(!drawer.classList.contains('open')); });   // keyboard / assistive 'click'
   tab.addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); setDrawer(!drawer.classList.contains('open')); } });
 }
-window.addEventListener('keydown', (e) => { if (e.code === 'Tab' && !e.target.closest('input, select, textarea, button, summary') && !e.target.closest('#drawer')) { e.preventDefault(); setDrawer(!drawer.classList.contains('open')); } });
+window.addEventListener('keydown', (e) => { if (e.code === 'Tab' && !e.target.closest('input, select, textarea, button, summary') && !e.target.closest('#drawer')) { e.preventDefault(); setDrawer(!drawer.classList.contains('open'), true); } });
 // open by default on wide screens; closed on phones so you see the room
 setDrawer(matchMedia('(min-width: 640px) and (min-aspect-ratio: 5/4)').matches);
 if (!matchMedia('(max-width: 520px)').matches) $('hamMore').open = true;
@@ -521,9 +527,11 @@ scene.onFirstLight = () => {
   scene.flyToEyes(() => { scene.setFollow(true); if (cfg.mode === 'auto') settleEyes(); });
   return true;
 };
-scene.onLook = (d) => {
+let lookYaw = 0, lookRaf = 0;
+scene.onLook = (d) => {       // a fast finger sends many moves per frame: gather them, turn once per frame
   map.faceBox = false; $('faceBox').checked = false;
-  map.listener.yaw -= d; map.emit();
+  lookYaw += d;
+  if (!lookRaf) lookRaf = requestAnimationFrame(() => { lookRaf = 0; map.listener.yaw -= lookYaw; lookYaw = 0; map.emit(); });
 };
 $('faceBox').addEventListener('change', (e) => { map.faceBox = e.target.checked; map.emit(); });
 $('earH').addEventListener('input', (e) => { map.listener.z = walk.zT = +e.target.value; $('earHv').textContent = (+e.target.value).toFixed(2) + ' m'; postureLabel(); map.emit(); });
@@ -532,7 +540,7 @@ $('earH').addEventListener('input', (e) => { map.listener.z = walk.zT = +e.targe
 // W/S (or ↑/↓) forward and back, A/D sidestep, Q/E (or ←/→) turn, Space stand, C crouch, +/− zoom;
 // the on-screen pad does the same for touch. Your ears move with you, so you hear the room change.
 const POSTURES = [['Crouching', 0.8], ['Sitting', 1.2], ['Standing', 1.62]];
-const walk = { keys: new Set(), pad: new Set(), raf: 0, last: 0, zT: 1.2 };
+const walk = { shift: false, keys: new Set(), pad: new Set(), stick: { x: 0, y: 0 }, vf: 0, vs: 0, vt: 0, vl: 0, raf: 0, last: 0, zT: 1.2 };
 function postureLabel() {
   if (lean) { $('postureTxt').textContent = 'Leaning in'; $('standBtn').disabled = $('crouchBtn').disabled = false; return; }
   const z = walk.zT; let i = 0; for (let k = 1; k < POSTURES.length; k++) if (Math.abs(POSTURES[k][1] - z) < Math.abs(POSTURES[i][1] - z)) i = k;
@@ -553,23 +561,31 @@ function walkLoop() {
   const step = (now) => {
     const dt = Math.min(0.05, (now - walk.last) / 1000); walk.last = now;
     const L = map.listener, P = walk.pad;
-    const f = (held('KeyW') || P.has('fwd') ? 1 : 0) - (held('KeyS') || P.has('back') ? 1 : 0);
-    const sd = (held('KeyD') || P.has('sr') ? 1 : 0) - (held('KeyA') || P.has('sl') ? 1 : 0);
+    const J = walk.stick;
+    let f = (held('KeyW') || P.has('fwd') ? 1 : 0) - (held('KeyS') || P.has('back') ? 1 : 0) - J.y;
+    let sd = (held('KeyD') || P.has('sr') ? 1 : 0) - (held('KeyA') || P.has('sl') ? 1 : 0) + J.x;
+    const m = Math.hypot(f, sd); if (m > 1) { f /= m; sd /= m; }
     const look = (P.has('lu') || held('ArrowUp') ? 1 : 0) - (P.has('ld') || held('ArrowDown') ? 1 : 0);
     const turn = (held('ArrowLeft') || P.has('tl') ? 1 : 0) - (held('ArrowRight') || P.has('tr') ? 1 : 0);
+    // momentum: ease into a walk and out of it (and the same for turning and looking), so nothing lurches
+    const vmax = (L.z < 1.0 ? 0.45 : 1.0) * (J.run || walk.shift ? 1.6 : 1);      // Shift (or the thumb carried on past the stick's rim) hurries
+    const ease = (v, to, rate) => v + (to - v) * (1 - Math.exp(-rate * dt));
+    walk.vf = ease(walk.vf, f * vmax, f ? 8 : 6); walk.vs = ease(walk.vs, sd * vmax, sd ? 8 : 6);
+    walk.vt = ease(walk.vt, turn * 1.5, turn ? 9 : 7); walk.vl = ease(walk.vl, look * 0.8, look ? 9 : 7);
+    const tiny = (v) => Math.abs(v) < 0.004;
+    if (tiny(walk.vf)) walk.vf = 0; if (tiny(walk.vs)) walk.vs = 0; if (tiny(walk.vt)) walk.vt = 0; if (tiny(walk.vl)) walk.vl = 0;
     let moved = false;
-    if (look) scene.tilt(look * 0.8 * dt);      // through your eyes: look up or down; otherwise tilt the view
-    if (turn) { map.faceBox = false; $('faceBox').checked = false; L.yaw += turn * 1.5 * dt; moved = true; }
-    if (f || sd) {
-      const v = (L.z < 1.0 ? 0.45 : 1.0) * dt, n = Math.hypot(f, sd);
+    if (walk.vl) scene.tilt(walk.vl * dt);      // through your eyes: look up or down; otherwise tilt the view
+    if (walk.vt) { map.faceBox = false; $('faceBox').checked = false; L.yaw += walk.vt * dt; moved = true; }
+    if (walk.vf || walk.vs) {
       const fx = Math.cos(L.yaw), fy = Math.sin(L.yaw), rx = Math.sin(L.yaw), ry = -Math.cos(L.yaw);
-      let x = L.x + (f * fx + sd * rx) / n * v, y = L.y + (f * fy + sd * ry) / n * v;
+      let x = L.x + (walk.vf * fx + walk.vs * rx) * dt, y = L.y + (walk.vf * fy + walk.vs * ry) * dt;
       [x, y] = collide(x, y);
       L.x = x; L.y = y; moved = true;
     }
     if (Math.abs(walk.zT - L.z) > 0.002) { L.z += (walk.zT - L.z) * Math.min(1, dt * 5); moved = true; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; }
     if (moved) map.emit();
-    if (moved || f || sd || turn || look) walk.raf = requestAnimationFrame(step); else walk.raf = 0;
+    if (moved || f || sd || turn || look || walk.vl) walk.raf = requestAnimationFrame(step); else walk.raf = 0;
   };
   walk.raf = requestAnimationFrame(step);
 }
@@ -599,6 +615,7 @@ document.addEventListener('pointerup', (e) => { const t = e.target; if (t && (t.
 $('view').addEventListener('pointerdown', release);
 const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 window.addEventListener('keydown', (e) => {
+  walk.shift = e.shiftKey;
   if (e.code === 'Escape') { release(); return; }
   if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
   // an arrow key on a slider or dropdown you reached with Tab still works that control
@@ -613,14 +630,77 @@ window.addEventListener('keydown', (e) => {
   else if (e.code === 'KeyC') posture(-1);
 });
 const litKey = (code, on) => document.querySelectorAll(`.navCtl [data-key="${code}"]`).forEach((k) => k.classList.toggle('held', on));
-window.addEventListener('keyup', (e) => { walk.keys.delete(e.code); litKey(e.code, false); });
-window.addEventListener('blur', () => { walk.keys.clear(); walk.pad.clear(); document.querySelectorAll('[data-move].held').forEach((b) => b.classList.remove('held')); });
+window.addEventListener('keyup', (e) => { walk.shift = e.shiftKey; walk.keys.delete(e.code); litKey(e.code, false); });
+window.addEventListener('blur', () => { walk.keys.clear(); walk.pad.clear(); walk.stick.x = walk.stick.y = 0; document.querySelectorAll('[data-move].held').forEach((b) => b.classList.remove('held')); });
 document.querySelectorAll('button[data-move]').forEach((b) => {
   const on = (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ } lean = null; walk.pad.add(b.dataset.move); b.classList.add('held'); walkLoop(); };
   const off = () => { walk.pad.delete(b.dataset.move); b.classList.remove('held'); };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
   b.addEventListener('contextmenu', (e) => e.preventDefault());
 });
+// ---- touch, as in Ashland: a floating thumbstick on the left walks (and strafes); drag anywhere else to look.
+// The stick jumps to wherever your thumb lands in the lower left of the room; a quick tap there is still a tap.
+{
+  const stick = $('stick'), knob = stick.querySelector('i'), view = $('view');
+  let joy = null;
+  const reset = () => { joy = null; walk.stick.x = walk.stick.y = 0; walk.stick.run = false; knob.style.transform = ''; stick.style.transform = ''; stick.classList.remove('held'); };
+  $('stage').addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || joy) return;
+    const onStick = e.target === stick, r = $('stage').getBoundingClientRect();
+    const inZone = e.target === view && scene.followListener && !$('navCtl').classList.contains('hidden')
+      && e.clientX - r.left < r.width * 0.42 && e.clientY - r.top > r.height * 0.5;
+    if (!onStick && !inZone) return;
+    e.preventDefault(); e.stopPropagation();          // the room underneath doesn't see this finger
+    try { stick.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ }
+    const s = stick.getBoundingClientRect(), hx = s.left + s.width / 2, hy = s.top + s.height / 2;
+    const inside = Math.hypot(e.clientX - hx, e.clientY - hy) < s.width / 2;
+    const cx = inside ? hx : e.clientX, cy = inside ? hy : e.clientY;
+    if (!inside) stick.style.transform = `translate(${cx - hx}px, ${cy - hy}px)`;
+    joy = { id: e.pointerId, cx, cy, R: s.width * 0.4, t0: e.timeStamp, x0: e.clientX, y0: e.clientY, moved: false, zone: !onStick };
+    lean = null; stick.classList.add('held'); move(e);
+  }, true);
+  const move = (e) => {
+    if (!joy || e.pointerId !== joy.id) return;
+    let dx = e.clientX - joy.cx, dy = e.clientY - joy.cy;
+    const l = Math.hypot(dx, dy); if (l > joy.R) { dx *= joy.R / l; dy *= joy.R / l; }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    if (Math.hypot(e.clientX - joy.x0, e.clientY - joy.y0) > 8) joy.moved = true;
+    // a small dead zone, then a gentle curve: fine steps near the middle, a full stride at the rim;
+    // carry on past the rim (thumb well outside the well) to hurry
+    const raw = Math.hypot(e.clientX - joy.cx, e.clientY - joy.cy), n = Math.min(1, raw / joy.R), dead = 0.12;
+    const g = n < dead ? 0 : Math.pow((n - dead) / (1 - dead), 1.35);
+    walk.stick.x = raw ? (dx / l) * g : 0; walk.stick.y = raw ? (dy / l) * g : 0;
+    walk.stick.run = raw > joy.R * 1.25;
+    walkLoop();
+  };
+  stick.addEventListener('pointermove', move);
+  const end = (e) => {
+    if (!joy || e.pointerId !== joy.id) return;
+    const tap = joy.zone && !joy.moved && e.timeStamp - joy.t0 < 350;
+    reset();
+    if (tap && e.type === 'pointerup') scene.tapAt(e);   // the candle, the cage, a double tap to lean in
+  };
+  stick.addEventListener('pointerup', end); stick.addEventListener('pointercancel', end); stick.addEventListener('lostpointercapture', (e) => { if (joy && e.pointerId === joy.id) reset(); });
+  stick.addEventListener('contextmenu', (e) => e.preventDefault());
+  // the "drag to look" hint fades once you've looked about
+  scene.onLookStart = () => { $('lookHint').classList.add('gone'); scene.onLookStart = null; };
+}
+// ---- desktop, as in Ashland: click an empty part of the room and the mouse looks around (WASD walks, Shift
+// hurries); the settings need a free mouse, so Esc lets go, and Tab opens the drawer and lets go (Tab again
+// closes it and takes the mouse back). If the page isn't allowed to hold the mouse, dragging the room looks.
+scene.canGrab = () => !$('navCtl').classList.contains('hidden') && !(drawer.classList.contains('open') && !wideScreen());
+scene.onGrabFail = () => { scene.canGrab = () => false; $('mouseKTxt').innerHTML = 'drag the room:<br>look'; };
+let hintQuiet = 0;
+document.addEventListener('pointerlockchange', () => {
+  const on = scene.mouseHeld();
+  document.body.classList.toggle('mouse-held', on);
+  $('mouseKTxt').innerHTML = on ? 'Esc frees<br>the mouse' : 'click the room:<br>mouse looks';
+  // the long hint shows the first couple of times, then just a moment
+  const h = $('mouseHint'); h.classList.remove('quiet');
+  if (on && ++hintQuiet > 2) requestAnimationFrame(() => h.classList.add('quiet'));
+  if (!on) { walk.keys.clear(); document.querySelectorAll('.navCtl [data-key].held').forEach((k) => k.classList.remove('held')); }
+});
+document.addEventListener('pointerlockerror', () => scene.onGrabFail());
 $('standBtn').addEventListener('click', () => posture(+1));
 $('crouchBtn').addEventListener('click', () => posture(-1));
 $('zoomIn').addEventListener('click', () => scene.dolly(0.8));

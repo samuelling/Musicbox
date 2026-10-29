@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Frisky — a physically modelled music box</title>
-<link rel="stylesheet" href="css/style.css?v=1793306234">
+<link rel="stylesheet" href="css/style.css?v=1793307369">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }</script>
 </head>
 <body>
@@ -66,28 +66,22 @@
           <div class="krow"><button data-move="sl" data-key="KeyA" title="Step left">A</button><button data-move="back" data-key="KeyS" title="Step back">S</button><button data-move="sr" data-key="KeyD" title="Step right">D</button></div><span>walk · zoom</span></div>
         <div class="kc"><div class="krow"><button data-move="lu" data-key="ArrowUp" title="Look up">↑</button></div>
           <div class="krow"><button data-move="tl" data-key="ArrowLeft" title="Turn left">←</button><button data-move="ld" data-key="ArrowDown" title="Look down">↓</button><button data-move="tr" data-key="ArrowRight" title="Turn right">→</button></div><span>look</span></div>
+        <div class="kc mouseK" id="mouseK"><div class="krow"><span class="mouseIco" aria-hidden="true"></span></div><span id="mouseKTxt">click the room:<br>mouse looks</span></div>
       </div>
-      <!-- touch: a pad to walk with (left thumb) -->
-      <div class="dpad walkPad" aria-label="Walk">
-        <button data-move="fwd" class="up" aria-label="Walk forward">▲</button>
-        <button data-move="sl" class="lt" aria-label="Step left">◀</button>
-        <span class="mid padName">walk</span>
-        <button data-move="sr" class="rt" aria-label="Step right">▶</button>
-        <button data-move="back" class="dn" aria-label="Step back">▼</button>
-      </div>
+      <!-- touch: a floating thumbstick to walk with (left thumb); push to the rim to hurry -->
+      <div id="stick" class="stick" aria-label="Walk: push the stick"><i></i><span class="padName">walk</span></div>
       <div class="posture">
         <button id="standBtn" title="Stand up (Space)">Stand <kbd>␣</kbd></button><span id="postureTxt">Sitting</span><button id="crouchBtn" title="Crouch (C)">Crouch <kbd>C</kbd></button>
       </div>
       </div>
     </div>
-    <!-- touch: a second pad to turn and look (right thumb) -->
-    <div id="lookPad" class="dpad lookPad" aria-label="Turn and look">
-      <button data-move="lu" class="up" aria-label="Look up">▲</button>
-      <button data-move="tl" class="lt" aria-label="Turn left">↶</button>
-      <button id="faceBtn" class="mid" aria-label="Face the music box" title="Face the music box">◎</button>
-      <button data-move="tr" class="rt" aria-label="Turn right">↷</button>
-      <button data-move="ld" class="dn" aria-label="Look down">▼</button>
+    <!-- touch: drag anywhere else on the room to turn and look (right thumb) -->
+    <div id="lookPad" class="lookPad" aria-label="Turn and look">
+      <span id="lookHint" class="lookHint">drag to look</span>
+      <button id="faceBtn" aria-label="Face the music box" title="Face the music box">◎</button>
     </div>
+    <div id="reticle" class="reticle" aria-hidden="true"></div>
+    <div id="mouseHint" class="mouseHint">Mouse looks · click acts on the dot · double-click leans in · <b>Esc</b> frees the mouse · <b>Tab</b> settings</div>
     <div id="busy" class="busy hidden">Tuning tines…</div>
   </section>
 
@@ -260,6 +254,6 @@
   the code is <a href="https://github.com/samuelling/Musicbox" target="_blank" rel="noopener">on GitHub</a>.
   All tunes are public domain, traditional or original.</p>
 </dialog>
-<script type="module" src="js/main.js?v=1793306234"></script>
+<script type="module" src="js/main.js?v=1793307369"></script>
 </body>
 </html>

@@ -45,9 +45,13 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   Settings slide in from ☰ Settings (Tab on a keyboard): a side panel on a wide screen, the whole screen on a phone.
   Or play in a nursery (a cuckoo clock), a living room (a mantel clock), a wood-panelled parlour
   (a longcase clock with the real phase of the moon), a stone chapel (a great painted dial) or an
-  anechoic chamber (a lab clock). Every clock shows the real time. Walk with W A S D or the on-screen
-  keys on screen (or two thumb pads on a phone), turn with ← →, look up and down with ↑ ↓, stand (Space) or crouch (C),
-  zoom in with E and out with Q (or + −). The view is your own eyes by default (👁 toggles it); double-tap the box to lean over
+  anechoic chamber (a lab clock). Every clock shows the real time. Moving about borrows Ashland's
+  controls. At a desk: W A S D walks (Shift hurries), and a click on an empty part of the room hands it the mouse,
+  so the mouse looks around and a click acts on whatever the dot in the middle is on; Esc frees the mouse, and Tab
+  opens the settings (letting go of it) and closes them again (taking it back). ← → ↑ ↓ turn and look too, and the
+  wheel or a two-finger scroll zooms. On a phone: a floating thumbstick on the left walks (it jumps to wherever your
+  thumb lands; carry on past its rim to hurry) and a drag anywhere else looks. Walking and turning ease in and out.
+  Stand (Space) or crouch (C); zoom in with E and out with Q (or + −). The view is your own eyes by default (👁 toggles it); double-tap the box to lean over
   the table and look in, and again to sit back. Esc (or a tap on the room) hands the keys back from the menus.
   Sound is rendered binaurally with a structural HRTF (head, pinna, shoulder) on every path — choose in-ear (AirPods), over-ear or speakers, set your head and ear size, and turn your device to turn your head. Or drag your head on the room map; turn it with two fingers. Distance, direction,
   reflections, Doppler and head shadow are all simulated. The header shows the dB

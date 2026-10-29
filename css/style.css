@@ -188,18 +188,28 @@ a { color: var(--accent2); }
 .posture button { padding: 6px 8px; font-size: 12px; min-width: 62px; }
 .posture kbd { font: 600 10px/1 -apple-system, system-ui, sans-serif; opacity: .7; margin-left: 3px; }
 .posture span { font-size: 10px; color: var(--dim); background: #0008; padding: 1px 6px; border-radius: 6px; text-align: center; }
-.lookPad { position: absolute; right: 12px; top: 12px; z-index: 3; }
-.lookPad .mid { font-size: 16px; }
+.lookPad { position: absolute; right: 12px; top: 12px; z-index: 3; align-items: center; gap: 6px; }
+.lookPad button { width: 36px; height: 36px; padding: 0; font-size: 17px; border-radius: 50%; }
+.lookHint { font-size: 10px; color: var(--dim); background: #0008; padding: 2px 7px; border-radius: 8px; transition: opacity .8s; pointer-events: none; }
+.lookHint.gone { opacity: 0; }
+/* the thumbstick: a well with a knob; it jumps to wherever your thumb lands in the lower left */
+.stick { position: relative; flex: none; width: 112px; height: 112px; border-radius: 50%; touch-action: none; display: none;
+  background: radial-gradient(circle at 50% 45%, #2a1f16cc, #120d0acc 72%); border: 1.5px solid #8a6a40aa; box-shadow: 0 4px 14px #0007 inset; }
+.stick i { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle at 40% 35%, #f1dcb2, #b89466 75%); border: 1.5px solid #3a2a1c; box-shadow: 0 3px 8px #000a; }
+.stick .padName { position: absolute; left: 0; right: 0; bottom: -15px; text-align: center; font-size: 10px; color: var(--dim); pointer-events: none; }
+.stick.held { border-color: var(--accent); }
+.stick.held .padName { opacity: 0; }
 /* keyboard and mouse: keys, no pads */
-.walkPad, .lookPad { display: none; }
+.lookPad { display: none; }
 .zoomBtns { display: none; }       /* desktop zooms with the Q and E keys beside W */
 @media (hover: none), (pointer: coarse) {
   .keys, .posture kbd, .navLabel, .zoomBtns kbd, .zoomName { display: none; }
-  .walkPad { display: grid; }
+  .stick { display: block; }
   .zoomBtns { display: flex; }
-  .lookPad { display: grid; }
+  .lookPad { display: flex; }
 }
-@media (max-width: 420px) { .dpad { grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 30px); } .dpad button, .zoomBtns button { width: 30px; height: 30px; } .posture button { min-width: 54px; padding: 5px 6px; } }
+@media (max-width: 420px) { .stick { width: 100px; height: 100px; } .zoomBtns button { width: 30px; height: 30px; } .posture button { min-width: 54px; padding: 5px 6px; } }
 
 details.advanced { margin: 10px 0; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
 details.advanced summary { cursor: pointer; color: var(--dim); font-size: 13px; }
@@ -218,10 +228,10 @@ details.advanced[open] summary { margin-bottom: 6px; }
 .drawer #panels { flex: 1; min-height: 0; }
 .drawerHead { display: flex; justify-content: flex-end; flex: none; padding: 6px 8px 0; min-height: 34px; }
 .drawerClose { border: 0; background: #3a2d22; color: var(--ink); width: 30px; height: 30px; border-radius: 50%; font-size: 14px; }
-.drawerTab { position: absolute; left: -34px; top: 50%; transform: translateY(-50%); width: 34px; height: 132px; padding: 10px 0; border: 1px solid #5a4632; border-right: 0;
+.drawerTab { position: absolute; left: -34px; top: calc(50% - 66px); width: 34px; height: 132px; padding: 10px 0; border: 1px solid #5a4632; border-right: 0;
   border-radius: 14px 0 0 14px; background: linear-gradient(90deg, #2a1f16, var(--panel)); color: var(--accent); display: flex; flex-direction: column; align-items: center; justify-content: space-between;
   box-shadow: -6px 0 16px #0007; cursor: grab; touch-action: none; }
-.drawerTab:active { cursor: grabbing; }
+.drawerTab:active { cursor: grabbing; transform: none; }   /* no press-nudge: the tab stays put under your finger */
 .tabWord { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .grip { width: 4px; height: 18px; border-left: 2px solid #8a6a40; border-right: 2px solid #8a6a40; opacity: .9; }
 .drawer.open .drawerTab { color: var(--ink); }
@@ -242,3 +252,14 @@ details.advanced[open] summary { margin-bottom: 6px; }
   .wordmark { font-size: 27px; }
   #nowPlaying { display: none; }
 }
+
+/* Ashland-style mouse look (desktop): a dot in the middle while the room has hold of the mouse */
+.reticle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #f4e6c8e6; box-shadow: 0 0 0 1.5px #0009; pointer-events: none; z-index: 4; display: none; }
+.mouseHint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); font-size: 11px; color: var(--dim); background: #0009; padding: 4px 10px; border-radius: 10px; pointer-events: none; z-index: 4; white-space: nowrap; opacity: 0; transition: opacity .4s; }
+body.mouse-held .reticle { display: block; }
+body.mouse-held .mouseHint { opacity: 1; }
+body.mouse-held .mouseHint.quiet { opacity: 0; transition: opacity 1.6s 2.5s; }
+.mouseK .mouseIco { display: inline-block; width: 16px; height: 24px; border: 1.5px solid #8a6a40; border-radius: 8px; position: relative; margin: 2px 0; }
+.mouseK .mouseIco::after { content: ''; position: absolute; left: 6px; top: 4px; width: 1.5px; height: 6px; background: #8a6a40; }
+body.mouse-held .mouseK .mouseIco { border-color: var(--accent); }
+.mouseK > span:last-child { line-height: 1.15; }

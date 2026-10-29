@@ -65,11 +65,36 @@ export class MusicBoxScene {
     this.onPick = null;
     let down = null, look = null;
     this.onLook = null;
-    canvas.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY, e.timeStamp]; if (this.followListener) look = [e.clientX, e.clientY]; });
+    // Ashland-style mouse look: once the room has hold of the mouse it turns your head, and a click acts on
+    // whatever the dot in the middle of the view is on (a double click there leans you in)
+    const held = () => document.pointerLockElement === canvas;
+    this.mouseHeld = held;
+    const centre = (e) => { const r = canvas.getBoundingClientRect(); return { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, timeStamp: e.timeStamp }; };
+    document.addEventListener('mousemove', (e) => {
+      if (!held() || !this.followListener || (!e.movementX && !e.movementY)) return;
+      const k = 0.0022 * (this.camera.fov / 62);              // slower when you've zoomed in
+      if (this.onLook && e.movementX) this.onLook(e.movementX * k);
+      const cur = this.lookPitch ?? this.autoPitch ?? 0;
+      if (e.movementY) this.lookPitch = Math.max(-1.2, Math.min(1.2, cur - e.movementY * k));
+      if (this.onLookStart) this.onLookStart();
+      this.dirty = Math.max(this.dirty, 2);
+    });
+    // a plain click on an empty part of the room takes hold of the mouse (Esc, or Tab for the settings, lets go)
+    this.grabMouse = () => { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => this.onGrabFail && this.onGrabFail()); } catch (err) { if (this.onGrabFail) this.onGrabFail(); } };
+    // through your own eyes the wheel (or a trackpad's two-finger scroll or pinch) zooms
+    canvas.addEventListener('wheel', (e) => {
+      if (!this.followListener) return;
+      e.preventDefault();
+      this.dolly(Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * (e.ctrlKey ? 0.01 : 0.002)));
+    }, { passive: false });
+    canvas.addEventListener('pointerdown', (e) => { if (held()) { const c = centre(e); down = [c.clientX, c.clientY, e.timeStamp]; return; } down = [e.clientX, e.clientY, e.timeStamp]; if (this.followListener) look = [e.clientX, e.clientY]; });
     canvas.addEventListener('pointermove', (e) => {
-      if (!look || !this.followListener) return;
+      if (!look || !this.followListener || held()) return;
       const dx = e.clientX - look[0], dy = e.clientY - look[1]; look = [e.clientX, e.clientY];
-      const k = (this.camera.fov * Math.PI / 180) / Math.max(200, canvas.clientHeight);
+      // a mouse grabs the world one-to-one; a thumb turns faster (as in Ashland): about 115° per phone-width swipe
+      const k = e.pointerType === 'touch' ? 0.0052 * Math.min(1, Math.max(0.72, 900 / window.innerWidth))
+        : (this.camera.fov * Math.PI / 180) / Math.max(200, canvas.clientHeight);
+      if (this.onLookStart && (dx || dy)) this.onLookStart();
       if (this.onLook) this.onLook(-dx * k);   // grab the world: drag right and you turn to your left (as the up/down drag does)
       const cur = this.lookPitch ?? this.autoPitch ?? 0;
       if (Math.abs(dy) > 0) this.lookPitch = Math.max(-1.2, Math.min(1.2, cur + dy * k));
@@ -79,17 +104,23 @@ export class MusicBoxScene {
     canvas.addEventListener('pointerup', (e) => {
       if (!down) return;
       const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
+      if (held()) { if (e.timeStamp - down[2] < 400) this.tapAt(centre(e)); down = null; return; }
       if (moved < 6 && e.timeStamp - down[2] < 400) {
-        // a second tap close by within 320 ms is a double tap (works for mouse and touch alike)
-        const t = e.timeStamp, lt = this.lastTap;
-        if (lt && t - lt.t < 320 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 30) { this.lastTap = null; this.doubleTap(e); }
-        else { this.lastTap = { t, x: e.clientX, y: e.clientY }; this.pick(e); }
+        const hit = this.tapAt(e);
+        if (!hit && e.pointerType === 'mouse' && this.followListener && this.canGrab && this.canGrab()) this.grabMouse();
       }
       down = null;
     });
     this.loop = this.loop.bind(this);
     this.last = performance.now();
     requestAnimationFrame(this.loop);
+  }
+
+  // a tap (or the second of two: a double tap, within 320 ms and close by); works for mouse and touch alike
+  tapAt(e) {
+    const t = e.timeStamp, lt = this.lastTap;
+    if (lt && t - lt.t < 320 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 30) { this.lastTap = null; this.doubleTap(e); return true; }
+    this.lastTap = { t, x: e.clientX, y: e.clientY }; return this.pick(e);
   }
 
   resize() {
@@ -137,15 +168,16 @@ export class MusicBoxScene {
     const rect = this.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(v, this.camera);
-    if (this.candle && this.lit > 0.5 && this.raycaster.intersectObject(this.candle.g, true).length) { this.candle.gust = 1.3; return; }
+    if (this.candle && this.lit > 0.5 && this.raycaster.intersectObject(this.candle.g, true).length) { this.candle.gust = 1.3; return true; }
     // a tap on the cage glass wakes him (or startles him)
     if (this.hamRig && !this.hamRig.covered && this.onTapCage) {
       const under = (o, root) => { for (let p = o; p; p = p.parent) if (p === root) return true; return false; };
       const hit = this.raycaster.intersectObjects(this.root.children, true).find((h) => h.object.visible && !(this.roomOuter && under(h.object, this.roomOuter)));
-      if (hit && under(hit.object, this.hamRig.group)) { this.onTapCage(); return; }
+      if (hit && under(hit.object, this.hamRig.group)) { this.onTapCage(); return true; }
     }
     const hits = this.raycaster.intersectObjects(this.tines.map((t) => t.mesh), false);
-    if (hits.length) { const i = hits[0].object.userData.tine; this.select(i); this.onPick && this.onPick(i); }
+    if (hits.length) { const i = hits[0].object.userData.tine; this.select(i); this.onPick && this.onPick(i); return true; }
+    return false;
   }
 
   select(i) {
