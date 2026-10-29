@@ -1,4 +1,5 @@
 import { Engine } from './audio/engine.js';
+import { strikeMatch } from './audio/match.js';
 import { MusicBoxScene } from './render/scene.js';
 import { CrankPad } from './ui/crank.js';
 import { ListenerMap } from './ui/listener-map.js';
@@ -83,26 +84,65 @@ scene.onPick = (i) => selectTine(i, true);
 // ------------------------------------------------------------------ audio start
 // Audio start. iOS only allows audio from a *completed* tap (click / touchend), and
 // only for work done synchronously in that handler, so the unlock happens right there.
-let wired = false;
+let wired = false, snuffTimer = 0;
+const prompt = $('lightPrompt'), cap = prompt.querySelector('.lightCap');
+const PROMPTS = {
+  first: ['Tap the candle to light it', 'and the music box comes to life'],
+  relight: ['The candle went out', 'tap it to relight and resume the sound'],
+  retry: ['Tap again to start the sound', 'the browser held the audio back'],
+};
+function showPrompt(kind, sub) {
+  prompt.classList.toggle('gone', !kind);
+  if (!kind) return;
+  const [a, b] = PROMPTS[kind] || [kind, ''];
+  prompt.querySelector('.lightText').textContent = a;
+  prompt.querySelector('.lightSub').textContent = sub || b;
+  placePrompt(scene.candleScreen());
+}
+// keep the ring over the candle as the view moves; centre it if the candle is off screen
+function placePrompt(p) {
+  if (prompt.classList.contains('gone')) return;
+  const anchored = !!(p && p.on);
+  prompt.classList.toggle('anchored', anchored);
+  if (!anchored) { prompt.style.left = prompt.style.top = ''; prompt.style.removeProperty('--ring'); cap.style.transform = ''; return; }
+  const ring = Math.max(72, Math.min(190, p.size * 1.25));
+  const x = Math.max(ring / 2 + 4, Math.min(p.w - ring / 2 - 4, p.x)), y = Math.max(ring / 2 + 6, Math.min(p.h - ring / 2 - 64, p.y));
+  prompt.style.setProperty('--ring', ring.toFixed(0) + 'px');
+  prompt.style.left = x.toFixed(1) + 'px'; prompt.style.top = y.toFixed(1) + 'px';
+  // the ring stays on the candle; only the caption slides to stay on screen
+  const cw = cap.offsetWidth || 220;
+  const dx = Math.max(8 - (x - cw / 2), Math.min(0, p.w - 8 - (x + cw / 2)));
+  cap.style.transform = dx ? `translateX(${dx.toFixed(1)}px)` : '';
+}
+scene.onCandleScreen = placePrompt;
 function ensureStarted() {
   const p = engine.unlock();
   if (!wired) {
     wired = true; started = true;
     engine.onState = onState;
-    engine.onRunning = (on) => setOverlay(!on);
+    // the candle is the audio's pilot light: it goes out when the browser suspends the
+    // sound (screen lock, a call, another app) and relights when the sound comes back
+    engine.onRunning = (on) => {
+      clearTimeout(snuffTimer);
+      if (on) { scene.lightCandle(); showPrompt(null); }
+      else snuffTimer = setTimeout(() => { if (!engine.running) { scene.snuffCandle(); showPrompt('relight'); } }, 700);
+    };
     p.then(() => {
       pushAll();
       if (engine.sampleRate !== cfg.sr) { cfg.sr = engine.sampleRate; requestBuild(0); }
-    }).catch((e) => { console.error(e); $('playOverlay').querySelector('.playSub').textContent = 'Audio failed to start: ' + e.message; setOverlay(true); });
+    }).catch((e) => { console.error(e); showPrompt('retry', 'Audio failed to start: ' + e.message); });
   }
-  setOverlay(!engine.running);
+  if (engine.running) { scene.lightCandle(); showPrompt(null); }
 }
-function setOverlay(show) { $('playOverlay').classList.toggle('gone', !show); }
-$('playOverlay').addEventListener('click', (e) => {
-  e.stopPropagation(); ensureStarted(); setOverlay(false);
-  // if the browser still refused, bring the button back so the next tap can retry
-  setTimeout(() => setOverlay(!engine.running), 900);
+prompt.addEventListener('click', (e) => {
+  e.stopPropagation();
+  ensureStarted();                       // synchronous unlock, inside the tap
+  strikeMatch(engine.ctx);
+  scene.lightCandle(); showPrompt(null);
+  // if the browser still refused, ask for one more tap (the flame stays lit)
+  setTimeout(() => { if (!engine.running) showPrompt('retry'); }, 1200);
 });
+showPrompt('first');
 // any later completed tap also revives audio that iOS suspended (screen lock, calls, other apps)
 for (const ev of ['click', 'touchend']) document.addEventListener(ev, () => { if (started && !engine.running) ensureStarted(); }, { capture: true });
 function pushAll() {

@@ -5,7 +5,9 @@ physically modelled: tuned steel tines, pins on a brass cylinder, the governor f
 the wooden box, the table it sits on, the room, and your head.
 
 **Play it:** open `index.html` from any static web server (GitHub Pages works; no
-build step). On a phone, draw circles on the round pad to crank it.
+build step). Tap the candle to light it — the struck match is what starts the
+sound (browsers only allow audio after a tap). If the browser suspends audio, the
+candle goes out; tap it to relight. On a phone, draw circles on the round pad to crank it.
 
 ## What you can do
 

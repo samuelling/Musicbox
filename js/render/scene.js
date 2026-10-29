@@ -40,7 +40,11 @@ export class MusicBoxScene {
     this.scene.add(key);
     const rim = new THREE.DirectionalLight(0x9fb7ff, 0.12); rim.position.set(-200, 120, -180); this.scene.add(rim);
     this.candle = null;
+    // candle state survives rebuilds: lit (0..1), ignition clock, smoke clock, wick ember
+    this.lit = 0; this.litTarget = 0; this.igniteT = -1; this.smokeT = -1; this.ember = 0;
+    this.onCandleScreen = null;
     this.root = new THREE.Group(); this.scene.add(this.root);
+    this.smoke = this.makeSmoke(); this.scene.add(this.smoke.group);
     this.mats = {
       brass: new THREE.MeshStandardMaterial({ color: 0xcaa24e, metalness: 1, roughness: 0.28 }),
       steel: new THREE.MeshStandardMaterial({ color: 0xc9ced4, metalness: 1, roughness: 0.22 }),
@@ -79,6 +83,7 @@ export class MusicBoxScene {
     const rect = this.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(v, this.camera);
+    if (this.candle && this.lit > 0.5 && this.raycaster.intersectObject(this.candle.g, true).length) { this.candle.gust = 1.3; return; }
     const hits = this.raycaster.intersectObjects(this.tines.map((t) => t.mesh), false);
     if (hits.length) { const i = hits[0].object.userData.tine; this.select(i); this.onPick && this.onPick(i); }
   }
@@ -314,7 +319,7 @@ export class MusicBoxScene {
     // charred, curled wick
     const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 7, 8), new THREE.MeshStandardMaterial({ color: 0x120c08, roughness: 1 }));
     wick.position.y = 9 + H - 1; wick.rotation.z = 0.25; g.add(wick);
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff5a10 }));
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({ color: 0x1a0d06 }));
     tip.position.set(-0.9, 9 + H + 2.6, 0); g.add(tip);
     // flame: bright core inside a softer outer envelope, blue at the base
     const flame = new THREE.Group(); flame.position.y = 9 + H + 1.5;
@@ -333,6 +338,9 @@ export class MusicBoxScene {
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     halo.scale.set(70, 70, 1); halo.position.y = 9; flame.add(halo);
     g.add(flame);
+    // the match head flaring beside the wick while it is struck
+    const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo.material.map, color: 0xfff0d0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
+    flare.position.set(7, 9 + H + 4, 5); flare.scale.set(1, 1, 1); g.add(flare);
     // the light itself: warm, physically falling off with distance (scene units are mm)
     const light = new THREE.PointLight(0xffa04a, 34000, 0, 2);
     light.position.y = 9 + H + 16; light.castShadow = true;
@@ -340,12 +348,106 @@ export class MusicBoxScene {
     light.shadow.bias = -0.0008; light.shadow.radius = 4;
     g.add(light);
     this.root.add(g);
-    this.candle = { g, flame, outer, core, light, halo, wax, base: 34000, n1: 0, n2: 0, t: 0 };
+    this.candle = { g, flame, outer, core, light, halo, wax, tip, flare, H, base: 34000, n1: 0, n2: 0, t: 0 };
+    this.flicker(0);
+  }
+
+  // ---------- lighting and snuffing ----------
+  get isLit() { return this.litTarget === 1; }
+  lightCandle() {
+    if (this.litTarget === 1) return;
+    this.litTarget = 1; this.igniteT = 0; this.smokeT = -1;
+    this.dirty = Math.max(this.dirty, 2);
+  }
+  snuffCandle() {
+    if (this.litTarget === 0) return;
+    this.litTarget = 0; this.igniteT = -1; this.smokeT = 0; this.ember = 1;
+    this.dirty = Math.max(this.dirty, 2);
+  }
+  get candleBusy() { return this.lit > 1e-3 || this.igniteT >= 0 || this.smokeT >= 0 || this.ember > 0.01 || this.smoke.alive > 0; }
+
+  // a thin wisp of smoke from a snuffed wick: soft sprites rising, spreading and fading
+  makeSmoke() {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const cx = cv.getContext('2d'); const grd = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(200,196,190,0.9)'); grd.addColorStop(0.5, 'rgba(170,166,160,0.35)'); grd.addColorStop(1, 'rgba(150,150,150,0)');
+    cx.fillStyle = grd; cx.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(cv);
+    const group = new THREE.Group(), parts = [];
+    for (let i = 0; i < 36; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xa8a29a, depthWrite: false, transparent: true, opacity: 0 }));
+      sp.visible = false; group.add(sp); parts.push({ sp, age: 0, life: 1, on: false, x0: 0, y0: 0, z0: 0, ph: 0 });
+    }
+    return { group, parts, alive: 0, acc: 0 };
+  }
+  stepSmoke(dt) {
+    const S = this.smoke, c = this.candle;
+    if (this.smokeT >= 0 && c) {
+      this.smokeT += dt;
+      // a dense column at first, thinning out over a couple of seconds
+      S.acc += dt * 16 * Math.exp(-this.smokeT / 0.9);
+      const src = c.g.localToWorld(new THREE.Vector3(-0.9, 9 + c.H + 3, 0));
+      while (S.acc >= 1) {
+        S.acc -= 1;
+        const p = S.parts.find((q) => !q.on); if (!p) break;
+        p.on = true; p.age = 0; p.life = 2.6 + Math.random() * 1.6; p.ph = Math.random() * 6.28;
+        p.x0 = src.x; p.y0 = src.y; p.z0 = src.z; p.sp.visible = true;
+      }
+      if (this.smokeT > 3) this.smokeT = -1;
+    }
+    let alive = 0;
+    for (const p of S.parts) {
+      if (!p.on) continue;
+      p.age += dt;
+      if (p.age >= p.life) { p.on = false; p.sp.visible = false; continue; }
+      alive++;
+      const a = p.age, u = a / p.life;
+      // buoyant rise that slows as it mixes; a lazy sideways curl that grows with height
+      const y = 22 * a + 9 * a * a / (1 + a);
+      const sway = (2 + 7 * a) * Math.sin(1.7 * a + p.ph);
+      p.sp.position.set(p.x0 + sway, p.y0 + y, p.z0 + 0.6 * sway * Math.cos(p.ph));
+      const sc = 2.2 + 9 * a; p.sp.scale.set(sc, sc, 1);
+      p.sp.material.opacity = 0.42 * Math.min(1, a * 5) * (1 - u) * (1 - u);
+    }
+    S.alive = alive;
+  }
+
+  // where the candle sits on screen (CSS px within the canvas), for the tap-to-light prompt
+  candleScreen() {
+    const c = this.candle; if (!c) return null;
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    const toS = (y) => { const v = c.g.localToWorld(new THREE.Vector3(0, y, 0)).project(this.camera); return [(v.x + 1) * w / 2, (1 - v.y) * h / 2, v.z]; };
+    const a = toS(0), b = toS(9 + c.H + 22);
+    const x = (a[0] + b[0]) / 2, y = (a[1] + b[1]) / 2;
+    const size = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const on = a[2] < 1 && b[2] < 1 && x > 0 && x < w && y > 0 && y < h;
+    return { x, y, size, on, w, h };
   }
 
   flicker(dt) {
     const c = this.candle; if (!c) return;
     c.t += dt;
+    // ---- lighting: match strike, flare, the wick catching (with a sputter), then a steady flame
+    let flare = 0;
+    if (this.igniteT >= 0) {
+      const t = (this.igniteT += dt);
+      flare = t < 0.06 ? t / 0.06 : Math.exp(-(t - 0.06) / 0.22) * (0.75 + 0.25 * Math.random());
+      const sm = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+      const grow = sm((t - 0.3) / 1.5);
+      const sputter = 1 - 0.45 * Math.exp(-(((t - 0.85) / 0.09) ** 2));
+      this.lit = grow * sputter;
+      if (t > 1.9) { this.igniteT = -1; this.lit = 1; flare = 0; }
+    } else if (this.litTarget === 0) {
+      this.lit *= Math.exp(-dt / 0.07);           // pinched out
+      if (this.lit < 1e-3) this.lit = 0;
+      this.ember *= Math.exp(-dt / 1.4);          // the wick glows, then dies
+      if (this.ember < 0.01) { if (this.ember > 0) this.dirty = Math.max(this.dirty, 1); this.ember = 0; }
+    } else this.lit = 1;
+    const L = this.lit;
+    c.flare.material.opacity = Math.min(1, flare);
+    const fs = 4 + 34 * flare; c.flare.scale.set(fs, fs, 1);
+    c.tip.material.color.setRGB(0.1 + 0.9 * Math.max(L, this.ember), 0.05 + 0.3 * Math.max(L, this.ember), 0.02 + 0.04 * Math.max(L, this.ember));
+    c.flame.visible = L > 2e-3;
     // two smoothed random walks (slow breathing + quick gutter) plus an occasional draught
     const k1 = 1 - Math.exp(-dt * 3), k2 = 1 - Math.exp(-dt * 18);
     c.n1 += (Math.random() * 2 - 1 - c.n1) * k1;
@@ -354,14 +456,14 @@ export class MusicBoxScene {
     c.gust = (c.gust || 0) * Math.exp(-dt * 2.5);
     const gustWobble = c.gust * Math.sin(c.t * 23);
     const lvl = 1 + 0.16 * c.n1 + 0.09 * c.n2 - 0.25 * Math.abs(gustWobble);
-    c.light.intensity = c.base * Math.max(0.45, lvl);
+    c.light.intensity = c.base * (Math.max(0.45, lvl) * Math.pow(L, 1.3) + 0.55 * flare);
     const lean = 0.06 * c.n1 + 0.25 * gustWobble;
     c.flame.rotation.z = lean; c.flame.rotation.x = 0.05 * c.n2;
-    c.flame.scale.set(1 - 0.06 * c.n2, Math.max(0.6, 1 + 0.14 * c.n1 + 0.08 * c.n2 - 0.2 * Math.abs(gustWobble)), 1);
+    c.flame.scale.set((1 - 0.06 * c.n2) * (0.35 + 0.65 * L), Math.max(0.6, 1 + 0.14 * c.n1 + 0.08 * c.n2 - 0.2 * Math.abs(gustWobble)) * Math.pow(L, 0.8), 1);
     c.light.position.x = -lean * 12;
     c.outer.material.opacity = 0.45 + 0.12 * lvl;
-    c.halo.material.opacity = 0.65 + 0.3 * (lvl - 1);
-    c.wax.emissiveIntensity = 0.3 * lvl;
+    c.halo.material.opacity = (0.65 + 0.3 * (lvl - 1)) * L;
+    c.wax.emissiveIntensity = 0.3 * lvl * L;
   }
 
   buildPins(info, patch, pinsList) {
@@ -431,13 +533,15 @@ export class MusicBoxScene {
     }
     this.controls.update();
     if (this.state.keyAngle !== this.lastKey) { this.lastKey = this.state.keyAngle; this.dirty = Math.max(this.dirty, 1); }
-    if (this.candle) {
-      // the flame never stops; ~30 fps is plenty for a flicker when nothing else moves
-      this.flicker(dt);
+    if (this.candle && this.candleBusy) {
+      // a lit flame never stops; ~30 fps is plenty for a flicker when nothing else moves
+      const quick = this.igniteT >= 0 || this.smoke.alive > 0;   // lighting and smoke get every frame
+      this.flicker(dt); this.stepSmoke(dt);
       this.candleFrame = !this.candleFrame;
-      if (this.dirty <= 0 && this.candleFrame) return;
+      if (this.dirty <= 0 && this.candleFrame && !quick) return;
     } else if (this.dirty <= 0) return;      // nothing moved: save the battery
     if (this.dirty > 0) this.dirty--;
     this.renderer.render(this.scene, this.camera);
+    if (this.onCandleScreen) this.onCandleScreen(this.candleScreen());
   }
 }

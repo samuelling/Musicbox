@@ -11,13 +11,19 @@ header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-a
 .spl { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--accent2); min-width: 60px; text-align: right; }
 #stage { position: relative; height: 46vh; min-height: 280px; flex: none; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 #view { width: 100%; height: 100%; display: block; touch-action: none; }
-.playOverlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 30px 18px; border: 1px solid #e3b45a55; border-radius: 22px; background: radial-gradient(ellipse at center, #1b130cee 0%, #0d0907d9 100%); color: var(--ink); box-shadow: 0 10px 40px #000a, 0 0 60px #e3b45a22; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); transition: opacity .45s, transform .45s; cursor: pointer; }
-.playOverlay.gone { opacity: 0; transform: translate(-50%, -46%) scale(.96); pointer-events: none; }
-.playDisc { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 38% 32%, #f3cf86, #c9963d 70%); box-shadow: 0 0 0 6px #e3b45a22, 0 0 30px #e3b45a66; animation: breathe 2.4s ease-in-out infinite; }
-.playDisc svg { width: 34px; height: 34px; fill: #2a1a0b; margin-left: 5px; }
-.playText { font-family: Georgia, "Times New Roman", serif; font-size: 22px; color: var(--accent); letter-spacing: .02em; }
-.playSub { font-size: 12px; color: var(--dim); }
-@keyframes breathe { 0%, 100% { box-shadow: 0 0 0 6px #e3b45a22, 0 0 24px #e3b45a55; } 50% { box-shadow: 0 0 0 10px #e3b45a18, 0 0 44px #e3b45a88; } }
+/* Start prompt. Anchored: an invisible ring over the candle with a caption under it.
+   Unanchored (no candle in view): a centred button with a flame icon. */
+.lightPrompt { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 0; border: 0; background: none; color: var(--ink); cursor: pointer; transition: opacity .6s; --ring: 96px; }
+.lightPrompt.gone { opacity: 0; pointer-events: none; }
+.lightRing { width: var(--ring); height: var(--ring); border-radius: 50%; display: grid; place-items: center; border: 1.5px solid #e3b45a66; background: radial-gradient(circle, #e3b45a14 0%, #e3b45a00 70%); animation: halo 2.6s ease-in-out infinite; }
+.lightRing svg { width: 40%; height: 40%; fill: var(--accent); filter: drop-shadow(0 0 8px #e3b45a88); }
+.lightPrompt.anchored { transform: translate(-50%, calc(var(--ring) / -2)); }
+.lightPrompt.anchored .lightRing svg { display: none; }
+.lightPrompt:not(.anchored) .lightRing { --ring: 84px; background: radial-gradient(circle at 40% 35%, #2a1d12, #120c08 75%); border-color: #e3b45a88; }
+.lightCap { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 14px 8px; border-radius: 14px; background: #0c0806d0; box-shadow: 0 6px 24px #0009; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); white-space: nowrap; }
+.lightText { font-family: Georgia, "Times New Roman", serif; font-size: 18px; color: var(--accent); letter-spacing: .02em; }
+.lightSub { font-size: 12px; color: var(--dim); }
+@keyframes halo { 0%, 100% { box-shadow: 0 0 0 0 #e3b45a00, 0 0 18px #e3b45a22; transform: scale(1); } 50% { box-shadow: 0 0 0 7px #e3b45a14, 0 0 34px #e3b45a44; transform: scale(1.05); } }
 .hint { position: absolute; left: 50%; top: 52px; transform: translateX(-50%); background: #000a; padding: 6px 12px; border-radius: 16px; font-size: 13px; pointer-events: none; transition: opacity .4s; }
 .hint.gone { opacity: 0; }
 .modeSwitch { position: absolute; left: 10px; top: 10px; display: flex; background: #0008; border-radius: 18px; padding: 3px; }
