@@ -466,10 +466,19 @@ export class HamsterRig {
 
     // crank extension shaft through the box wall to a pulley, with a pillow block on a post
     const shaftLen = xp + 4 - anchor.x;
-    const shaft = cyl(1.6, shaftLen, steel); shaft.rotation.z = Math.PI / 2; shaft.position.set(anchor.x + shaftLen / 2, yc, zc); g.add(shaft);
-    const hub = cyl(3.6, 5, brass, 16); hub.rotation.z = Math.PI / 2; hub.position.set(anchor.x, yc, zc); g.add(hub);
-    for (const x of [anchor.boxRight + 6, (anchor.boxRight + xp) / 2, xp - 16]) {
-      const blk = new THREE.Mesh(new THREE.BoxGeometry(8, 9, 12), brass); blk.position.set(x, yc, zc); blk.castShadow = true; g.add(blk);
+    // the shaft turns with the crank: polished steel, a red stripe painted along it and brass couplings
+    // with set screws, so you can see it going round from across the room
+    const shaftG = (this.shaftG = new THREE.Group()); shaftG.position.set(anchor.x, yc, zc); g.add(shaftG);
+    const bright = new THREE.MeshStandardMaterial({ color: 0xe4e8ec, metalness: 0.95, roughness: 0.18 });
+    const paint = new THREE.MeshStandardMaterial({ color: 0xc8321e, roughness: 0.5 });
+    const shaft = cyl(3.2, shaftLen, bright, 16); shaft.rotation.z = Math.PI / 2; shaft.position.x = shaftLen / 2; shaftG.add(shaft);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(shaftLen - 6, 1.6, 2.2), paint); stripe.position.set(shaftLen / 2, 3.0, 0); shaftG.add(stripe);
+    for (const x of [4, anchor.boxRight + 20 - anchor.x, xp - 30 - anchor.x]) {
+      const cpl = cyl(6, 12, brass, 20); cpl.rotation.z = Math.PI / 2; cpl.position.x = x; cpl.castShadow = true; shaftG.add(cpl);
+      const screw = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 4), paint); screw.position.set(x, 6.4, 0); shaftG.add(screw);
+    }
+    for (const x of [anchor.boxRight + 6, (anchor.boxRight + xp) / 2 + 12, xp - 16]) {
+      const blk = new THREE.Mesh(new THREE.BoxGeometry(9, 13, 15), brass); blk.position.set(x, yc, zc); blk.castShadow = true; g.add(blk);
       const post = cyl(2, yc - anchor.bottomY, steel); post.position.set(x, (yc + anchor.bottomY) / 2 - 4, zc); g.add(post);
       const foot = cyl(7, 2, steel, 20); foot.position.set(x, anchor.bottomY + 1, zc); g.add(foot);
     }
@@ -518,7 +527,7 @@ export class HamsterRig {
     for (let i = 0; i <= 24; i++) { const a = Math.PI - (i / 24) * Math.PI; pts.push(new THREE.Vector3(xp, yc - rc * Math.sin(a), zc + rc * Math.cos(a))); }  // back → under → front
     for (let i = 0; i <= 32; i++) { const b = Math.PI - (i / 32) * Math.PI; pts.push(new THREE.Vector3(xw + rw * Math.cos(b), yw + rw * Math.sin(b), zwp)); } // left → over → right
     pts.push(pts[0].clone());
-    const belt = new THREE.Mesh(new THREE.TubeGeometry(new PolyCurve(pts), 220, 1.3, 8, true), new THREE.MeshStandardMaterial({ color: 0xb2402b, roughness: 0.55 }));
+    const belt = new THREE.Mesh(new THREE.TubeGeometry(new PolyCurve(pts), 220, 2.2, 8, true), new THREE.MeshStandardMaterial({ color: 0xd2482c, roughness: 0.5 }));
     belt.castShadow = true; g.add(belt); this.belt = belt;
 
     // the hamster: either on the tread at angle φ from the bottom, or about his business in the cage
@@ -628,6 +637,7 @@ export class HamsterRig {
       this.view = { ...st, phase: (st.phase + st.f * age) % 1 };
     }
     this.crankPulley.rotation.x = -crankAngle;
+    this.shaftG.rotation.x = -crankAngle;
     const inWheel = life && life.where === 'wheel' && st && st.inWheel;
     const root = this.ham.root;
     root.visible = !this.covered;
