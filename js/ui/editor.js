@@ -7,7 +7,7 @@ const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)
 export class PinRoll {
   constructor(canvas, onToggle) {
     this.cv = canvas; this.ctx = canvas.getContext('2d'); this.onToggle = onToggle;
-    this.rows = []; this.steps = 64; this.placed = []; this.play = -1; this.meter = [4, 4];
+    this.rows = []; this.allRows = []; this.scale = null; this.root = 0; this.degFn = null; this.off = new Set(); this.steps = 64; this.placed = []; this.play = -1; this.meter = [4, 4];
     this.sx = 0; this.sy = 0; this.dpr = Math.min(2, devicePixelRatio || 1);
     this.drag = null; this.lastUser = 0; this.flash = null;
     canvas.addEventListener('pointerdown', (e) => {
@@ -36,7 +36,7 @@ export class PinRoll {
   }
   // geometry, all in device pixels
   get top() { return 16 * this.dpr; }
-  get lw() { return 44 * this.dpr; }
+  get lw() { return 54 * this.dpr; }
   cellW() { return (coarse ? 22 : 14) * this.dpr; }
   rowH() {
     const fit = (this.cv.height - this.top) / Math.max(1, this.rows.length);
@@ -54,12 +54,32 @@ export class PinRoll {
     this.draw();
   }
   set(rows, steps, placed, meter) {
-    const firstRows = this.rows.length === 0;
-    this.rows = rows; this.steps = steps; this.placed = placed; this.meter = meter;
+    const firstRows = this.allRows.length === 0;
+    this.allRows = rows; this.steps = steps; this.placed = placed; this.meter = meter;
+    this.filter();
     this.sx = this.clampX(this.sx);
     // start scrolled to the middle of the comb (where the melody usually lives)
     this.sy = firstRows ? this.clampY(this.maxY() / 2) : this.clampY(this.sy);
     this.draw();
+  }
+  // Quantise to a scale: only in-scale rows are shown (rows outside it stay, dimmed, while they
+  // still hold pins, so nothing in the tune disappears). set: pitch classes, or null = chromatic.
+  setScale(set, root, degFn) {
+    // keep the pitch at the middle of the view in view
+    const rh = this.rowH(), mid = this.rows[Math.floor((this.sy + (this.cv.height - this.top) / 2) / rh)];
+    this.scale = set; this.root = root; this.degFn = degFn;
+    this.filter();
+    if (mid !== undefined && this.rows.length) {
+      let best = 0; for (let i = 0; i < this.rows.length; i++) if (Math.abs(this.rows[i] - mid) < Math.abs(this.rows[best] - mid)) best = i;
+      this.sy = this.clampY(best * this.rowH() - (this.cv.height - this.top) / 2);
+    } else this.sy = this.clampY(this.sy);
+    this.draw();
+  }
+  filter() {
+    const pc = (m) => ((m % 12) + 12) % 12, set = this.scale;
+    const used = new Set(this.placed.map((p) => p.midi));
+    this.rows = this.allRows.filter((m) => !set || set.has(pc(m)) || used.has(m));
+    this.off = new Set(set ? this.rows.filter((m) => !set.has(pc(m))) : []);
   }
   setPlayhead(step) {
     this.play = step;
@@ -93,8 +113,11 @@ export class PinRoll {
     const yOf = (i) => top + i * rh - this.sy;
     c.save(); c.beginPath(); c.rect(lw, top, W - lw, H - top); c.clip();
     for (let i = r0; i <= r1; i++) {
-      const black = [1, 3, 6, 8, 10].includes(((this.rows[i] % 12) + 12) % 12);
-      c.fillStyle = black ? '#120e0b' : '#1a1410'; c.fillRect(lw, yOf(i), W - lw, rh);
+      const pcI = ((this.rows[i] % 12) + 12) % 12, black = [1, 3, 6, 8, 10].includes(pcI);
+      const isRoot = this.scale && pcI === this.root, isOff = this.off.has(this.rows[i]);
+      c.fillStyle = isOff ? '#241010' : isRoot ? '#2a2013' : this.scale ? (i % 2 ? '#17120e' : '#1b1511') : black ? '#120e0b' : '#1a1410';
+      c.fillRect(lw, yOf(i), W - lw, rh);
+      if (isRoot) { c.fillStyle = '#e3b45a33'; c.fillRect(lw, yOf(i), W - lw, 1.5 * d); }
       c.fillStyle = '#ffffff08'; c.fillRect(lw, yOf(i) + rh - 1, W - lw, 1);
     }
     const barLen = (this.meter[0] * 16) / this.meter[1], beat = 16 / this.meter[1];
@@ -132,7 +155,16 @@ export class PinRoll {
     c.fillStyle = '#0d0a08'; c.fillRect(0, top, lw, H - top);
     c.save(); c.beginPath(); c.rect(0, top, lw, H - top); c.clip();
     c.font = `${Math.min(11 * d, rh * 0.6)}px ui-monospace, monospace`;
-    for (let i = r0; i <= r1; i++) { c.fillStyle = '#b5a58f'; c.fillText(noteName(this.rows[i]), 4 * d, yOf(i) + rh * 0.68); }
+    for (let i = r0; i <= r1; i++) {
+      const m = this.rows[i], isRoot = this.scale && (((m % 12) + 12) % 12) === this.root, isOff = this.off.has(m);
+      c.fillStyle = isOff ? '#a0574a' : isRoot ? '#e3b45a' : '#b5a58f';
+      c.fillText(noteName(m), 4 * d, yOf(i) + rh * 0.68);
+      if (this.scale && this.degFn) {
+        const dg = this.degFn(m);
+        c.fillStyle = isOff ? '#a0574a' : '#b5a58f88';
+        c.fillText(isOff ? '×' : String(dg), lw - 12 * d, yOf(i) + rh * 0.68);
+      }
+    }
     c.restore();
     // scroll hints
     if (this.maxY() > 0) {

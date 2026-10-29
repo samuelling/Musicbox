@@ -91,8 +91,14 @@
         <button id="saveTune">Save to My tunes</button>
         <button id="retune" title="Rebuild the comb so it matches this tune">Re-tune comb</button>
       </div>
+      <div class="row">
+        <label>Scale <select id="scaleSel"></select></label>
+        <label>Root <select id="rootSel"></select></label>
+        <button id="matchKey" title="Use the key of this tune">Match tune's key</button>
+        <button id="snapScale" title="Move notes outside the scale to the nearest scale note">Snap notes to scale</button>
+      </div>
       <div class="editorWrap"><canvas id="editor"></canvas></div>
-      <p class="small">Tap a cell to add or remove a pin; drag to scroll. Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
+      <p class="small">Tap a cell to add or remove a pin; drag to scroll. With a scale chosen, only its notes are offered (numbers are scale degrees; the root is gold). Each row is one tine of the comb; the playhead is the cylinder's real angle, so you can edit while it plays.</p>
     </section>
 
     <!-- TINES / COMB -->

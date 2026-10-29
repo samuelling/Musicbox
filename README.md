@@ -58,3 +58,7 @@ node tools/render-song.mjs brahms c30 classic oak living 30 out.wav spring
 how the model was checked for stability and level.
 
 Vendored: three.js r170 (MIT) in `vendor/`, loaded through an import map.
+
+* **Compose in a scale** — the pin roll can be quantised to 24 scales (major/minor, modes,
+  pentatonics and blues, Freygish and other Jewish and Middle Eastern modes, Japanese and
+  symmetric scales) on any root; "Match tune's key" and "Snap notes to scale" help.

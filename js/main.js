@@ -7,7 +7,8 @@ import { ListenerMap } from './ui/listener-map.js';
 import { PinRoll } from './ui/editor.js';
 import { TineStrip, Inspector } from './ui/inspector.js';
 import { SONGS, CATEGORIES } from './melody/songs.js';
-import { compileSong } from './melody/notation.js';
+import { compileSong, detectKey } from './melody/notation.js';
+import { SCALE_GROUPS, SCALES, ROOTS, scaleSet, degreeOf, snapToScale } from './melody/scales.js';
 import { arrange } from './melody/arranger.js';
 import { parseMidi } from './melody/midi.js';
 import { DEFAULT_CONFIG } from './physics/model.js';
@@ -418,7 +419,51 @@ function rearrange() {
 function updateRoll() {
   const rows = [...new Set(built.combNotes)].sort((a, b) => b - a);
   roll.set(rows, song.steps, built.arrangement.placed, song.meter);
+  if (!updateRoll.init) { updateRoll.init = true; applyScale(); }
 }
+// ---- quantised scales for composing (pitches as they sound on the comb)
+const scaleState = (() => { try { return JSON.parse(localStorage.getItem('musicbox.scale')) || { id: 'chromatic', root: 0 }; } catch (e) { return { id: 'chromatic', root: 0 }; } })();
+{
+  const sel = $('scaleSel');
+  for (const [label, list] of SCALE_GROUPS) {
+    const parent = label ? Object.assign(document.createElement('optgroup'), { label }) : sel;
+    for (const [id, name] of list) parent.appendChild(Object.assign(document.createElement('option'), { value: id, textContent: name }));
+    if (label) sel.appendChild(parent);
+  }
+  ROOTS.forEach((r, i) => $('rootSel').appendChild(Object.assign(document.createElement('option'), { value: i, textContent: r })));
+  if (!SCALES[scaleState.id]) scaleState.id = 'chromatic';
+  sel.value = scaleState.id; $('rootSel').value = scaleState.root;
+}
+function applyScale() {
+  const { id, root } = scaleState;
+  $('rootSel').disabled = id === 'chromatic'; $('snapScale').disabled = id === 'chromatic';
+  roll.setScale(scaleSet(id, root), root, (m) => degreeOf(m, id, root));
+  try { localStorage.setItem('musicbox.scale', JSON.stringify(scaleState)); } catch (e) { /* private mode */ }
+}
+$('scaleSel').addEventListener('change', (e) => { scaleState.id = e.target.value; applyScale(); });
+$('rootSel').addEventListener('change', (e) => { scaleState.root = +e.target.value; applyScale(); });
+$('matchKey').addEventListener('click', () => {
+  if (!built || !song.notes.length) return;
+  const k = song.key && Number.isFinite(song.key.tonic) ? song.key : detectKey(song.notes.map((n) => ({ ...n, w: 1 })));
+  scaleState.root = ((((k.tonic + built.arrangement.transpose) % 12) + 12) % 12);
+  scaleState.id = k.mode === 'minor' ? 'minor' : 'major';
+  $('scaleSel').value = scaleState.id; $('rootSel').value = scaleState.root; applyScale();
+});
+$('snapScale').addEventListener('click', () => {
+  const set = scaleSet(scaleState.id, scaleState.root); if (!set || !built) return;
+  const t = built.arrangement.transpose; let moved = 0;
+  const seen = new Set(), out = [];
+  for (const n of song.notes) {
+    const m = snapToScale(n.midi + t, set) - t;
+    if (m !== n.midi) moved++;
+    const key = `${n.step}:${m}:${n.voice || 0}`; if (seen.has(key)) continue; seen.add(key);
+    out.push({ ...n, midi: m });
+  }
+  if (!moved) { $('arrInfo').textContent = '— every note is already in the scale'; return; }
+  song.notes = out;
+  if (songId !== 'new' && !String(songId).startsWith('mine-')) { songId = 'edited'; song.title = song.title.replace(/( \(edited\))?$/, ' (edited)'); }
+  rearrange();
+});
 function updateArrInfo() {
   const a = built.arrangement, st = a.stats;
   const parts = [`${built.combNotes.length} tines`, `transposed ${a.transpose >= 0 ? '+' : ''}${a.transpose}`, `${a.pins.reduce((s, p) => s + p.length, 0)} pins`];
@@ -552,4 +597,4 @@ $('meterSel').value = song.meter.join(',');
 renderSongs();
 setMode('crank');
 requestBuild(0);
-window.__mb = { cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; } };
+window.__mb = { cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; }, roll };
