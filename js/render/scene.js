@@ -43,7 +43,7 @@ export class MusicBoxScene {
     const sc = key.shadow.camera; sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 10; sc.far = 900;
     this.scene.add(key);
     const rim = new THREE.DirectionalLight(0x9fb7ff, 0.12); rim.position.set(-200, 120, -180); this.scene.add(rim);
-    this.candle = null;
+    this.candle = null; this.gaze = 'box';
     // candle state survives rebuilds: lit (0..1), ignition clock, smoke clock, wick ember
     this.lit = 0; this.litTarget = 0; this.igniteT = -1; this.smokeT = -1; this.ember = 0;
     this.onCandleScreen = null;
@@ -102,9 +102,15 @@ export class MusicBoxScene {
   // double tap: zoom into the music box (or onto the hamster's cage); again to come back out
   doubleTap(e) {
     if (this.followListener) {
-      // seeing through your own eyes: a double tap leans you over the table (and back)
+      // seeing through your own eyes: a double tap leans you in to the box or the cage (and back)
       this.lookPitch = null;
-      if (this.onLean) this.onLean();
+      const rect = this.canvas.getBoundingClientRect();
+      this.raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), this.camera);
+      const under = (o, root) => { for (let p = o; p; p = p.parent) if (p === root) return true; return false; };
+      const hit = this.raycaster.intersectObjects(this.root.children, true).find((h) => h.object.visible && !(this.roomOuter && under(h.object, this.roomOuter)));
+      const what = hit && this.hamRig && under(hit.object, this.hamRig.group) ? 'ham' : 'box';
+      if (what === 'ham' && this.hamRig.covered) { if (this.onUncover) this.onUncover(); return; }
+      if (this.onLean) this.onLean(what);
       return;
     }
     const rect = this.canvas.getBoundingClientRect();
@@ -132,6 +138,12 @@ export class MusicBoxScene {
     const v = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(v, this.camera);
     if (this.candle && this.lit > 0.5 && this.raycaster.intersectObject(this.candle.g, true).length) { this.candle.gust = 1.3; return; }
+    // a tap on the cage glass wakes him (or startles him)
+    if (this.hamRig && !this.hamRig.covered && this.onTapCage) {
+      const under = (o, root) => { for (let p = o; p; p = p.parent) if (p === root) return true; return false; };
+      const hit = this.raycaster.intersectObjects(this.root.children, true).find((h) => h.object.visible && !(this.roomOuter && under(h.object, this.roomOuter)));
+      if (hit && under(hit.object, this.hamRig.group)) { this.onTapCage(); return; }
+    }
     const hits = this.raycaster.intersectObjects(this.tines.map((t) => t.mesh), false);
     if (hits.length) { const i = hits[0].object.userData.tine; this.select(i); this.onPick && this.onPick(i); }
   }
@@ -748,7 +760,7 @@ export class MusicBoxScene {
     // look where you face; with "face the box" on, tilt to look at it
     let pitch = this.lookPitch;
     if (pitch === null || pitch === undefined) {
-      const tgt = this.tipWorld || new THREE.Vector3();
+      const tgt = this.gazeWorld();
       const d = tgt.clone().sub(eye);
       pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
       this.autoPitch = pitch;
@@ -758,7 +770,7 @@ export class MusicBoxScene {
     this.camera.lookAt(eye.clone().add(dir));
   }
 
-  // smoothly reframe the camera: the box (and candle), the hamster rig, or a close-up of her
+  // smoothly reframe the camera: the box (and candle), the hamster rig, or a close-up of his
   frame(what, now = false) {
     if (!this.tipWorld) return;
     let tgt, pos, dur = 900, fovTo = this.followListener ? 62 : 38;
@@ -798,12 +810,20 @@ export class MusicBoxScene {
     if (now) { this.camAnim = null; this.controls.target.copy(tgt); this.camera.position.copy(pos); this.camera.fov = fovTo; this.camera.updateProjectionMatrix(); this.controls.update(); this.dirty = 3; return; }
     this.camAnim = { t: 0, t0: performance.now(), dur, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos, fov0: this.camera.fov, fov1: fovTo };
   }
+  // what your eyes settle on when you aren't steering them: the box, the hamster, or between the two
+  gazeWorld() {
+    const box = this.tipWorld || new THREE.Vector3();
+    if (this.gaze === 'ham' && this.hamRig) return this.hamRig.focus();
+    if (this.gaze === 'rig' && this.hamRig) return box.clone().lerp(this.hamRig.focus(), 0.5);
+    return box;
+  }
+  toRoom(v) { const q = this.roomInner.worldToLocal(v.clone()); return [q.x / 1000, q.z / 1000, q.y / 1000]; }
   // from the opening view, fly down into your own eyes (then the view is yours)
   flyToEyes(done) {
     const L = this.listener; if (!L || !this.roomInner) { done(); return; }
     const eye = this.toScene(L.x, L.y, L.z);
     this.zoomed = null; this.follow = false;
-    this.camAnim = { t: 0, t0: performance.now(), dur: 2800, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt: this.tipWorld.clone(), pos: eye, fov0: this.camera.fov, fov1: 62, done };
+    this.camAnim = { t: 0, t0: performance.now(), dur: 2800, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt: this.gazeWorld().clone(), pos: eye, fov0: this.camera.fov, fov1: 62, done };
   }
   // look up (+) or down (−): your eyes' pitch, or the orbiting camera's height around its target
   tilt(da) {
@@ -881,7 +901,7 @@ export class MusicBoxScene {
       if (this.hamLife && !this.hamRig.covered) this.hamLife.update(dt, this.hamRig.st, this.audioOn);
       this.hamRig.update(dt, th * (s.gCrank || 1), this.hamLife);
       if (this.follow && !this.camAnim) {
-        // keep her centred while orbiting is still yours
+        // keep his centred while orbiting is still yours
         const f = this.hamRig.focus(); f.y -= 15;
         const d = f.clone().sub(this.controls.target).multiplyScalar(Math.min(1, dt * 4));
         this.controls.target.add(d); this.camera.position.add(d);
@@ -895,7 +915,7 @@ export class MusicBoxScene {
     if (cabinOn) this.cabin.update(dt);
     if (this.state.keyAngle !== this.lastKey) { this.lastKey = this.state.keyAngle; this.dirty = Math.max(this.dirty, 1); }
     if ((rigOn || cabinOn) && !(this.candle && this.candleBusy)) {
-      // the hamster breathes, blinks and runs: always animate (every frame while she runs)
+      // the hamster breathes, blinks and runs: always animate (every frame while he runs)
       this.candleFrame = !this.candleFrame;
       const quick = rigOn && ((this.hamRig.st && this.hamRig.st.f > 0) || (this.hamLife && this.hamLife.v > 0.02));
       if (this.dirty <= 0 && this.candleFrame && !quick) return;

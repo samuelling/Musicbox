@@ -6,13 +6,44 @@
 <meta name="theme-color" content="#15110e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Frisky — a physically modelled music box</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=1793301779">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }</script>
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="brand">Frisky</div>
+    <div class="brand" aria-label="Frisky">
+      <svg class="logo" viewBox="0 0 64 56" aria-hidden="true">
+        <defs>
+          <linearGradient id="lgWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9824c"/><stop offset="1" stop-color="#7a4a26"/></linearGradient>
+          <linearGradient id="lgLid" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a6234"/><stop offset="1" stop-color="#6a3c1c"/></linearGradient>
+          <radialGradient id="lgFur" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#f6d6a4"/><stop offset="0.6" stop-color="#e2a35e"/><stop offset="1" stop-color="#b97434"/></radialGradient>
+          <radialGradient id="lgGlow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle cx="32" cy="30" r="27" fill="url(#lgGlow)"/>
+        <!-- the open lid, tipped back, with a pearl rosette -->
+        <path d="M14 30 L18 10 Q19 7 22 7 L50 9 Q53 9.5 52.5 12.5 L50 30 Z" fill="url(#lgLid)"/>
+        <circle cx="35" cy="18" r="4" fill="#efe6d8" opacity=".9"/><circle cx="35" cy="18" r="1.6" fill="#c9a050"/>
+        <!-- the hamster, peeking over the front of the box -->
+        <ellipse cx="32" cy="33" rx="13" ry="10" fill="url(#lgFur)"/>
+        <ellipse cx="22.5" cy="24.5" rx="3.6" ry="4" fill="#d08d4a"/><ellipse cx="22.5" cy="25" rx="2" ry="2.4" fill="#f2b9a8"/>
+        <ellipse cx="41.5" cy="24.5" rx="3.6" ry="4" fill="#d08d4a"/><ellipse cx="41.5" cy="25" rx="2" ry="2.4" fill="#f2b9a8"/>
+        <ellipse cx="32" cy="36" rx="8" ry="5.5" fill="#fbecd4"/>
+        <circle cx="27" cy="30.5" r="2.1" fill="#1b120c"/><circle cx="37" cy="30.5" r="2.1" fill="#1b120c"/>
+        <circle cx="27.6" cy="29.9" r=".6" fill="#fff"/><circle cx="37.6" cy="29.9" r=".6" fill="#fff"/>
+        <ellipse cx="32" cy="34" rx="1.5" ry="1.1" fill="#c96a6a"/>
+        <path d="M24 35 l-6 -1 M24 36.5 l-6 1 M40 35 l6 -1 M40 36.5 l6 1" stroke="#8a6040" stroke-width=".6" stroke-linecap="round"/>
+        <!-- the box: front, brass escutcheon, little paws over the edge -->
+        <rect x="10" y="37" width="44" height="15" rx="2.5" fill="url(#lgWood)"/>
+        <rect x="10" y="37" width="44" height="2.6" rx="1.2" fill="#d9a466"/>
+        <ellipse cx="27" cy="38" rx="2.6" ry="1.8" fill="#f0c896"/><ellipse cx="37" cy="38" rx="2.6" ry="1.8" fill="#f0c896"/>
+        <rect x="30.5" y="43.5" width="3" height="4" rx="1" fill="#e3b45a"/>
+        <!-- a note drifting up -->
+        <path d="M55 6 v9.5" stroke="#e3b45a" stroke-width="1.4"/><ellipse cx="53" cy="15.5" rx="2.4" ry="1.8" fill="#e3b45a" transform="rotate(-20 53 15.5)"/><path d="M55 6 q4 1 4 5" stroke="#e3b45a" stroke-width="1.4" fill="none"/>
+      </svg>
+      <span class="wordmark">Frisky</span>
+    </div>
+    <button id="aboutBtn" class="aboutBtn" title="About Frisky">About</button>
     <div id="nowPlaying" class="now">—</div>
     <div id="spl" class="spl" title="Sound pressure level at your ears">— dB</div>
   </header>
@@ -32,12 +63,12 @@
       </div>
     </div>
     <div id="hamInfo" class="hamInfo hidden">
-      <div id="hamTxt" class="hamTxt">She's waking up…</div>
-      <div class="hamBtns"><button id="hamPlace"><span class="ic">🎡</span>Place her in the wheel</button><button id="hamWatch"><span class="ic">👀</span>Watch her</button><button id="hamCover"><span class="ic">🧺</span>Cover the cage</button></div>
+      <div id="hamTxt" class="hamTxt">He's waking up…</div>
+      <div class="hamBtns"><button id="hamPlace"><span class="ic">🎡</span>Place him in the wheel</button><button id="hamWatch"><span class="ic">👀</span>Watch him</button><button id="hamTap"><span class="ic">✋</span>Tap his cage</button><button id="hamCover"><span class="ic">🧺</span>Cover the cage</button></div>
       <label class="hamGear">Wheel sound <input type="range" id="hamVol" min="0" max="2" step="0.05" value="1"><span id="hamVolv">100%</span></label>
       <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="0.75"><span id="hamGearv">×0.75</span></label>
-      <div class="hamNature" role="group" aria-label="Her nature">
-        <span>Her nature</span>
+      <div class="hamNature" role="group" aria-label="His nature">
+        <span>His nature</span>
         <div class="seg"><button data-lover="0" class="on">Real hamster</button><button data-lover="1">♥ Wheel lover</button></div>
         <input type="checkbox" id="hamLover" hidden>
       </div>
@@ -54,6 +85,7 @@
     </div>
     <div id="navCtl" class="navCtl" aria-label="Move around the room">
       <div class="navLabel">Movement controls:</div>
+      <div class="navRow">
       <div class="zoomBtns"><button id="zoomIn" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zoomOut" aria-label="Zoom out" title="Zoom out (−)">−</button></div>
       <!-- desktop: keyboard keys you can also click; they light up as you press them -->
       <div class="keys">
@@ -71,8 +103,8 @@
         <button data-move="back" class="dn" aria-label="Step back">▼</button>
       </div>
       <div class="posture">
-        <button id="eyesBtn" title="See through your eyes (double-tap the box to lean in)">👁 Eyes</button>
         <button id="standBtn" title="Stand up (Space)">Stand <kbd>␣</kbd></button><span id="postureTxt">Sitting</span><button id="crouchBtn" title="Crouch (C)">Crouch <kbd>C</kbd></button>
+      </div>
       </div>
     </div>
     <!-- touch: a second pad to turn and look (right thumb) -->
@@ -102,18 +134,22 @@
         <div class="mapWrap"><canvas id="map"></canvas></div>
         <div class="mapSide">
           <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
-          <label class="chk"><input type="checkbox" id="follow" checked> Follow perspective <span class="small hideNarrow">(see from where you stand)</span></label>
           <label>Ear height <input type="range" id="earH" min="0.3" max="1.9" step="0.01" value="1.2"><span id="earHv">1.20 m</span></label>
           <label>Facing <input type="range" id="yaw" min="-180" max="180" step="1" value="90"><span id="yawv">90°</span></label>
         </div>
       </div>
-      <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. With Follow perspective on, the 3D view is your eyes: drag on it to look around. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
+      <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. The 3D view is your eyes: drag on it to look around, and double-tap the box or the cage to lean in. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
       <h3>Your ears <span class="small">a head-related transfer function for every sound path</span></h3>
       <div class="row">
         <label>Listening on <select id="hpMode"><option value="inear">In-ear (AirPods, earbuds)</option><option value="overear">Over-ear headphones</option><option value="speakers">Speakers</option></select></label>
         <label class="grow">Head size <input type="range" id="headC" min="50" max="64" step="0.5" value="57"><span id="headCv">57 cm around</span></label>
         <label class="grow">Ear size <input type="range" id="pinna" min="0.8" max="1.25" step="0.01" value="1"><span id="pinnav">average</span></label>
       </div>
+      <details class="advanced">
+        <summary>Advanced</summary>
+        <label class="chk"><input type="checkbox" id="detach"> Detach the camera from your head <span class="small">(orbit freely; you stay where you are on the map)</span></label>
+        <input type="checkbox" id="follow" checked hidden>
+      </details>
       <label class="chk" id="trackRow"><input type="checkbox" id="headTrack"> Head tracking: turn your device to turn your head</label>
       <p class="small" id="hpHint"></p>
       <div class="row">
@@ -164,7 +200,7 @@
       <p id="presetDesc" class="small"></p>
     </div>
     <div class="subtabs hidden" role="tablist" aria-label="Music box">
-      <button data-sub="comb" class="on">Tines</button><button data-sub="box">Box</button><button data-sub="physics">Physics</button>
+      <button data-sub="comb" class="on">Tines</button><button data-sub="box">Box</button><button data-sub="cage">Cage</button><button data-sub="physics">Physics</button>
     </div>
     <section class="panel" data-panel="comb">
       <div class="grid">
@@ -196,7 +232,11 @@
         <label>Governor air brake <input type="range" id="airBrake" min="0.4" max="2.5" step="0.01" value="1"><span id="airBrakev">×1.00</span></label>
       </div>
       <div id="boxInfo" class="small mono"></div>
-      <h3>Hamster drive <span class="small">a golden hamster in a wheel, belted to the crank</span></h3>
+    </section>
+
+    <!-- CAGE -->
+    <section class="panel" data-panel="cage">
+      <h3>Frisky <span class="small">a golden hamster in a glass tank; his wheel can be belted to the crank</span></h3>
       <div class="grid">
         <label>Hamster <input type="range" id="hamMass" min="85" max="210" step="1" value="125"><span id="hamMassv">125 g</span></label>
         <label>Wheel <select id="hamWheel"></select></label>
@@ -214,6 +254,34 @@
     </section>
   </main>
 </div>
-<script type="module" src="js/main.js"></script>
+
+<dialog id="about" class="about">
+  <form method="dialog"><button class="aboutClose" aria-label="Close">✕</button></form>
+  <h2>About Frisky</h2>
+  <p><b>Frisky is a music box that isn't a recording.</b> Nothing you hear is sampled. Every sound comes
+  from physics worked out as it plays: steel tines plucked by pins on a turning cylinder, the comb ringing
+  through its bedplate into the box, the box into the table, the table into the room, and the room into
+  your two ears.</p>
+  <p>It's named for Frisky, a golden hamster from a boyhood long ago. He lives here again, in a glass tank
+  beside the box: he sleeps through the day, eats, stuffs his cheek pouches, digs and runs at night by
+  your own clock. Belt his wheel to the crank and his pace becomes the tempo.</p>
+  <h3>What's simulated</h3>
+  <ul>
+    <li><b>The tines:</b> each one a tapered steel beam with its own modes, tuned by length, thickness and lead weights, plucked and damped by real contact with the pins.</li>
+    <li><b>The drive:</b> your hand on the crank through a ratchet, or a wound spring held to time by a fan governor, or the hamster's wheel through an O-ring belt.</li>
+    <li><b>The hamster:</b> a 125 g body on a wheel, with leg forces, gaits, stride rates, heart rate and metabolism taken from studies of golden hamsters, and a day of behaviours from hamster ethology.</li>
+    <li><b>The room:</b> walls, floor and furniture as reflecting surfaces, an Alpine hut or five other rooms, each with its own reverberation (and its own clock, showing the real time).</li>
+    <li><b>Your ears:</b> a head-related transfer function on every sound path, so with headphones the box sits where you see it. Walk around, crouch, lean over the table and listen.</li>
+  </ul>
+  <h3>How to play</h3>
+  <p>Light the candle. Circle the dial to crank, or wind the key and pull the lever, or let the hamster run.
+  Choose a tune, or compose your own on the pin roll. Walk with W A S D, look with the arrows, and
+  double-tap the box to lean in.</p>
+  <p class="small">Made by Sam Ling, with Claude. The derivations are in
+  <a href="https://github.com/samuelling/Musicbox/blob/main/PHYSICS.md" target="_blank" rel="noopener">PHYSICS.md</a>;
+  the code is <a href="https://github.com/samuelling/Musicbox" target="_blank" rel="noopener">on GitHub</a>.
+  All tunes are public domain, traditional or original.</p>
+</dialog>
+<script type="module" src="js/main.js?v=1793301779"></script>
 </body>
 </html>

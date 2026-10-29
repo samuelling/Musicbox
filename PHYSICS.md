@@ -221,26 +221,26 @@ with the cylinder, so each footfall reaches the pins (`js/physics/hamster.js`).
 **Bodies.** Two bodies are integrated:
 
 - **Wheel:** angle θw.
-- **Hamster:** her centre of mass rides a circle of radius Rc = R − hc inside the tread, at
+- **Hamster:** his centre of mass rides a circle of radius Rc = R − hc inside the tread, at
   angle φ from the bottom.
 
-Her feet exert a tangential ground reaction F, which pushes her forward and the tread back:
+His feet exert a tangential ground reaction F, which pushes him forward and the tread back:
 
     m Rc φ̈ = F − m g sin φ
     Iw ω̇w  = F R − τaxle(ωw) − Fbelt r_w
 
-**Where she runs in the wheel.** Nothing places her; her position comes out of the
+**Where he runs in the wheel.** Nothing places him; his position comes out of the
 dynamics. In steady running F = m g sin φ, so sin φ = τload / (m g R).
 
 The music box asks for 0.03–0.8 mW at the cylinder: pin plucks plus bearings, measured
 with `tools/load-probe.mjs`. Seen at a 28 cm wheel, that load holds a 125 g hamster
-about 0.1° up from the bottom; the axle friction holds her about 1° up. She barely notices
-the music box. What you see her do is the swing: she runs up the front when she
-accelerates and rides back when she brakes. That swing is a pendulum of period
-2π√(Rc/g) ≈ 0.7 s, damped through her legs.
+about 0.1° up from the bottom; the axle friction holds him about 1° up. He barely notices
+the music box. What you see him do is the swing: he runs up the front when he
+accelerates and rides back when he brakes. That swing is a pendulum of period
+2π√(Rc/g) ≈ 0.7 s, damped through his legs.
 
 **Legs.** F comes from a neuromuscular controller, F = m kv (v* − v_rel). Here
-v_rel = Rc φ̇ + R ωw is her speed over the tread and v* is the pace she has chosen. The
+v_rel = Rc φ̇ + R ωw is his speed over the tread and v* is the pace he has chosen. The
 controller is limited three ways:
 
 - **Hill's force–velocity curve:** F ≤ F0 (1 − v/vmax)/(1 + v/(0.25 vmax)), with
@@ -261,23 +261,23 @@ controller is limited three ways:
   0.72 m/s, half-bound (hind feet together) above that. The footfall card draws the
   live Hildebrand diagram.
 
-**Behaviour.** She runs in bouts, which is the classic structure of hamster wheel running:
+**Behaviour.** He runs in bouts, which is the classic structure of hamster wheel running:
 
 - **Bout length:** exponentially distributed, mean about 40 s.
 - **Pace within a bout:** set per bout (lognormal around 0.46 m/s), wandering as an
   Ornstein–Uhlenbeck process.
-- **Sprints and stutters:** occasional sprints, and brief stutters when she glances around.
-- **Rests:** a few seconds of sitting, washing her face or looking around between bouts.
-- **Time of day:** she is nocturnal, so in the daytime by your clock bouts are shorter
-  and rests longer. "Tap the cage" wakes her up.
+- **Sprints and stutters:** occasional sprints, and brief stutters when he glances around.
+- **Rests:** a few seconds of sitting, washing his face or looking around between bouts.
+- **Time of day:** he is nocturnal, so in the daytime by your clock bouts are shorter
+  and rests longer. "Tap his cage" wakes him up for a few minutes; what he does then is his choice (the wheel, food, grooming, or his toilet corner).
 
 **Energetics.**
 
 - **Metabolic rate:** Taylor, Heglund & Maloiy (1982):
-  Ė/M = 10.7 M^−0.316 v + 6.03 M^−0.303 W/kg, plus her external work at 25 % efficiency.
+  Ė/M = 10.7 M^−0.316 v + 6.03 M^−0.303 W/kg, plus his external work at 25 % efficiency.
 - **O₂ on-kinetics:** τ ≈ 20 s.
 - **Aerobic ceiling:** VO₂max from Weibel's allometry (≈ 6 W for 125 g).
-- **Fatigue:** above 70 % of VO₂max she draws on a finite anaerobic reserve, and she
+- **Fatigue:** above 70 % of VO₂max he draws on a finite anaerobic reserve, and he
   slows when it runs low.
 - **Heart and breathing rates:** mapped between hamster resting and maximal values,
   roughly 310–470 bpm and 70–135 breaths/min.
@@ -289,8 +289,8 @@ controller is limited three ways:
 - **One-way action:** a belt only pulls. When the wheel slows faster than the crank train
   can coast, the belt goes slack and the crank's freewheel lets the pulley overrun, so the
   pawl clicks.
-- **Pulley ratio:** chosen so the tune runs at its written tempo when she trots at
-  0.44 m/s. Her own pace is the tempo: sprints speed the tune up and rests stop it.
+- **Pulley ratio:** chosen so the tune runs at its written tempo when he trots at
+  0.44 m/s. His own pace is the tempo: sprints speed the tune up and rests stop it.
 
 **Sound of the wheel.** It is radiated from beside the box and enters the room model with
 everything else. Each paw strike rings the wheel shell (about 240 Hz). On wire rungs the
@@ -301,29 +301,29 @@ speed, which makes the axle unstable. The squeal is strongest at low speed and a
 on each turn where the axle load peaks. The dry axle also has about 15× the Coulomb drag
 of a ball bearing.
 
-**Her body.** The 3D hamster is a signed-distance sculpture, a smooth union of ellipsoids,
+**His body.** The 3D hamster is a signed-distance sculpture, a smooth union of ellipsoids,
 in Syrian proportions: 15–16 cm nose to rump, big rounded head with cheek pouches. Its
 fur is drawn as 9–16 shells, each a 3D lattice of tapering strands combed back.
 
 Each hair is agouti: grey base, golden shaft and a dark tip along the back; ivory on the
-belly. She also has the grey-black cheek flash and the white crescent behind it, big glossy
-eyes, thin grey-pink ears, orange incisors and whiskers that twitch. Her legs are two-bone
+belly. He also has the grey-black cheek flash and the white crescent behind it, big glossy
+eyes, thin grey-pink ears, orange incisors and whiskers that twitch. His legs are two-bone
 IK chains whose paws follow the same footfall pattern that drives the physics.
 
 
-**Her life in the cage** (`js/sim/hamster-life.js`). She always lives in a glass tank on the
-table. The Hamster mode only decides whether her wheel is belted to the crank. Off the wheel
-she follows an ethogram, a time budget of behaviours:
+**His life in the cage** (`js/sim/hamster-life.js`). He always lives in a glass tank on the
+table. The Hamster mode only decides whether his wheel is belted to the crank. Off the wheel
+he follows an ethogram, a time budget of behaviours:
 
-- **Wheel:** she goes to the wheel and runs in bouts.
-- **Food:** she nibbles seeds held in her forepaws, or stuffs her cheek pouches at the bowl.
-  The pouches swell back to her shoulders. She then carries the haul to her house and pushes
-  it out with her forepaws, which is larder hoarding.
-- **Drinking:** she rears up to lick the bottle's ball valve, and a bubble rises.
-- **Grooming:** she washes her face sitting up.
-- **Digging:** she digs in the bedding, and the pile grows.
-- **Exploring:** she pauses to rear up on her hind legs, whisking and sniffing.
-- **Napping:** she curls up in her nest.
+- **Wheel:** he goes to the wheel and runs in bouts.
+- **Food:** he nibbles seeds held in his forepaws, or stuffs his cheek pouches at the bowl.
+  The pouches swell back to his shoulders. He then carries the haul to his house and pushes
+  it out with his forepaws, which is larder hoarding.
+- **Drinking:** he rears up to lick the bottle's ball valve, and a bubble rises.
+- **Grooming:** he washes his face sitting up.
+- **Digging:** he digs in the bedding, and the pile grows.
+- **Exploring:** he pauses to rear up on his hind legs, whisking and sniffing.
+- **Napping:** he curls up in his nest.
 
 **Time budgets.**
 
@@ -331,11 +331,11 @@ she follows an ethogram, a time budget of behaviours:
   hoarding, grooming, digging, drinking and exploring.
 - **Wheel lover:** close to 100 % wheel, the setting for when the music matters most.
 
-**Leaving the wheel.** She climbs out after a pause in her running, and the wheel coasts down
-on its axle. "Place her in the wheel" lifts her in and wakes her up.
+**Leaving the wheel.** He climbs out after a pause in his running, and the wheel coasts down
+on its axle. "Place him in the wheel" lifts him in and wakes him up.
 
-**Time of night.** The cabin is always night, so she keeps hamster night hours. Before the
-candle is lit she is asleep in her nest.
+**Time of night.** The cabin is always night, so he keeps hamster night hours. Before the
+candle is lit he is asleep in his nest.
 
 **Belt ratio.** The hub pulley can be resized from ×0.5 to ×2. That changes how fast the tune
 plays for the same running pace: ×1 plays the written tempo at 0.44 m/s.

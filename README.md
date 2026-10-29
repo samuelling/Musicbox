@@ -1,5 +1,7 @@
 # Frisky
 
+Named for Frisky, a golden hamster from a boyhood long ago.
+
 A music box you can crank with your finger or wind up, and every sound it makes is
 physically modelled: tuned steel tines, pins on a brass cylinder, the governor fan,
 the wooden box, the table it sits on, the room, and your head.
@@ -15,13 +17,14 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   through a ratchet; turn faster and the tune runs faster.
 * **Wind-up** — circle to wind the key (the ratchet clicks), then pull the lever. A
   fan governor keeps time, and the tune slows as the spring runs down.
-* **Hamster** — a golden hamster lives in a glass tank beside the box. She sleeps, eats,
-  stuffs her cheek pouches and hoards, drinks, grooms, digs, explores and runs. "Hamster" mode
-  belts her wheel to the crank through a quarter-twist O-ring; "Place her in the wheel" when
-  she isn't in the mood, "Wheel lover" for a hamster who'd rather run, and a belt-ratio slider
-  for tempo. Her gait (walk, trot, half-bound), the forces from her paws, how
-  far up the wheel she rides, her bouts and rests (she's nocturnal), heart rate and metabolic
-  power are all simulated. Her pace is the tempo. "Watch her" zooms in; "Tap the cage" wakes her.
+* **Hamster** — a golden hamster lives in a glass tank beside the box. He sleeps, eats,
+  stuffs his cheek pouches and hoards, drinks, grooms, digs, explores and runs. "Hamster" mode
+  belts his wheel to the crank through a quarter-twist O-ring; "Place him in the wheel" when
+  he isn't in the mood, "Wheel lover" for a hamster who'd rather run, and a belt-ratio slider
+  for tempo. His gait (walk, trot, half-bound), the forces from his paws, how
+  far up the wheel he rides, his bouts and rests (he's nocturnal), heart rate and metabolic
+  power are all simulated. His pace is the tempo. "Watch him" leans you in close; "Tap his cage" (or tap the glass) wakes him, and then he does as he likes:
+  maybe the wheel, maybe a snack, maybe a pee in his toilet corner. He keeps a toilet corner away from his nest and food.
 * **Music Box** (Tines · Box · Physics) — start from a **box type**: keepsake 30-note, child's plastic
   toy, wooden jewellery box, bare movement, pocket movement in your hand, Swiss 50-note cabinet, grand
   72-note on a resonance box, a century-old antique (worn pins, A = 435) or a brass-comb vintage box —

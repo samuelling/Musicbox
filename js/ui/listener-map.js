@@ -60,7 +60,9 @@ export class ListenerMap {
     this.listener.x = x; this.listener.y = y; this.emit();
   }
   emit() {
-    if (this.faceBox && this.box && !this.held) this.listener.yaw = Math.atan2(this.box[1] - this.listener.y, this.box[0] - this.listener.x);
+    // face the box, or whatever you're watching (faceAt, e.g. the hamster)
+    const tgt = this.faceAt || this.box;
+    if (this.faceBox && tgt && !this.held) this.listener.yaw = Math.atan2(tgt[1] - this.listener.y, tgt[0] - this.listener.x);
     this.draw(); this.onChange && this.onChange(this.listener);
   }
   draw() {

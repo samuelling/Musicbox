@@ -87,6 +87,8 @@ function onBuilt(res) {
 const scene = new MusicBoxScene($('view'));
 scene.onPick = (i) => selectTine(i, true);
 
+$('aboutBtn').addEventListener('click', () => { const d = $('about'); if (d.showModal) d.showModal(); else d.setAttribute('open', ''); });
+
 // ------------------------------------------------------------------ audio start
 // Audio start. iOS only allows audio from a *completed* tap (click / touchend), and
 // only for work done synchronously in that handler, so the unlock happens right there.
@@ -180,19 +182,23 @@ function setCovered(on) {
   if (on && life && life.where === 'wheel') { life.where = 'cage'; life.act = 'sleep'; life.timer = 60; life.x = life.cage.house.bed.x; life.z = life.cage.house.bed.z; life.y = 0; }
   engine.send({ type: 'hamster', silent: on, ...(on ? { inWheel: false } : {}) });
   if (on && cfg.mode === 'auto') setMode('crank');
+  // the first time the blanket comes off, Frisky is lifted straight into his wheel
+  if (!on && !unveiled) { unveiled = true; const put = (k) => { if (life) life.placeInWheel(); else if (k < 20) setTimeout(() => put(k + 1), 250); }; setTimeout(() => put(0), 700); }
 }
+let unveiled = false;
 scene.onUncover = () => setCovered(false);
 function setMode(mode) {
-  if (mode === 'auto' && cfg.ham.covered) setCovered(false);   // hooking her up lifts the blanket
+  if (mode === 'auto' && cfg.ham.covered) setCovered(false);   // hooking him up lifts the blanket
   cfg.mode = mode;
   document.querySelectorAll('.modeSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
   $('windInfo').classList.toggle('hidden', mode !== 'spring');
   $('hamInfo').classList.toggle('hidden', mode !== 'auto');
   $('gaitCard').classList.toggle('hidden', mode !== 'auto');
   $('pad').classList.toggle('hidden', mode === 'auto');
+  if ($('follow').checked && scene.everLit) settleEyes();
   if (mode === 'auto') {
-    sendHam(); $('hamWatch').classList.remove('on'); $('hamWatch').innerHTML = '<span class="ic">👀</span>Watch her';
-    // the first time you meet her, make it plain she can be put to work, watched, or put to bed
+    sendHam(); $('hamWatch').classList.remove('on'); $('hamWatch').innerHTML = '<span class="ic">👀</span>Watch him';
+    // the first time you meet him, make it plain he can be put to work, watched, or put to bed
     try { if (!localStorage.getItem('musicbox.metHer')) { localStorage.setItem('musicbox.metHer', '1'); $('hamInfo').classList.add('intro'); setTimeout(() => $('hamInfo').classList.remove('intro'), 9000); } } catch (e) { /* private mode */ }
   }
   $('padLabel').innerHTML = mode === 'crank' ? 'Circle clockwise<br>to crank' : 'Circle clockwise<br>to wind';
@@ -219,7 +225,7 @@ function buildRig() {
   if (!built) return;
   const R = WHEELS[cfg.ham.wheel].D / 2, [rw, rc] = pulleyRadii(built.drive.G_crank, built.drive.omegaNom, R, cfg.ham.gear);
   scene.buildHamRig({ R, rw, rc, surface: cfg.ham.surface, mass: cfg.ham.mass });
-  // her life goes on across rebuilds
+  // his life goes on across rebuilds
   if (!life) { life = new HamsterLife(scene.hamRig.layout); life.onWheel = (on, placed) => engine.send({ type: 'hamster', inWheel: on, ...(placed ? { wake: true } : {}) }); }
   else life.setCage(scene.hamRig.layout);
   life.mode = cfg.ham.lover ? 'lover' : 'real';
@@ -228,13 +234,23 @@ function buildRig() {
   const M = cfg.ham.mass;
   $('hamDriveInfo').textContent = [
     `belt       ${(rw * 2e3).toFixed(0)} mm hub pulley → ${(rc * 2e3).toFixed(0)} mm crank pulley (×${(rw / rc).toFixed(2)}), quarter-twist O-ring`,
-    `tempo      100% when she runs ${(0.44 / cfg.ham.gear).toFixed(2)} m/s (${(0.44 / cfg.ham.gear / R * 60 / TAU).toFixed(0)} wheel rpm)`,
-    `her limits VO2max ≈ ${(vo2maxW(M) / 20.1 * 60).toFixed(1)} ml O2/min, aerobic pace up to ≈ ${((0.7 * vo2maxW(M) / M - 6.03 * M ** -0.303) / (10.7 * M ** -0.316)).toFixed(2)} m/s`,
+    `tempo      100% when he runs ${(0.44 / cfg.ham.gear).toFixed(2)} m/s (${(0.44 / cfg.ham.gear / R * 60 / TAU).toFixed(0)} wheel rpm)`,
+    `his limits VO2max ≈ ${(vo2maxW(M) / 20.1 * 60).toFixed(1)} ml O2/min, aerobic pace up to ≈ ${((0.7 * vo2maxW(M) / M - 6.03 * M ** -0.303) / (10.7 * M ** -0.316)).toFixed(2)} m/s`,
   ].join('\n');
 }
 $('hamMass').addEventListener('input', (e) => { cfg.ham.mass = +e.target.value / 1000; $('hamMassv').textContent = e.target.value + ' g'; sendHam(); clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 250); });
 for (const [id, key] of [['hamWheel', 'wheel'], ['hamTread', 'surface'], ['hamAxle', 'axle']]) $(id).addEventListener('change', (e) => { cfg.ham[key] = e.target.value; sendHam(); buildRig(); });
 $('hamCover').addEventListener('click', () => setCovered(true));
+// tap the glass: asleep, he wakes and potters; awake, he startles. What he does next is up to him.
+function tapCage() {
+  if (!life) return;
+  if (cfg.ham.covered) { setCovered(false); return; }
+  const what = life.tap();
+  const b = $('hamTap'); b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 400);
+  return what;
+}
+$('hamTap').addEventListener('click', () => { ensureStarted(); tapCage(); });
+scene.onTapCage = () => { ensureStarted(); tapCage(); };
 $('hamVol').addEventListener('input', (e) => { cfg.ham.vol = +e.target.value; $('hamVolv').textContent = Math.round(cfg.ham.vol * 100) + '%'; engine.send({ type: 'hamster', vol: cfg.ham.vol }); });
 $('hamPlace').addEventListener('click', () => { ensureStarted(); if (life) life.placeInWheel(); });
 $('hamGear').addEventListener('input', (e) => {
@@ -247,9 +263,13 @@ document.querySelectorAll('.hamNature .seg button').forEach((b) => b.addEventLis
 syncNature();
 $('hamWatch').addEventListener('click', () => {
   const on = !$('hamWatch').classList.contains('on');
-  // the camera can't fly to her while it is your eyes
-  if (on && $('follow').checked) { $('follow').checked = false; scene.setFollow(false); $('eyesBtn').classList.remove('on'); }
-  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch her';
+  if (scene.followListener) {
+    // through your own eyes: lean in close to the cage (and back out to see the whole rig)
+    if (on) { if (lean && lean.what !== 'ham') { lean = null; } scene.onLean('ham'); }
+    else if (lean) scene.onLean();
+    return;
+  }
+  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch him';
   scene.frame(on ? 'hamster' : 'rig');
 });
 // footfall (Hildebrand) diagram: stance bars for each paw scrolling right to left
@@ -288,12 +308,12 @@ function hamText(h) {
   let what;
   if (inW && h.state === 'run') what = `<b>${({ walk: 'Walking', trot: 'Trotting', bound: 'Half-bounding' })[h.gait]}</b> in the wheel, ${(Math.abs(h.v) * 3.6).toFixed(1)} km/h${h.slip ? ' · paws slipping' : ''}`;
   else if (inW) what = `<b>Pausing</b> in the wheel`;
-  else what = `<b>${life ? life.desc : 'Asleep in her nest'}</b>`;
+  else what = `<b>${life ? life.desc : 'Asleep in his nest'}</b>`;
   if (life && !inW && (life.act === 'sleep' || life.act === 'nap') && life.activity < 0.5) {
     const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     what += ` — it's ${t}; Syrian hamsters sleep through the day and wake around dusk`;
   }
-  const hooked = cfg.mode === 'auto' ? (inW ? '' : ' — the box is waiting for her') : '';
+  const hooked = cfg.mode === 'auto' ? (inW ? '' : ' — the box is waiting for him') : '';
   return `${what}${hooked}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} tonight`;
 }
 
@@ -355,36 +375,73 @@ $('headTrack').addEventListener('change', async (e) => {
 });
 
 // follow perspective: the 3D view is your eyes; dragging it turns your head
+$('detach').addEventListener('change', (e) => { const f = $('follow'); f.checked = !e.target.checked; f.dispatchEvent(new Event('change')); });
 $('follow').addEventListener('change', (e) => {
   // before the candle is lit you're still taking in the room; the view becomes yours once it is
   if (!scene.everLit) return;
-  scene.setFollow(e.target.checked); $('eyesBtn').classList.toggle('on', e.target.checked);
+  scene.setFollow(e.target.checked)
 });
 // double tap through your own eyes: lean over the table to look into the box, then back.
 // Your head really moves, so you hear it close up too.
 let lean = null;
-function leanPose(L, b) {
+function leanPose(L, b, dist = 0.3, up = 0.32) {
   const dx = b[0] - L.x, dy = b[1] - L.y, d = Math.hypot(dx, dy) || 1;
-  return { x: b[0] - dx / d * 0.3, y: b[1] - dy / d * 0.3, z: b[2] + 0.32, yaw: Math.atan2(dy, dx), faceBox: false };
+  return { x: b[0] - dx / d * dist, y: b[1] - dy / d * dist, z: b[2] + up, yaw: Math.atan2(dy, dx), faceBox: false };
 }
-scene.onLean = () => {
-  const L = map.listener, b = built && built.room.boxPos;
-  if (!b || built.room.held) return;
-  let to;
-  if (lean) { to = lean.from; lean = null; }
-  else { lean = { from: { x: L.x, y: L.y, z: L.z, yaw: L.yaw, faceBox: map.faceBox } }; to = leanPose(L, b); }
-  const start = { x: L.x, y: L.y, z: L.z, yaw: L.yaw }, t0 = performance.now();
+// where your eyes go: the box, Frisky, or the whole rig (between them), in room coordinates
+function gazePoint(kind) {
+  if (kind === 'box' || !scene.hamRig) return built && built.room.boxPos;
+  return scene.toRoom(scene.gazeWorld());
+}
+function gazeAt(kind) {
+  scene.gaze = kind; scene.lookPitch = null;
+  map.faceAt = kind === 'box' ? null : gazePoint(kind);
+  map.faceBox = true; $('faceBox').checked = true; map.emit();
+}
+// keep turning your head to follow him as he moves about the cage
+setInterval(() => {
+  if (scene.gaze === 'box' || !map.faceBox || !scene.hamRig) return;
+  const p = gazePoint(scene.gaze); if (!p) return;
+  const f = map.faceAt;
+  if (!f || Math.hypot(p[0] - f[0], p[1] - f[1]) > 0.01) { map.faceAt = p; map.emit(); }
+}, 150);
+// move your head smoothly to a pose (and hear it move)
+function moveHead(to, done) {
+  const L = map.listener, start = { x: L.x, y: L.y, z: L.z, yaw: L.yaw }, t0 = performance.now();
   let dyaw = to.yaw - start.yaw; while (dyaw > Math.PI) dyaw -= 2 * Math.PI; while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
-  map.faceBox = false;
+  const keepFace = map.faceBox; map.faceBox = false;
   const go = (now) => {
     const u = Math.min(1, (now - t0) / 900), e = u * u * (3 - 2 * u);
     L.x = start.x + (to.x - start.x) * e; L.y = start.y + (to.y - start.y) * e; L.z = start.z + (to.z - start.z) * e; L.yaw = start.yaw + dyaw * e;
     walk.zT = L.z;
     if (u < 1) { map.emit(); requestAnimationFrame(go); }
-    else { map.faceBox = to.faceBox; $('faceBox').checked = to.faceBox; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; postureLabel(); map.emit(); }
+    else { map.faceBox = keepFace; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; postureLabel(); map.emit(); if (done) done(); }
   };
   requestAnimationFrame(go);
+}
+const restGaze = () => (cfg.mode === 'auto' ? 'rig' : 'box');
+// your eyes go to what's playing: the whole rig with him in it (sitting back first), or the box
+function settleEyes() {
+  if (lean && (cfg.mode === 'auto' || lean.what === 'ham')) { const back = lean.from; lean = null; syncWatch(); moveHead({ ...back, yaw: map.listener.yaw }, () => gazeAt(restGaze())); }
+  else setTimeout(() => gazeAt(restGaze()), 50);
+}
+// double tap through your own eyes: lean in over the box (or close to the cage), then back.
+// Your head really moves, so you hear it close up too.
+scene.onLean = (what = 'box') => {
+  const L = map.listener;
+  if (lean) { const back = lean.from; lean = null; syncWatch(); moveHead({ ...back, yaw: L.yaw }, () => gazeAt(restGaze())); return; }
+  const tgt = gazePoint(what === 'ham' ? 'ham' : 'box');
+  if (!tgt || (what === 'box' && built.room.held)) return;
+  lean = { from: { x: L.x, y: L.y, z: L.z, yaw: L.yaw }, what };
+  const pose = what === 'ham' ? leanPose(L, tgt, 0.42, 0.22) : leanPose(L, tgt);
+  gazeAt(what === 'ham' ? 'ham' : 'box');
+  syncWatch();
+  moveHead(pose);
 };
+function syncWatch() {
+  const on = !!(lean && lean.what === 'ham');
+  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch him';
+}
 // the first light, with Follow perspective on: lean over the table and fly from the opening view
 // down into your own eyes, looking into the box (double-tap to sit back)
 scene.onFirstLight = () => {
@@ -395,7 +452,7 @@ scene.onFirstLight = () => {
     const P = leanPose(L, b); L.x = P.x; L.y = P.y; L.z = P.z; L.yaw = P.yaw; map.faceBox = false; $('faceBox').checked = false; walk.zT = L.z;
     $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; postureLabel(); map.emit();
   }
-  scene.flyToEyes(() => { scene.setFollow(true); $('eyesBtn').classList.add('on'); });
+  scene.flyToEyes(() => { scene.setFollow(true); if (cfg.mode === 'auto') settleEyes(); });
   return true;
 };
 scene.onLook = (d) => {
@@ -501,7 +558,6 @@ $('standBtn').addEventListener('click', () => posture(+1));
 $('crouchBtn').addEventListener('click', () => posture(-1));
 $('zoomIn').addEventListener('click', () => scene.dolly(0.8));
 $('zoomOut').addEventListener('click', () => scene.dolly(1.25));
-$('eyesBtn').addEventListener('click', () => { const f = $('follow'); f.checked = !f.checked; f.dispatchEvent(new Event('change')); });
 $('faceBtn').addEventListener('click', () => { map.faceBox = true; $('faceBox').checked = true; scene.lookPitch = null; map.emit(); });
 postureLabel();
 $('yaw').addEventListener('input', (e) => { map.faceBox = false; $('faceBox').checked = false; map.listener.yaw = (+e.target.value * Math.PI) / 180; $('yawv').textContent = e.target.value + '°'; map.emit(); });
@@ -589,7 +645,7 @@ $('makeOwn').addEventListener('toggle', () => {
 // Tunes · Listen · Music box; the music box tab holds Tines, Box and Physics as sub-tabs
 let subTab = 'comb';
 function showPanel(name) {
-  const sub = ['comb', 'box', 'physics'].includes(name);
+  const sub = ['comb', 'box', 'cage', 'physics'].includes(name);
   if (sub) subTab = name;
   const tab = sub ? 'musicbox' : name;
   document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x.dataset.tab === tab));

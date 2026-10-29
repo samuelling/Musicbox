@@ -1,4 +1,4 @@
-// A golden hamster's night in her cage: what she does, where, and for how long.
+// A golden hamster's night in his cage: what he does, where, and for how long.
 // The time budget follows observations of Syrian hamsters with a wheel (nocturnal; much of the
 // active phase spent wheel-running; the rest foraging, filling the cheek pouches and hoarding
 // into the nest, drinking, grooming, digging and exploring with upright "sniff" postures; naps
@@ -11,16 +11,17 @@ const pick = (w) => { let s = 0; for (const k in w) s += w[k]; let r = Math.rand
 const ang = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 const BUDGET = {
-  real:  { wheel: 0.26, eat: 0.13, hoard: 0.12, drink: 0.07, groom: 0.1, explore: 0.13, dig: 0.08, nap: 0.07 },
-  lover: { wheel: 0.78, eat: 0.05, hoard: 0.03, drink: 0.04, groom: 0.04, explore: 0.03, dig: 0.01, nap: 0.02 },
+  real:  { wheel: 0.26, eat: 0.13, hoard: 0.12, drink: 0.07, groom: 0.1, explore: 0.13, dig: 0.08, nap: 0.07, pee: 0.03, poop: 0.02 },
+  lover: { wheel: 0.78, eat: 0.05, hoard: 0.03, drink: 0.04, groom: 0.04, explore: 0.03, dig: 0.01, nap: 0.02, pee: 0.01, poop: 0.01 },
 };
 const DESC = {
-  sleep: 'Asleep, curled up in her nest', wake: 'Waking up and stretching', walk: 'Pottering about',
-  eat: 'Nibbling a sunflower seed', pouch: 'Stuffing her cheek pouches', carry: 'Carrying her haul to the nest',
-  empty: 'Emptying her pouches into the hoard', drink: 'Drinking from the bottle', groom: 'Washing her face',
-  sniff: 'Up on her hind legs, sniffing the air', dig: 'Digging in the bedding', nap: 'Napping in her nest',
+  sleep: 'Asleep, curled up in his nest', wake: 'Waking up and stretching', walk: 'Pottering about',
+  eat: 'Nibbling a sunflower seed', pouch: 'Stuffing his cheek pouches', carry: 'Carrying his haul to the nest',
+  empty: 'Emptying his pouches into the hoard', drink: 'Drinking from the bottle', groom: 'Washing his face',
+  sniff: 'Up on his hind legs, sniffing the air', dig: 'Digging in the bedding', nap: 'Napping in his nest',
   toWheel: 'Heading for the wheel', climbIn: 'Climbing into the wheel', wheel: 'In the wheel', climbOut: 'Hopping out of the wheel',
-  lifted: 'Being placed in the wheel',
+  lifted: 'Being placed in the wheel', pee: 'Peeing in his toilet corner', poop: 'Leaving a few droppings',
+  startle: 'Startled by the tap, up on his hind legs',
 };
 
 // How awake a Syrian hamster is by local time: nocturnal, most active in the first half of the
@@ -44,21 +45,30 @@ export class HamsterLife {
     this.v = 0; this.phase = 0; this.pouch = 0; this.hoard = 0; this.digPile = 0;
     this.wheelT = 0; this.onWheel = null; this.awake = false;
     this.pose = {};
+    this.marks = [];      // pee spots and droppings left in the bedding
+    this.roused = 0;      // seconds left of being woken by a tap on the glass
+  }
+  // Syrian hamsters keep a toilet corner well away from their nest and food
+  get toilet() {
+    const c = this.cage, z0 = c.wheel.entry.z + 20;
+    const corners = [{ x: 40, z: z0 }, { x: c.L - 40, z: z0 }, { x: 40, z: c.D - 35 }, { x: c.L - 40, z: c.D - 35 }];
+    const score = (p) => Math.min(Math.hypot(p.x - c.house.bed.x, p.z - c.house.bed.z), Math.hypot(p.x - c.bowl.x, p.z - c.bowl.z) * 1.2, Math.hypot(p.x - c.drink.x, p.z - c.drink.z));
+    return corners.reduce((a, b) => (score(b) > score(a) ? b : a));
   }
 
   setCage(cage) { const fx = this.x / this.cage.L, fz = this.z / this.cage.D; this.cage = cage; if (this.where === 'cage') { this.x = fx * cage.L; this.z = fz * cage.D; } }
   get desc() { return DESC[this.act] || ''; }
 
-  get activity() { return Math.min(1, activityAt(hourNow()) + (this.mode === 'lover' ? 0.25 : 0)); }
+  get activity() { return Math.min(1, Math.max(this.roused > 0 ? 0.9 : 0, activityAt(hourNow()) + (this.mode === 'lover' ? 0.25 : 0))); }
   wakeUp() {
     if (this.awake) return;
     this.awake = true; this.plan = [];
-    // in the daytime she sleeps on; otherwise she wakes and stretches
+    // in the daytime he sleeps on; otherwise he wakes and stretches
     if (this.activity < 0.35) { this.act = 'sleep'; this.timer = R(90, 600); }
     else { this.act = 'wake'; this.timer = 2.2; }
   }
 
-  // "place hamster in wheel": a hand lifts her over and sets her on the tread
+  // "place hamster in wheel": a hand lifts him over and sets him on the tread
   placeInWheel() {
     if (this.where === 'wheel' || this.act === 'lifted' || this.act === 'climbIn') return;
     this.awake = true;
@@ -66,11 +76,24 @@ export class HamsterLife {
     this.act = 'lifted'; this.plan = []; this.timer = 1.1; this.where = 'cage';
   }
 
+  // a tap on the glass: asleep, he wakes (and stays up a while); awake, he startles and rears up.
+  // Then he does whatever he likes: maybe the wheel, maybe not. Returns what he chose.
+  tap() {
+    this.roused = 180; this.awake = true;
+    if (this.where === 'wheel' || ['lifted', 'climbIn', 'climbOut'].includes(this.act)) return 'busy';
+    const asleep = this.act === 'sleep' || this.act === 'nap';
+    const choice = pick(this.mode === 'lover' ? { wheel: 0.7, eat: 0.1, groom: 0.05, pee: 0.05, poop: 0.05, explore: 0.05 } : { wheel: 0.3, pee: 0.14, poop: 0.12, eat: 0.16, groom: 0.1, explore: 0.1, drink: 0.08 });
+    const c = this.cage, atNest = Math.hypot(this.x - c.house.bed.x, this.z - c.house.bed.z) < 30;
+    this.plan = [...(asleep && atNest ? [{ act: 'walk', to: c.house.door }] : []), ...this.planFor(choice)];
+    this.start(asleep ? { act: 'wake', dur: 2.2 } : { act: 'startle', dur: 1.3 });
+    return choice;
+  }
+
   // ---- planning ----
   next() {
     if (this.plan.length) { const s = this.plan.shift(); this.start(s); return; }
     const c = this.cage, b = BUDGET[this.mode];
-    // the clock: the less active the hour, the more likely she goes back to sleep in her nest
+    // the clock: the less active the hour, the more likely he goes back to sleep in his nest
     const A = this.activity;
     if (Math.random() > A) {
       const dur = A < 0.2 ? R(600, 1800) : A < 0.5 ? R(120, 480) : R(30, 90);
@@ -79,26 +102,31 @@ export class HamsterLife {
       if (!atNest) this.plan.push({ act: 'walk', to: c.house.door });
       this.next(); return;
     }
-    const what = pick(b);
+    this.plan = this.planFor(pick(b));
+    this.next();
+  }
+  planFor(what) {
+    const c = this.cage;
     const go = (p, fast = false) => ({ act: 'walk', to: p, fast });
     const near = (p, r = 25) => ({ x: p.x + R(-r, r), z: p.z + R(-r, r) });
     switch (what) {
-      case 'wheel': this.plan = [{ ...go(c.wheel.entry, true), act: 'toWheel' }, { act: 'climbIn', dur: 0.8 }]; break;
-      case 'eat': this.plan = [go(near(c.bowl)), { act: 'eat', dur: R(7, 18), face: c.bowl }]; break;
-      case 'hoard': this.plan = [go(near(c.bowl)), { act: 'pouch', dur: R(4, 8), face: c.bowl }, { act: 'carry', to: c.house.door, fast: true }, { act: 'walk', to: c.house.bed }, { act: 'empty', dur: R(3, 5) }]; break;
-      case 'drink': this.plan = [go({ x: c.drink.x, z: c.drink.z }), { act: 'drink', dur: R(3, 8), face: { x: c.drink.x + 100, z: c.drink.z } }]; break;
-      case 'groom': this.plan = [{ act: 'groom', dur: R(5, 12) }]; break;
-      case 'dig': this.plan = [go(near(c.dig, 30)), { act: 'dig', dur: R(4, 10) }]; break;
-      case 'nap': this.plan = [go(c.house.door), { act: 'walk', to: c.house.bed }, { act: 'nap', dur: this.mode === 'lover' ? R(6, 12) : R(20, 50) }, { act: 'walk', to: c.house.door }]; break;
+      case 'pee': return [go({ x: this.toilet.x + R(-8, 8), z: this.toilet.z + R(-8, 8) }), { act: 'pee', dur: R(2.5, 4) }];
+      case 'poop': return [go({ x: this.toilet.x + R(-20, 20), z: this.toilet.z + R(-20, 20) }), { act: 'poop', dur: R(2, 3.5) }];
+      case 'wheel': return [{ ...go(c.wheel.entry, true), act: 'toWheel' }, { act: 'climbIn', dur: 0.8 }];
+      case 'eat': return [go(near(c.bowl)), { act: 'eat', dur: R(7, 18), face: c.bowl }];
+      case 'hoard': return [go(near(c.bowl)), { act: 'pouch', dur: R(4, 8), face: c.bowl }, { act: 'carry', to: c.house.door, fast: true }, { act: 'walk', to: c.house.bed }, { act: 'empty', dur: R(3, 5) }];
+      case 'drink': return [go({ x: c.drink.x, z: c.drink.z }), { act: 'drink', dur: R(3, 8), face: { x: c.drink.x + 100, z: c.drink.z } }];
+      case 'groom': return [{ act: 'groom', dur: R(5, 12) }];
+      case 'dig': return [go(near(c.dig, 30)), { act: 'dig', dur: R(4, 10) }];
+      case 'nap': return [go(c.house.door), { act: 'walk', to: c.house.bed }, { act: 'nap', dur: this.mode === 'lover' ? R(6, 12) : R(20, 50) }, { act: 'walk', to: c.house.door }];
       default: {
         const pts = [];
         for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) {
           pts.push(go(this.freeSpot()), { act: 'sniff', dur: R(1.2, 3) });
         }
-        this.plan = pts;
+        return pts;
       }
     }
-    this.next();
   }
   freeSpot() {
     const c = this.cage;
@@ -120,7 +148,7 @@ export class HamsterLife {
     const c = this.cage;
     if (!audioOn && !this.awake) { this.pose = { curl: 1 }; this.v = 0; return; }
     if (audioOn && !this.awake) this.wakeUp();
-    this.timer -= dt;
+    this.timer -= dt; if (this.roused > 0) this.roused -= dt;
     this.pose = {};
     this.v = 0;
     switch (this.act) {
@@ -147,7 +175,7 @@ export class HamsterLife {
       case 'lifted': {
         const L = this.lift; L.t += dt / 1.1; const u = Math.min(1, L.t), e = u * u * (3 - 2 * u);
         this.x = L.x0 + (c.wheel.x - L.x0) * e; this.z = L.z0 + (c.wheel.z - L.z0) * e;
-        this.y = L.y0 + (c.wheel.y - L.y0) * e + 150 * Math.sin(Math.PI * u);
+        this.y = L.y0 + (c.wheel.y - L.y0) * e + 240 * Math.sin(Math.PI * u);   // lifted clear over the roof of his house
         this.h += ang(0 - this.h) * Math.min(1, dt * 4);
         this.pose = { dangle: 1 };
         if (u >= 1) { this.where = 'wheel'; this.act = 'wheel'; this.wheelT = 0; this.motivated = true; this.onWheel && this.onWheel(true, true); }
@@ -155,7 +183,7 @@ export class HamsterLife {
       }
       case 'wheel': {
         this.wheelT += dt;
-        // she leaves after a pause in her running, sooner if she is not a wheel lover
+        // he leaves after a pause in his running, sooner if he is not a wheel lover
         const lover = this.mode === 'lover';
         if (!this.wheelCap) this.wheelCap = lover ? R(240, 600) : R(90, 240);
         if (ham && ham.state === 'rest' && ham.restT > (lover ? 3 : 2)) {
@@ -181,7 +209,17 @@ export class HamsterLife {
       case 'empty': this.pouch = Math.max(0, this.pouch - dt / 3); this.pose = { rear: 0.3, empty: 1, pouch: this.pouch }; if (this.timer <= 0) { this.pouch = 0; this.hoard = Math.min(1, this.hoard + 0.25); this.next(); } break;
       case 'drink': this.faceTo(dt); this.pose = { rear: 0.55, drink: 1 }; if (this.timer <= 0) this.next(); break;
       case 'groom': this.pose = { rear: 0.42, groom: 1 }; if (this.timer <= 0) this.next(); break;
-      case 'sniff': this.pose = { rear: 0.62, sniff: 1 }; if (this.timer <= 0) this.next(); break;
+      case 'sniff': case 'startle': this.pose = { rear: this.act === 'startle' ? 0.75 : 0.62, sniff: 1 }; if (this.timer <= 0) this.next(); break;
+      case 'pee': case 'poop':
+        this.pose = { squat: 1, rear: 0.12 };
+        if (this.timer <= 0) {
+          const bx = this.x - Math.cos(this.h) * 26, bz = this.z - Math.sin(this.h) * 26;
+          if (this.act === 'pee') this.marks.push({ type: 'pee', x: bx, z: bz, r: R(10, 16), t: performance.now() });
+          else for (let k = 0, n = 1 + Math.floor(Math.random() * 3); k < n; k++) this.marks.push({ type: 'poop', x: bx + R(-8, 8), z: bz + R(-8, 8), a: R(0, 6.28), t: performance.now() });
+          if (this.marks.length > 60) this.marks.splice(0, this.marks.length - 60);
+          this.next();
+        }
+        break;
       case 'dig': this.pose = { dig: 1 }; this.digPile = Math.min(1, this.digPile + dt / 40); if (this.timer <= 0) this.next(); break;
       case 'nap': case 'sleep': this.pose = { curl: 1 }; if (this.timer <= 0) this.next(); break;
       default: this.next();

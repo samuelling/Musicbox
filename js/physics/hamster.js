@@ -125,7 +125,7 @@ export class Hamster {
   }
 
   // ------------------------------------------------------------- behaviour (block rate)
-  // she climbs in or out (decided by her life in the cage, js/sim/hamster-life.js)
+  // he climbs in or out (decided by his life in the cage, js/sim/hamster-life.js)
   setInWheel(on) {
     if (on === this.inWheel) return;
     this.inWheel = on;
@@ -319,7 +319,7 @@ export class Hamster {
   }
 }
 
-// Belt pulleys sized so the crank turns at its design rate when she runs at her usual
+// Belt pulleys sized so the crank turns at its design rate when he runs at his usual
 // pace (~0.44 m/s): r_wheel / r_crank = ω_crank / ω_wheel.
 // `gear` scales the hub pulley: ×2 makes the tune run twice as fast for the same pace.
 export function pulleyRadii(Gcrank, omegaNom, R, gear = 1) {

@@ -115,7 +115,7 @@ export class HamsterModel {
   constructor({ mass = 0.125, shells = 16 } = {}) {
     const s = Math.cbrt(mass / 0.125);
     this.scale = s;
-    const root = (this.root = new THREE.Group());   // origin: on the tread between the feet; +x forward, +y up, +z her left
+    const root = (this.root = new THREE.Group());   // origin: on the tread between the feet; +x forward, +y up, +z his left
     const body = (this.body = new THREE.Group()); root.add(body);
     body.scale.setScalar(s);
     const sp = (this.spine = new THREE.Group()); body.add(sp);     // pivot near the hips for rearing / bounding
@@ -149,7 +149,7 @@ export class HamsterModel {
     };
     const bodyG = starMesh(bodySdf, new THREE.Vector3(-12, 30, 0), 88, 60, bodyPaint);
 
-    // ----- head (own pivot at the neck so she can look, groom and stabilise her gaze) -----
+    // ----- head (own pivot at the neck so he can look, groom and stabilise his gaze) -----
     const head = (this.head = new THREE.Group()); head.position.set(28, 42, 0); head.scale.setScalar(1.14); tor.add(head);
     this.pouch = 1;
     const headSdf = (x, y, z) => {
@@ -312,8 +312,8 @@ export class HamsterModel {
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
   }
 
-  // st: gait/behaviour (wheel physics report, or her life in the cage); Rin: radius of the ground
-  // under her (the wheel's tread, or effectively flat); pose: what she is doing with her body
+  // st: gait/behaviour (wheel physics report, or his life in the cage); Rin: radius of the ground
+  // under him (the wheel's tread, or effectively flat); pose: what he is doing with his body
   update(dt, st, Rin, pose = {}) {
     this.t += dt;
     const t = this.t, s = this.scale;
@@ -329,7 +329,7 @@ export class HamsterModel {
       else if (st.gait === 'trot') { bob = 1.6 * k * Math.abs(Math.sin(2 * Math.PI * ph)); pitch = 0.025 * Math.sin(4 * Math.PI * ph); }
       else bob = 0.8 * Math.sin(4 * Math.PI * ph);
       this.body.position.y = bob - 4 * k;
-    } else this.body.position.y = pose.curl ? -5 : 0;
+    } else this.body.position.y = pose.curl ? -5 : pose.squat ? -4 : 0;
     const rearT = running ? 0 : (pose.rear ?? (groom ? 0.42 : 0));
     this.pose.rear += (rearT - this.pose.rear) * Math.min(1, dt * 4);
     this.pose.curl = (this.pose.curl || 0) + ((pose.curl ? 1 : 0) - (this.pose.curl || 0)) * Math.min(1, dt * 2);
@@ -441,7 +441,7 @@ export class HamsterRig {
     const wire = new THREE.MeshStandardMaterial({ color: 0xd2d6da, metalness: 0.85, roughness: 0.3 });
     const brass = new THREE.MeshStandardMaterial({ color: 0xc19a4c, metalness: 1, roughness: 0.3 });
     const plastic = new THREE.MeshStandardMaterial({ color: 0x8fb8a8, roughness: 0.45, metalness: 0, transparent: true, opacity: 0.88 });
-    // her cage: a glass tank on the table beside the box; the wheel stands at the back, its axle
+    // his cage: a glass tank on the table beside the box; the wheel stands at the back, its axle
     // passes out through the back glass to the hub pulley
     const zc = anchor.z, yc = anchor.y, zwp = zc + rc;
     const L = Math.max(640, 2 * Rs + 380), D = Wd + 300, Hc = 2 * Rs + 130;
@@ -508,13 +508,13 @@ export class HamsterRig {
     const belt = new THREE.Mesh(new THREE.TubeGeometry(new PolyCurve(pts), 220, 1.3, 8, true), new THREE.MeshStandardMaterial({ color: 0xb2402b, roughness: 0.55 }));
     belt.castShadow = true; g.add(belt); this.belt = belt;
 
-    // the hamster: either on the tread at angle φ from the bottom, or about her business in the cage
+    // the hamster: either on the tread at angle φ from the bottom, or about his business in the cage
     this.ham = new HamsterModel({ mass: o.mass, shells: o.shells });
     this.hamPivot = new THREE.Group(); this.hamPivot.position.set(xw, yw, zw); g.add(this.hamPivot);
     this.cageCarrier = new THREE.Group(); this.cageCarrier.position.set(cx0, yB, cz0); g.add(this.cageCarrier);
     this.cageCarrier.add(this.ham.root);
     this.st = null; this.stT = 0; this.thw = 0; this.phase = 0;
-    // the layout her life plays out in (cage millimetres: x right, z forward, bedding at y = 0)
+    // the layout his life plays out in (cage millimetres: x right, z forward, bedding at y = 0)
     const hx = L - 100, hz = 85;
     this.layout = {
       L, D,
@@ -542,7 +542,7 @@ export class HamsterRig {
     const meshT = new THREE.CanvasTexture(mc); meshT.wrapS = meshT.wrapT = THREE.RepeatWrapping; meshT.repeat.set(L / 96, D / 96);
     const lid = new THREE.Mesh(new THREE.PlaneGeometry(L, D), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.4, alphaMap: meshT, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
     lid.rotation.x = -Math.PI / 2; lid.position.set(X(L / 2), yT + 15 + Hc, Z(D / 2)); g.add(lid);
-    // aspen bedding: pale shavings, with a mound where she digs
+    // aspen bedding: pale shavings, with a mound where he digs
     const bc = document.createElement('canvas'); bc.width = bc.height = 512; const bx = bc.getContext('2d');
     bx.fillStyle = '#c9b48c'; bx.fillRect(0, 0, 512, 512);
     for (let i = 0; i < 2600; i++) { const v = 170 + Math.random() * 70; bx.fillStyle = `rgba(${v + 20},${v},${v - 40},0.8)`; bx.save(); bx.translate(Math.random() * 512, Math.random() * 512); bx.rotate(Math.random() * 6.3); bx.fillRect(-9, -2, 18 + Math.random() * 10, 3 + Math.random() * 3); bx.restore(); }
@@ -552,13 +552,13 @@ export class HamsterRig {
     box(L, yB - yT - 8, D, X(L / 2), (yB + yT + 8) / 2, Z(D / 2), bedM);
     this.pile = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), bedM); this.pile.scale.set(60, 1, 45);
     this.pileAt = { x: (xw - cx0 + Rs + L - 175) / 2, z: 70 }; this.pile.position.set(X(this.pileAt.x + 20), yB, Z(this.pileAt.z - 15)); g.add(this.pile);
-    // her house: a little wooden hut with a gabled roof and a round door, hay inside
+    // his house: a little wooden hut with a gabled roof and a round door, hay inside
     const hx = L - 100, hz = 85;
     const hut = new THREE.Group(); hut.position.set(X(hx), yB, Z(hz)); g.add(hut);
     const pine = new THREE.MeshStandardMaterial({ color: 0xc89a62, roughness: 0.75 });
     const shell = (w, h, d, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pine); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; hut.add(b); };
     shell(150, 110, 10, 0, 55, -55); shell(10, 110, 120, -70, 55, 0); shell(10, 110, 120, 70, 55, 0);
-    // front: two jambs and a lintel around an open doorway, so you can see her inside
+    // front: two jambs and a lintel around an open doorway, so you can see him inside
     shell(45, 110, 10, -52, 55, 60); shell(45, 110, 10, 52, 55, 60); shell(60, 34, 10, 0, 93, 60);
     for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.BoxGeometry(170, 10, 100), pine); r.position.set(0, 140, s * 35); r.rotation.x = s * 0.6; r.castShadow = true; hut.add(r); }
     const hay = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xc8b060, roughness: 1 })); hay.scale.set(60, 18, 45); hay.position.set(0, 4, -5); hut.add(hay);
@@ -606,8 +606,22 @@ export class HamsterRig {
       this.ham.update(dt, L.gaitState(), 1e6, L.pose);
     }
     if (life) {
+      // pee spots and droppings in the bedding (the damp spots dry out over a few minutes)
+      if (!this.marks) { this.marks = []; this.markG = { pee: new THREE.CircleGeometry(1, 20), poop: new THREE.CapsuleGeometry(2.2, 5, 3, 6) }; this.markM = { poop: new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.8 }) }; }
+      while (this.marks.length > life.marks.length) this.cageCarrier.remove(this.marks.shift().mesh);
+      for (let i = 0; i < life.marks.length; i++) {
+        const m = life.marks[i];
+        if (this.marks[i] && this.marks[i].src === m) continue;
+        if (this.marks[i]) { this.cageCarrier.remove(this.marks[i].mesh); }
+        let mesh;
+        if (m.type === 'pee') { mesh = new THREE.Mesh(this.markG.pee, new THREE.MeshStandardMaterial({ color: 0x7a6a3e, roughness: 0.4, transparent: true, opacity: 0.5, depthWrite: false })); mesh.rotation.x = -Math.PI / 2; mesh.scale.setScalar(m.r); mesh.position.set(m.x, 1.2, m.z); }
+        else { mesh = new THREE.Mesh(this.markG.poop, this.markM.poop); mesh.rotation.set(Math.PI / 2, 0, m.a); mesh.position.set(m.x, 2.2, m.z); mesh.castShadow = true; }
+        this.cageCarrier.add(mesh); this.marks[i] = { src: m, mesh };
+      }
+      const now = performance.now();
+      for (const k of this.marks) if (k.src.type === 'pee') k.mesh.material.opacity = 0.5 * Math.max(0, 1 - (now - k.src.t) / 240000);
       const p = Math.min(1, 0.15 + life.digPile * 0.85); this.pile.scale.set(60 * (0.6 + 0.4 * p), 2 + 26 * p, 45 * (0.6 + 0.4 * p));
-      // the bottle's ball valve lets a bubble up while she drinks
+      // the bottle's ball valve lets a bubble up while he drinks
       if (life.act === 'drink') { this.bubble.visible = true; this.bubbleY = ((this.bubbleY || 95) + dt * 140); if (this.bubbleY > 205) this.bubbleY = 95; this.bubble.position.set(Math.sin(this.bubbleY) * 4, this.bubbleY, 0); }
       else this.bubble.visible = false;
     }
