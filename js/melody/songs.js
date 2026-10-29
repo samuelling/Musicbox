@@ -125,14 +125,7 @@ export const SONGS = [
     generate: () => ambient({ pitches: [69, 72, 74, 76, 79, 81, 84, 86, 88], bars: 56, loops: 5, phrase: [1, 2], minGap: 12, minP: 53, maxP: 137, bass: [57, 64] }),
   },
 
-  // ---------------------------------------------------------------- Other
-  {
-    id: 'thesun', key: 'Bb', cat: 'Other', title: 'The Sun', credit: 'Positron — music box arrangement from the recording', bpm: 68, meter: [4, 4], accomp: 'none',
-    voices: [
-      'F5:4 D5:4 G5:4 A5:4 | F5:4 A#5:1 D5:3 G5:4 A5:4 | D5:4 G5:4 A#5:6 A5:2 | A5:8 F5:4 G5:4 | A5:4 C6:4 A5:4 F5:4 | G5:12 D5:4 | D#5:4 F#5:4 A#5:8 | A#5:6 A5:2 F5:8 | D5:4 F5:4 A#5:4 C6:4 | D6:16 | D6:4 C6:4 A#5:8 | A5:4 F#5:4 D5:8 | F5:4 A#5:4 D6:6 C6:2 | A#5:8 G5:8 | A5:4 C6:4 F6:8 | D#6:4 C6:4 A5:8 | G5:4 A5:4 C6:4 A5:4 | F5:16 | F5:4 D5:4 G5:4 A5:4 | F5:4 A#5:1 D5:3 G5:4 A5:4 | G5:6 A5:2 A#5:8 | A5:4 C6:4 F5:8 | D6:6 C6:2 A#5:8 | C6:8 A5:8 | A#5:4 D6:4 F6:6 D6:2 | C6:4 A5:4 F5:8 | D5:4 F5:4 A#5:4 D6:4 | C6:16 | A#5:8 F5:8 | D5:4 F5:4 A#5:8 | A#5:6 F#5:2 D#5:8 | D5:4 F5:4 A5:8 | F5:4 D5:4 G5:4 A5:4 | F5:4 A#5:1 D5:3 G5:4 A5:4 | A#5:16',
-      'A#4:4 A#4:4 D#5:4 F5:4 | A#4:4 A#4:4 D#5:4 F5:4 | G4:2 A#4:2 D5:2 A#4:2 G5:2 D5:2 A#4:2 D5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | F4:2 A4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 | G4:2 D5:2 A#4:2 G5:2 D5:2 A#4:2 D5:2 A#4:2 | F#4:2 A#4:2 D#5:2 A#4:2 F#5:2 D#5:2 A#4:2 D#5:2 | F4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 A#4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | F4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 A#4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | F#4:2 D5:2 A4:2 F#5:2 D5:2 A4:2 D5:2 A4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | G4:2 D5:2 A#4:2 G5:2 D5:2 A#4:2 D5:2 A#4:2 | F4:2 A4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | F4:2 A4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | A#4:4 A#4:4 D#5:4 F5:4 | A#4:4 A#4:4 D#5:4 F5:4 | G4:2 A#4:2 D5:2 A#4:2 G5:2 D5:2 A#4:2 D5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | F4:2 C5:2 A4:2 F5:2 C5:2 A4:2 C5:2 A4:2 | F4:2 A#4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 | F4:2 D5:2 A#4:2 F5:2 D5:2 A#4:2 D5:2 A#4:2 | F#4:2 A#4:2 D#5:2 A#4:2 F#5:2 D#5:2 A#4:2 D#5:2 | F4:2 D5:2 A4:2 F5:2 D5:2 A4:2 D5:2 A4:2 | A#4:4 A#4:4 D#5:4 F5:4 | A#4:4 A#4:4 D#5:4 F5:4 | A#4:4 D5:4 F5:8',
-    ],
-  },
+
 ];
 
-export const CATEGORIES = ['Classics', 'Christmas', 'Hanukkah', 'Swiss', 'Ambient', 'Other', 'My tunes'];
+export const CATEGORIES = ['Classics', 'Christmas', 'Hanukkah', 'Swiss', 'Ambient', 'My tunes'];
