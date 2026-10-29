@@ -23,15 +23,18 @@
       <span class="lightRing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 2.6 3.8 4.6 3.8 8.6A3.8 3.8 0 0 1 12 15a3.8 3.8 0 0 1-3.8-3.9c0-2 1.2-3.1 2-4.3.3 1.3 1 2 1.7 2.2-.4-2.3-.2-4.6.1-6.5zM11 16.5h2v5h-2z"/></svg></span>
       <span class="lightCap"><span class="lightText">Tap the candle to light it</span><span class="lightSub">and the music box comes to life</span></span>
     </button>
-    <div class="modeSwitch">
-      <button data-mode="crank" class="on">Hand crank</button>
-      <button data-mode="spring">Wind-up</button>
-      <button data-mode="auto">Hamster</button>
+    <div class="modeWrap">
+      <div class="modeLabel">Play style:</div>
+      <div class="modeSwitch">
+        <button data-mode="crank" class="on">Hand crank</button>
+        <button data-mode="spring">Wind-up</button>
+        <button data-mode="auto">Hamster</button>
+      </div>
     </div>
     <div id="hamInfo" class="hamInfo hidden">
       <div id="hamTxt" class="hamTxt">She's waking up…</div>
       <div class="hamBtns"><button id="hamPlace"><span class="ic">🎡</span>Place her in the wheel</button><button id="hamWatch"><span class="ic">👀</span>Watch her</button><button id="hamCover"><span class="ic">🧺</span>Cover the cage</button></div>
-      <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="1"><span id="hamGearv">×1.00</span></label>
+      <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="0.75"><span id="hamGearv">×0.75</span></label>
       <div class="hamNature" role="group" aria-label="Her nature">
         <span>Her nature</span>
         <div class="seg"><button data-lover="0" class="on">Real hamster</button><button data-lover="1">♥ Wheel lover</button></div>
@@ -50,16 +53,34 @@
     </div>
     <div id="navCtl" class="navCtl" aria-label="Move around the room">
       <div class="zoomBtns"><button id="zoomIn" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zoomOut" aria-label="Zoom out" title="Zoom out (−)">−</button></div>
-      <div class="dpad" aria-label="Walk">
-        <button data-move="fwd" class="up" aria-label="Walk forward" title="Forward (W / ↑)">▲</button>
-        <button data-move="tl" class="lt" aria-label="Turn left" title="Turn left (Q / ←)">↶</button>
-        <button id="eyesBtn" class="mid" aria-label="See through your eyes" title="First person: see through your eyes">👁</button>
-        <button data-move="tr" class="rt" aria-label="Turn right" title="Turn right (E / →)">↷</button>
-        <button data-move="back" class="dn" aria-label="Step back" title="Back (S / ↓)">▼</button>
+      <!-- desktop: keyboard keys you can also click; they light up as you press them -->
+      <div class="keys">
+        <div class="kc"><div class="krow"><button data-move="fwd" data-key="KeyW" title="Walk forward">W</button></div>
+          <div class="krow"><button data-move="sl" data-key="KeyA" title="Step left">A</button><button data-move="back" data-key="KeyS" title="Step back">S</button><button data-move="sr" data-key="KeyD" title="Step right">D</button></div><span>walk</span></div>
+        <div class="kc"><div class="krow"><button data-move="fwd" data-key="ArrowUp" title="Walk forward">↑</button></div>
+          <div class="krow"><button data-move="tl" data-key="ArrowLeft" title="Turn left">←</button><button data-move="back" data-key="ArrowDown" title="Step back">↓</button><button data-move="tr" data-key="ArrowRight" title="Turn right">→</button></div><span>turn</span></div>
       </div>
-      <div class="posture"><button id="standBtn" title="Stand up (Space)">Stand</button><span id="postureTxt">Sitting</span><button id="crouchBtn" title="Crouch (C)">Crouch</button></div>
+      <!-- touch: a pad to walk with (left thumb) -->
+      <div class="dpad walkPad" aria-label="Walk">
+        <button data-move="fwd" class="up" aria-label="Walk forward">▲</button>
+        <button data-move="sl" class="lt" aria-label="Step left">◀</button>
+        <span class="mid padName">walk</span>
+        <button data-move="sr" class="rt" aria-label="Step right">▶</button>
+        <button data-move="back" class="dn" aria-label="Step back">▼</button>
+      </div>
+      <div class="posture">
+        <button id="eyesBtn" title="See through your eyes (double-tap the box to lean in)">👁 Eyes</button>
+        <button id="standBtn" title="Stand up (Space)">Stand <kbd>␣</kbd></button><span id="postureTxt">Sitting</span><button id="crouchBtn" title="Crouch (C)">Crouch <kbd>C</kbd></button>
+      </div>
     </div>
-    <div id="keyHint" class="keyHint">W A S D walk · Q E turn · Space stand · C crouch · + − zoom</div>
+    <!-- touch: a second pad to turn and look (right thumb) -->
+    <div id="lookPad" class="dpad lookPad" aria-label="Turn and look">
+      <button data-move="lu" class="up" aria-label="Look up">▲</button>
+      <button data-move="tl" class="lt" aria-label="Turn left">↶</button>
+      <button id="faceBtn" class="mid" aria-label="Face the music box" title="Face the music box">◎</button>
+      <button data-move="tr" class="rt" aria-label="Turn right">↷</button>
+      <button data-move="ld" class="dn" aria-label="Look down">▼</button>
+    </div>
     <div id="busy" class="busy hidden">Tuning tines…</div>
   </section>
 
@@ -74,15 +95,17 @@
     <section class="panel" data-panel="listen">
       <div class="row">
         <label>Room <select id="room"></select></label>
-        <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
-        <label class="chk"><input type="checkbox" id="follow"> Follow perspective <span class="small">(see from where you stand)</span></label>
       </div>
-      <div class="mapWrap"><canvas id="map"></canvas></div>
+      <div class="mapBlock">
+        <div class="mapWrap"><canvas id="map"></canvas></div>
+        <div class="mapSide">
+          <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
+          <label class="chk"><input type="checkbox" id="follow" checked> Follow perspective <span class="small hideNarrow">(see from where you stand)</span></label>
+          <label>Ear height <input type="range" id="earH" min="0.3" max="1.9" step="0.01" value="1.2"><span id="earHv">1.20 m</span></label>
+          <label>Facing <input type="range" id="yaw" min="-180" max="180" step="1" value="90"><span id="yawv">90°</span></label>
+        </div>
+      </div>
       <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. With Follow perspective on, the 3D view is your eyes: drag on it to look around. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
-      <div class="row">
-        <label class="grow">Ear height <input type="range" id="earH" min="0.3" max="1.9" step="0.01" value="1.2"><span id="earHv">1.20 m</span></label>
-        <label class="grow">Facing <input type="range" id="yaw" min="-180" max="180" step="1" value="90"><span id="yawv">90°</span></label>
-      </div>
       <h3>Your ears <span class="small">a head-related transfer function for every sound path</span></h3>
       <div class="row">
         <label>Listening on <select id="hpMode"><option value="inear">In-ear (AirPods, earbuds)</option><option value="overear">Over-ear headphones</option><option value="speakers">Speakers</option></select></label>

@@ -102,9 +102,10 @@ export class MusicBoxScene {
   // double tap: zoom into the music box (or onto the hamster's cage); again to come back out
   doubleTap(e) {
     if (this.followListener) {
-      // seeing through your own eyes: a double tap steps back out and zooms in on the movement
-      if (this.onLeaveEyes) this.onLeaveEyes();
-      this.frame('closeup'); return;
+      // seeing through your own eyes: a double tap leans you over the table (and back)
+      this.lookPitch = null;
+      if (this.onLean) this.onLean();
+      return;
     }
     const rect = this.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
@@ -475,7 +476,7 @@ export class MusicBoxScene {
     if (!this.everLit) {
       // the first light: watch the flame catch, then move in to the music box
       this.everLit = true;
-      setTimeout(() => { if (this.zoomed === 'wide' && !this.followListener) this.frame(this.state.mode === 'auto' ? 'rig' : 'box'); }, 1100);
+      setTimeout(() => { if (this.zoomed === 'wide' && !this.followListener && !(this.onFirstLight && this.onFirstLight())) this.frame(this.state.mode === 'auto' ? 'rig' : 'box'); }, 1100);
     }
     this.dirty = Math.max(this.dirty, 2);
   }
@@ -797,6 +798,13 @@ export class MusicBoxScene {
     if (now) { this.camAnim = null; this.controls.target.copy(tgt); this.camera.position.copy(pos); this.camera.fov = fovTo; this.camera.updateProjectionMatrix(); this.controls.update(); this.dirty = 3; return; }
     this.camAnim = { t: 0, t0: performance.now(), dur, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos, fov0: this.camera.fov, fov1: fovTo };
   }
+  // from the opening view, fly down into your own eyes (then the view is yours)
+  flyToEyes(done) {
+    const L = this.listener; if (!L || !this.roomInner) { done(); return; }
+    const eye = this.toScene(L.x, L.y, L.z);
+    this.zoomed = null; this.follow = false;
+    this.camAnim = { t: 0, t0: performance.now(), dur: 2800, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt: this.tipWorld.clone(), pos: eye, fov0: this.camera.fov, fov1: 62, done };
+  }
   // zoom buttons: dolly toward or away from what you are looking at
   dolly(k) {
     if (this.followListener) {
@@ -856,7 +864,7 @@ export class MusicBoxScene {
       this.controls.target.lerpVectors(A.fromT, A.tgt, e); this.camera.position.lerpVectors(A.fromP, A.pos, e);
       if (A.fov0 !== A.fov1) { this.camera.fov = A.fov0 + (A.fov1 - A.fov0) * e; this.camera.updateProjectionMatrix(); }
       this.dirty = Math.max(this.dirty, 2);
-      if (A.t >= 1) this.camAnim = null;
+      if (A.t >= 1) { this.camAnim = null; if (A.done) A.done(); }
     }
     const rigOn = !!this.hamRig;
     if (rigOn) {

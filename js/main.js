@@ -19,7 +19,7 @@ const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
 
 // ------------------------------------------------------------------ state
-const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 1, lover: false, covered: true }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
+const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 0.75, lover: false, covered: true }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
 let song = null;            // compiled tune (onsets)
 let songId = 'brahms';
 let built = null;           // last build result (info, arrangement, combNotes, geom, drive, room)
@@ -100,8 +100,7 @@ const PROMPTS = {
 function showPrompt(kind, sub) {
   prompt.classList.toggle('gone', !kind);
   // walking and zoom controls appear once the candle is lit (a quiet first screen)
-  if (kind === 'first') { $('navCtl').classList.add('hidden'); $('keyHint').classList.add('hidden'); }
-  if (!kind) { $('navCtl').classList.remove('hidden'); $('keyHint').classList.remove('hidden'); }
+  for (const id of ['navCtl', 'lookPad']) { if (kind === 'first') $(id).classList.add('hidden'); if (!kind) $(id).classList.remove('hidden'); }
   if (!kind) return;
   const [a, b] = PROMPTS[kind] || [kind, ''];
   prompt.querySelector('.lightText').textContent = a;
@@ -355,8 +354,49 @@ $('headTrack').addEventListener('change', async (e) => {
 });
 
 // follow perspective: the 3D view is your eyes; dragging it turns your head
-$('follow').addEventListener('change', (e) => { scene.setFollow(e.target.checked); $('eyesBtn').classList.toggle('on', e.target.checked); });
-scene.onLeaveEyes = () => { $('follow').checked = false; scene.setFollow(false); $('eyesBtn').classList.remove('on'); };
+$('follow').addEventListener('change', (e) => {
+  // before the candle is lit you're still taking in the room; the view becomes yours once it is
+  if (!scene.everLit) return;
+  scene.setFollow(e.target.checked); $('eyesBtn').classList.toggle('on', e.target.checked);
+});
+// double tap through your own eyes: lean over the table to look into the box, then back.
+// Your head really moves, so you hear it close up too.
+let lean = null;
+function leanPose(L, b) {
+  const dx = b[0] - L.x, dy = b[1] - L.y, d = Math.hypot(dx, dy) || 1;
+  return { x: b[0] - dx / d * 0.3, y: b[1] - dy / d * 0.3, z: b[2] + 0.32, yaw: Math.atan2(dy, dx), faceBox: false };
+}
+scene.onLean = () => {
+  const L = map.listener, b = built && built.room.boxPos;
+  if (!b || built.room.held) return;
+  let to;
+  if (lean) { to = lean.from; lean = null; }
+  else { lean = { from: { x: L.x, y: L.y, z: L.z, yaw: L.yaw, faceBox: map.faceBox } }; to = leanPose(L, b); }
+  const start = { x: L.x, y: L.y, z: L.z, yaw: L.yaw }, t0 = performance.now();
+  let dyaw = to.yaw - start.yaw; while (dyaw > Math.PI) dyaw -= 2 * Math.PI; while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
+  map.faceBox = false;
+  const go = (now) => {
+    const u = Math.min(1, (now - t0) / 900), e = u * u * (3 - 2 * u);
+    L.x = start.x + (to.x - start.x) * e; L.y = start.y + (to.y - start.y) * e; L.z = start.z + (to.z - start.z) * e; L.yaw = start.yaw + dyaw * e;
+    walk.zT = L.z;
+    if (u < 1) { map.emit(); requestAnimationFrame(go); }
+    else { map.faceBox = to.faceBox; $('faceBox').checked = to.faceBox; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; postureLabel(); map.emit(); }
+  };
+  requestAnimationFrame(go);
+};
+// the first light, with Follow perspective on: lean over the table and fly from the opening view
+// down into your own eyes, looking into the box (double-tap to sit back)
+scene.onFirstLight = () => {
+  if (!$('follow').checked) return false;
+  const L = map.listener, b = built && built.room.boxPos;
+  if (b && !built.room.held) {
+    lean = { from: { x: L.x, y: L.y, z: L.z, yaw: L.yaw, faceBox: map.faceBox } };
+    const P = leanPose(L, b); L.x = P.x; L.y = P.y; L.z = P.z; L.yaw = P.yaw; map.faceBox = false; $('faceBox').checked = false; walk.zT = L.z;
+    $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; postureLabel(); map.emit();
+  }
+  scene.flyToEyes(() => { scene.setFollow(true); $('eyesBtn').classList.add('on'); });
+  return true;
+};
 scene.onLook = (d) => {
   map.faceBox = false; $('faceBox').checked = false;
   map.listener.yaw -= d; map.emit();
@@ -370,11 +410,13 @@ $('earH').addEventListener('input', (e) => { map.listener.z = walk.zT = +e.targe
 const POSTURES = [['Crouching', 0.8], ['Sitting', 1.2], ['Standing', 1.62]];
 const walk = { keys: new Set(), pad: new Set(), raf: 0, last: 0, zT: 1.2 };
 function postureLabel() {
+  if (lean) { $('postureTxt').textContent = 'Leaning in'; $('standBtn').disabled = $('crouchBtn').disabled = false; return; }
   const z = walk.zT; let i = 0; for (let k = 1; k < POSTURES.length; k++) if (Math.abs(POSTURES[k][1] - z) < Math.abs(POSTURES[i][1] - z)) i = k;
   $('postureTxt').textContent = Math.abs(POSTURES[i][1] - z) < 0.06 ? POSTURES[i][0] : `ears ${z.toFixed(2)} m`;
   $('standBtn').disabled = z >= 1.6; $('crouchBtn').disabled = z <= 0.82;
 }
 function posture(dir) {
+  if (lean) { scene.onLean(); return; }
   const z = walk.zT;
   const next = dir > 0 ? POSTURES.find(([, h]) => h > z + 0.05) : [...POSTURES].reverse().find(([, h]) => h < z - 0.05);
   if (!next) return;
@@ -388,9 +430,11 @@ function walkLoop() {
     const dt = Math.min(0.05, (now - walk.last) / 1000); walk.last = now;
     const L = map.listener, P = walk.pad;
     const f = (held('KeyW') || held('ArrowUp') || P.has('fwd') ? 1 : 0) - (held('KeyS') || held('ArrowDown') || P.has('back') ? 1 : 0);
-    const sd = (held('KeyD') ? 1 : 0) - (held('KeyA') ? 1 : 0);
+    const sd = (held('KeyD') || P.has('sr') ? 1 : 0) - (held('KeyA') || P.has('sl') ? 1 : 0);
+    const look = (P.has('lu') ? 1 : 0) - (P.has('ld') ? 1 : 0);
     const turn = (held('KeyQ') || held('ArrowLeft') || P.has('tl') ? 1 : 0) - (held('KeyE') || held('ArrowRight') || P.has('tr') ? 1 : 0);
     let moved = false;
+    if (look && scene.followListener) { scene.lookPitch = Math.max(-1.2, Math.min(1.2, (scene.lookPitch ?? scene.autoPitch ?? 0) + look * 0.8 * dt)); scene.dirty = 3; }
     if (turn) { map.faceBox = false; $('faceBox').checked = false; L.yaw += turn * 1.5 * dt; moved = true; }
     if (f || sd) {
       const v = (L.z < 1.0 ? 0.45 : 1.0) * dt, n = Math.hypot(f, sd);
@@ -401,7 +445,7 @@ function walkLoop() {
     }
     if (Math.abs(walk.zT - L.z) > 0.002) { L.z += (walk.zT - L.z) * Math.min(1, dt * 5); moved = true; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; }
     if (moved) map.emit();
-    if (moved || f || sd || turn) walk.raf = requestAnimationFrame(step); else walk.raf = 0;
+    if (moved || f || sd || turn || look) walk.raf = requestAnimationFrame(step); else walk.raf = 0;
   };
   walk.raf = requestAnimationFrame(step);
 }
@@ -420,21 +464,34 @@ function collide(x, y) {
   }
   return [x, y];
 }
-const typing = (e) => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+// Menus shouldn't keep hold of the keys: only text fields swallow W A S D; a dropdown or slider you
+// just used lets go of the keyboard (so the arrows walk again), and Esc or a tap on the room always does.
+const TEXTY = new Set(['text', 'search', 'number', 'email', 'url', 'password', 'tel']);
+const typing = (e) => { const t = e.target; return t && ((t.tagName === 'INPUT' && TEXTY.has(t.type)) || t.tagName === 'TEXTAREA' || t.isContentEditable); };
+const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const release = () => { const a = document.activeElement; if (a && a !== document.body && !typing({ target: a })) a.blur(); };
+document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') e.target.blur(); }, true);
+document.addEventListener('pointerup', (e) => { const t = e.target; if (t && (t.type === 'range' || t.tagName === 'BUTTON')) setTimeout(() => t.blur(), 0); }, true);
+$('view').addEventListener('pointerdown', release);
 const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { release(); return; }
   if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (WALK_KEYS.has(e.code)) { e.preventDefault(); walk.keys.add(e.code); walkLoop(); $('keyHint').classList.add('gone'); return; }
+  // an arrow key on a slider or dropdown you reached with Tab still works that control
+  const t = e.target;
+  if (ARROWS.has(e.code) && t && (t.tagName === 'SELECT' || t.type === 'range') && t.matches(':focus-visible')) return;
+  if (WALK_KEYS.has(e.code)) { e.preventDefault(); walk.keys.add(e.code); lean = null; litKey(e.code, true); walkLoop(); return; }
   if (e.repeat) return;
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON') { e.preventDefault(); posture(+1); }
   else if (e.code === 'KeyC') posture(-1);
   else if (e.code === 'Equal' || e.code === 'NumpadAdd') scene.dolly(0.8);
   else if (e.code === 'Minus' || e.code === 'NumpadSubtract') scene.dolly(1.25);
 });
-window.addEventListener('keyup', (e) => walk.keys.delete(e.code));
-window.addEventListener('blur', () => { walk.keys.clear(); walk.pad.clear(); document.querySelectorAll('.dpad .held').forEach((b) => b.classList.remove('held')); });
-document.querySelectorAll('.dpad button[data-move]').forEach((b) => {
-  const on = (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ } walk.pad.add(b.dataset.move); b.classList.add('held'); walkLoop(); };
+const litKey = (code, on) => document.querySelectorAll(`.keys [data-key="${code}"]`).forEach((k) => k.classList.toggle('held', on));
+window.addEventListener('keyup', (e) => { walk.keys.delete(e.code); litKey(e.code, false); });
+window.addEventListener('blur', () => { walk.keys.clear(); walk.pad.clear(); document.querySelectorAll('[data-move].held').forEach((b) => b.classList.remove('held')); });
+document.querySelectorAll('button[data-move]').forEach((b) => {
+  const on = (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ } lean = null; walk.pad.add(b.dataset.move); b.classList.add('held'); walkLoop(); };
   const off = () => { walk.pad.delete(b.dataset.move); b.classList.remove('held'); };
   b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
   b.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -444,7 +501,7 @@ $('crouchBtn').addEventListener('click', () => posture(-1));
 $('zoomIn').addEventListener('click', () => scene.dolly(0.8));
 $('zoomOut').addEventListener('click', () => scene.dolly(1.25));
 $('eyesBtn').addEventListener('click', () => { const f = $('follow'); f.checked = !f.checked; f.dispatchEvent(new Event('change')); });
-setTimeout(() => $('keyHint').classList.add('gone'), 20000);
+$('faceBtn').addEventListener('click', () => { map.faceBox = true; $('faceBox').checked = true; scene.lookPitch = null; map.emit(); });
 postureLabel();
 $('yaw').addEventListener('input', (e) => { map.faceBox = false; $('faceBox').checked = false; map.listener.yaw = (+e.target.value * Math.PI) / 180; $('yawv').textContent = e.target.value + '°'; map.emit(); });
 $('vol').addEventListener('input', (e) => engine.send({ type: 'gain', value: +e.target.value }));

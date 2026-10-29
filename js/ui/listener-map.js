@@ -27,8 +27,9 @@ export class ListenerMap {
     const [X, Y] = this.room.dims;
     if (this.room.walls) this.view = { x0: 0, y0: 0, x1: X, y1: Y };
     else { const c = this.box || [X / 2, Y / 2]; this.view = { x0: c[0] - 3.5, y0: c[1] - 2.6, x1: c[0] + 3.5, y1: c[1] + 2.6 }; }
-    const W = this.cv.width, H = this.cv.height, pad = 14 * (this.dpr || 1);
-    const sx = (W - 2 * pad) / (this.view.x1 - this.view.x0), sy = (H - 2 * pad) / (this.view.y1 - this.view.y0);
+    // leave a band above and below the room for its name and your distance, so no text sits on the plan
+    const d = this.dpr || 1, W = this.cv.width, H = this.cv.height, pad = 14 * d, band = 24 * d;
+    const sx = (W - 2 * pad) / (this.view.x1 - this.view.x0), sy = (H - 2 * band) / (this.view.y1 - this.view.y0);
     this.s = Math.min(sx, sy);
     this.ox = (W - this.s * (this.view.x1 - this.view.x0)) / 2; this.oy = (H - this.s * (this.view.y1 - this.view.y0)) / 2;
   }
@@ -97,11 +98,20 @@ export class ListenerMap {
     c.beginPath(); c.moveTo(hr * 1.55, 0); c.lineTo(hr * 0.75, -hr * 0.45); c.lineTo(hr * 0.75, hr * 0.45); c.closePath(); c.fill();
     c.fillStyle = '#2b5566'; c.beginPath(); c.arc(0, -hr, hr * 0.32, 0, Math.PI * 2); c.arc(0, hr, hr * 0.32, 0, Math.PI * 2); c.fill();
     c.restore();
-    c.fillStyle = '#ffffffaa'; c.font = `${11 * d}px -apple-system, sans-serif`;
-    c.fillText(this.room.name, 8 * d, 16 * d);
+    // labels in the bands above and below the plan, centred on it
+    const [, top] = this.toScreen(0, this.view.y1), [, bot] = this.toScreen(0, this.view.y0), mid = (x0 + x1) / 2;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = '#ffffffcc';
+    let fs = 11, name = this.room.name;
+    c.font = `600 ${fs * d}px -apple-system, sans-serif`;
+    if (c.measureText(name).width > W - 12 * d) name = name.replace(/\s*\(.*\)$/, '');     // drop the "(…)" when it won't fit
+    while (fs > 8 && c.measureText(name).width > W - 12 * d) { fs -= 0.5; c.font = `600 ${fs * d}px -apple-system, sans-serif`; }
+    c.fillText(name, mid, Math.max(9 * d, top / 2));
     if (box) {
       const dist = Math.hypot(L.x - box[0], L.y - box[1], L.z - (this.boxZ || 0.8));
-      c.fillText(`${dist.toFixed(2)} m from the box`, 8 * d, H - 8 * d);
+      c.fillStyle = '#ffffff99'; c.font = `${11 * d}px -apple-system, sans-serif`;
+      c.fillText(`${dist.toFixed(2)} m from the box`, mid, Math.min(H - 9 * d, (bot + H) / 2));
     }
+    c.textAlign = 'start'; c.textBaseline = 'alphabetic';
   }
 }
