@@ -770,7 +770,8 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const fanNom = dp.G_fan * dp.omegaNom;
     const auto = d.mode === 'auto', ham = this.ham;
     if (!this.hourT || (this.hourT -= n) <= 0) { const now = new Date(); this.hourNow = now.getHours() + now.getMinutes() / 60; this.hourT = sr * 30; }
-    ham.behave(n * dt, this.hamHour ?? this.hourNow);      // his body clock follows your local time
+    // his body clock follows your local time (flipped by twelve hours if he's the diurnal mutant)
+    ham.behave(n * dt, this.hamHour ?? ((this.hourNow + (this.ham.opts.diurnal ? 12 : 0)) % 24));
     const gain = 4.0 * this.userGain * (p.gain || 1);
     const lidA = this.lidA, leak = p.lid.leak;
     const tableUnb = p.table && p.table.unbaffled;

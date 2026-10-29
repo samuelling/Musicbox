@@ -82,7 +82,7 @@ export class Hamster {
   constructor(sr) {
     this.sr = sr; this.dt = 1 / sr;
     this.rng = 0x2545f491;
-    this.opts = { mass: HAMSTER.mass, wheel: 'd28', surface: 'rungs', axle: 'bearing', lover: false };
+    this.opts = { mass: HAMSTER.mass, wheel: 'd28', surface: 'rungs', axle: 'bearing', lover: false, diurnal: false };
     this.inWheel = false; this.restT = 0; this.bouts = 0;
     this.derive();
     // state

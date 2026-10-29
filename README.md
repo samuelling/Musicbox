@@ -20,14 +20,14 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
 * **Hamster** — a golden hamster lives in a glass tank beside the box. He sleeps, eats,
   stuffs his cheek pouches and hoards, drinks, grooms, digs, explores and runs. "Hamster" mode
   belts his wheel to the crank through a quarter-twist O-ring; "Place him in the wheel" when
-  he isn't in the mood, "Wheel lover" for a hamster who'd rather run, and a belt-ratio slider
+  he isn't in the mood, "Wheel lover" for a hamster who'd rather run, "Mutant diurnal" for one whose clock is flipped (up by day, asleep by night), and a belt-ratio slider
   for tempo. His gait (walk, trot, half-bound), the forces from his paws, how
   far up the wheel he rides, his bouts and rests (he's nocturnal), heart rate and metabolic
   power are all simulated. His pace is the tempo. "Watch him" leans you in close; "Tap his cage" (or tap the glass) wakes him, and then he does as he likes:
   maybe the wheel, maybe a snack, maybe a pee in his toilet corner. He keeps a toilet corner away from his nest and food. He also yawns, scratches behind his ears, gnaws his
   chew stick, builds up his nest with bedding, peeks out of his house, paces the glass on
   his hind legs, scent-marks along the house, creeps about stretched out when wary, and climbs the ramp to the
-  half tier over his house to look around (or doze up there).
+  half tier over his house to look around, roll in his sand bath, or doze up there.
 * **Music Box** (Tines · Box · Physics) — start from a **box type**: keepsake 30-note, child's plastic
   toy, wooden jewellery box, Swiss 50-note cabinet, grand 72-note, a century-old antique (worn pins, A = 435) or a brass-comb vintage box —
   then change anything. **Tines**: 15-tine diatonic, 30-tine chromatic, 50-tine Swiss with lead-weighted

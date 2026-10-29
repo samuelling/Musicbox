@@ -19,7 +19,7 @@ const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
 
 // ------------------------------------------------------------------ state
-const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 0.75, lover: false, covered: true, vol: 1 }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
+const cfg = { ...DEFAULT_CONFIG, ham: { mass: 0.125, wheel: 'd28', surface: 'rungs', axle: 'bearing', gear: 0.75, lover: false, diurnal: false, nature: 'real', covered: true, vol: 1 }, mode: 'crank', comb: 'c30', enclosure: 'classic', surface: 'oak', room: 'cabin' };
 let song = null;            // compiled tune (onsets)
 let songId = 'brahms';
 let built = null;           // last build result (info, arrangement, combNotes, geom, drive, room)
@@ -96,11 +96,30 @@ function setDrawer(open) {
   const t0 = performance.now(); const step = () => { scene.resize(); if (performance.now() - t0 < 380) requestAnimationFrame(step); }; requestAnimationFrame(step);
   if (open) setTimeout(() => { map.resize(); roll.resize(); strip.resize(); insp.resize(); }, 340);
 }
-$('menuBtn').addEventListener('click', () => setDrawer(!drawer.classList.contains('open')));
 $('drawerClose').addEventListener('click', () => setDrawer(false));
-// swipe the sheet down to close it
-{ let y0 = null; drawer.querySelector('.drawerHead').addEventListener('pointerdown', (e) => { y0 = e.clientY; });
-  window.addEventListener('pointerup', (e) => { if (y0 !== null && e.clientY - y0 > 60) setDrawer(false); y0 = null; }); }
+// the grab tab: tap to slide the drawer open or shut, or drag it and let go
+{
+  const tab = $('menuBtn'); let drag = null;
+  tab.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); try { tab.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ }
+    drag = { x0: e.clientX, w: drawer.getBoundingClientRect().width, open: drawer.classList.contains('open'), moved: false };
+  });
+  tab.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x0; if (Math.abs(dx) > 6) drag.moved = true; if (!drag.moved) return;
+    const off = Math.max(0, Math.min(drag.w, (drag.open ? 0 : drag.w) + dx));
+    drawer.classList.add('dragging'); drawer.style.transform = `translateX(${off}px)`; drag.off = off;
+  });
+  const end = () => {
+    if (!drag) return;
+    drawer.classList.remove('dragging'); drawer.style.transform = '';
+    if (!drag.moved) setDrawer(!drag.open);
+    else setDrawer(drag.off < drag.w * 0.5);
+    drag = null;
+  };
+  tab.addEventListener('pointerup', end); tab.addEventListener('pointercancel', end);
+  tab.addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); setDrawer(!drawer.classList.contains('open')); } });
+}
 window.addEventListener('keydown', (e) => { if (e.code === 'Tab' && !e.target.closest('input, select, textarea, button, summary') && !e.target.closest('#drawer')) { e.preventDefault(); setDrawer(!drawer.classList.contains('open')); } });
 // open by default on wide screens; closed on phones so you see the room
 setDrawer(matchMedia('(min-width: 640px) and (min-aspect-ratio: 5/4)').matches);
@@ -250,7 +269,7 @@ function buildRig() {
   // his life goes on across rebuilds
   if (!life) { life = new HamsterLife(scene.hamRig.layout); life.onWheel = (on, placed) => engine.send({ type: 'hamster', inWheel: on, ...(placed ? { wake: true } : {}) }); }
   else life.setCage(scene.hamRig.layout);
-  life.mode = cfg.ham.lover ? 'lover' : 'real';
+  life.mode = cfg.ham.nature;
   scene.hamLife = life;
   scene.hamRig.setCovered(cfg.ham.covered);
   const M = cfg.ham.mass;
@@ -273,7 +292,7 @@ function tapCage() {
     wheel: 'and he heads straight for the wheel', eat: 'and he stomps off for a snack', pee: 'and he heads for his toilet corner',
     poop: 'and he heads for his toilet corner', groom: 'and he sits up and washes his face, crossly', explore: 'and he potters about, sniffing',
     drink: 'and he goes for a drink', gnaw: 'and he takes it out on his chew stick', surf: 'and he paces the glass on his hind legs',
-    nest: 'and he fusses with his nest', peek: 'and he retreats to peek out of his house', flank: 'and he goes round marking his territory',
+    nest: 'and he fusses with his nest', peek: 'and he retreats to peek out of his house', flank: 'and he goes round marking his territory', sand: 'and he climbs up for a roll in his sand bath',
   };
   const msg = r.what === 'ignore' ? 'Tap! He ignores you and keeps running.' : r.what === 'hopOut' ? 'Tap! He hops out of the wheel to see what that was.'
     : r.what === 'freeze' ? 'Tap! He freezes, eyes wide… then bolts for his house.' : r.what === 'busy' ? 'Tap! He\'s a bit busy right now.' : (r.asleep ? 'Tap! He wakes up, grumpy, ' : 'Tap! He startles, up on his hind legs, ') + (SAY[r.what] || 'and potters about') + '.';
@@ -298,9 +317,14 @@ $('hamGear').addEventListener('input', (e) => {
   cfg.ham.gear = +e.target.value; $('hamGearv').textContent = '×' + cfg.ham.gear.toFixed(2); sendHam();
   clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 200);
 });
-$('hamLover').addEventListener('change', (e) => { cfg.ham.lover = e.target.checked; if (life) life.mode = cfg.ham.lover ? 'lover' : 'real'; sendHam(); syncNature(); });
-function syncNature() { document.querySelectorAll('.hamNature .seg button').forEach((b) => b.classList.toggle('on', (b.dataset.lover === '1') === !!cfg.ham.lover)); }
-document.querySelectorAll('.hamNature .seg button').forEach((b) => b.addEventListener('click', () => { const h = $('hamLover'); h.checked = b.dataset.lover === '1'; h.dispatchEvent(new Event('change')); }));
+// his nature: a real (nocturnal) hamster, a wheel lover, or a mutant who's awake by day and asleep by night
+function setNature(n) {
+  cfg.ham.nature = n; cfg.ham.lover = n === 'lover'; cfg.ham.diurnal = n === 'diurnal';
+  if (life) life.mode = n;
+  sendHam(); syncNature();
+}
+function syncNature() { document.querySelectorAll('.hamNature .seg button').forEach((b) => b.classList.toggle('on', b.dataset.nature === cfg.ham.nature)); }
+document.querySelectorAll('.hamNature .seg button').forEach((b) => b.addEventListener('click', () => setNature(b.dataset.nature)));
 syncNature();
 $('hamWatch').addEventListener('click', () => {
   const on = !$('hamWatch').classList.contains('on');
@@ -353,10 +377,10 @@ function hamText(h) {
   else what = `<b>${life ? life.desc : 'Asleep in his nest'}</b>`;
   if (life && !inW && (life.act === 'sleep' || life.act === 'nap') && life.activity < 0.5) {
     const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    what += ` — it's ${t}; Syrian hamsters sleep through the day and wake around dusk`;
+    what += cfg.ham.nature === 'diurnal' ? ` — it's ${t}; this mutant sleeps through the night and wakes at dawn` : ` — it's ${t}; Syrian hamsters sleep through the day and wake around dusk`;
   }
   const hooked = cfg.mode === 'auto' ? (inW ? '' : ' — the box is waiting for him') : '';
-  return `${what}${hooked}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} tonight`;
+  return `${what}${hooked}<br>♥ ${h.hr.toFixed(0)} bpm · ${h.br.toFixed(0)} breaths/min · ${h.Emet.toFixed(1)} W · ${h.dist >= 1000 ? (h.dist / 1000).toFixed(2) + ' km' : h.dist.toFixed(0) + ' m'} ${cfg.ham.nature === 'diurnal' ? 'today' : 'tonight'}`;
 }
 
 // ------------------------------------------------------------------ listener map

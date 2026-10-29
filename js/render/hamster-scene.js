@@ -535,7 +535,7 @@ export class HamsterRig {
       wheel: { x: xw - cx0, z: zw - cz0, y: yw - this.treadR - yB, entry: { x: xw - cx0, z: zw - cz0 + Wd / 2 + 60 } },
       house: { door: { x: hx, z: hz + 115 }, bed: { x: hx, z: hz + 10 } },
       bowl: { x: this.bowlAt.x, z: this.bowlAt.z }, drink: { x: L - 80, z: this.bottleZ }, dig: { x: (xw - cx0 + Rs + hx - 75) / 2, z: 80 },
-      chew: { ...this.chewAt },
+      chew: { ...this.chewAt }, sand: { ...this.sandAt },
     };
   }
 
@@ -589,6 +589,11 @@ export class HamsterRig {
       const ramp = new THREE.Group(); ramp.position.set(X(Rm.x0 + run / 2), yB + T.h / 2, Z(Rm.z0 + rw2 / 2)); ramp.rotation.z = Rm.up === 'x1' ? ang : -ang; g.add(ramp);
       const board = new THREE.Mesh(new THREE.BoxGeometry(len, 6, rw2), ply); board.position.y = -3; board.castShadow = board.receiveShadow = true; ramp.add(board);
       for (let k = -len / 2 + 14; k < len / 2 - 8; k += 22) { const slat = new THREE.Mesh(new THREE.BoxGeometry(4, 4, rw2 - 6), ply); slat.position.set(k, 2, 0); ramp.add(slat); }
+      // a little dish of chinchilla sand up on the deck
+      this.sandAt = { x: T.x1 - 75, z: T.z0 + 85 };
+      const dish = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [44, 0], [49, 13], [46, 15], [41, 4], [0, 4]].map(([a, b]) => new THREE.Vector2(a, b)), 32), new THREE.MeshStandardMaterial({ color: 0x8fa9b8, roughness: 0.35 }));
+      dish.position.set(X(this.sandAt.x), yB + T.h, Z(this.sandAt.z)); dish.castShadow = dish.receiveShadow = true; g.add(dish);
+      const sand = new THREE.Mesh(new THREE.CircleGeometry(41, 28), new THREE.MeshStandardMaterial({ color: 0xe9dcc0, roughness: 1 })); sand.rotation.x = -Math.PI / 2; sand.position.set(X(this.sandAt.x), yB + T.h + 8, Z(this.sandAt.z)); g.add(sand);
     }
     // an apple-wood chew stick lying in the bedding
     this.chewAt = { x: 560, z: 255 };
