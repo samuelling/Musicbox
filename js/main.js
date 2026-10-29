@@ -1,7 +1,5 @@
 import { Engine } from './audio/engine.js';
 import { strikeMatch } from './audio/match.js';
-import { FireSound, StormSound } from './audio/fire.js';
-import { CABIN_FEATURES } from './render/cabin.js';
 import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physics/hamster.js';
 import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
@@ -133,11 +131,11 @@ function ensureStarted() {
     engine.onRunning = (on) => {
       clearTimeout(snuffTimer);
       scene.audioOn = on;
-      if (on) { scene.lightCandle(); showPrompt(null); updateFire(); }
+      if (on) { scene.lightCandle(); showPrompt(null); }
       else snuffTimer = setTimeout(() => { if (!engine.running) { scene.snuffCandle(); showPrompt('relight'); } }, 700);
     };
     p.then(() => {
-      pushAll(); updateFire();
+      pushAll();
       if (engine.sampleRate !== cfg.sr) { cfg.sr = engine.sampleRate; requestBuild(0); }
     }).catch((e) => { console.error(e); showPrompt('retry', 'Audio failed to start: ' + e.message); });
   }
@@ -160,7 +158,7 @@ function pushAll() {
   engine.send({ type: 'gain', value: +$('vol').value });
   engine.send({ type: 'airBrake', value: cfg.airBrake });
   engine.send({ type: 'listener', listener: { ...map.listener } });
-  sendHam();
+  sendHam(); sendBin();
 }
 
 // ------------------------------------------------------------------ crank pad
@@ -274,37 +272,70 @@ function hamText(h) {
 // ------------------------------------------------------------------ listener map
 const map = new ListenerMap($('map'), (L) => {
   engine.send({ type: 'listener', listener: { x: L.x, y: L.y, z: L.z, yaw: L.yaw } });
-  scene.setListener(L); if (fire) { fire.listen(L); }
+  scene.setListener(L);
   const deg = Math.round(((L.yaw * 180) / Math.PI + 540) % 360 - 180);
   $('yaw').value = deg; $('yawv').textContent = deg + '°';
   updateDist();
 });
+// ---- your ears: headphone type, head size (sets ITD and head shadow), pinna size (pinna echo delays)
+const binCfg = (() => { try { return { mode: 'inear', headC: 57, pinna: 1, ...JSON.parse(localStorage.getItem('musicbox.binaural') || '{}') }; } catch (e) { return { mode: 'inear', headC: 57, pinna: 1 }; } })();
+function sendBin() {
+  // effective sphere radius for ITD: 8.75 cm for a 57 cm head circumference, scaled with it
+  engine.send({ type: 'binaural', bin: { mode: binCfg.mode, headA: 0.0875 * binCfg.headC / 57, pinna: binCfg.pinna } });
+  $('headCv').textContent = `${binCfg.headC} cm around`;
+  $('pinnav').textContent = binCfg.pinna < 0.92 ? 'small' : binCfg.pinna > 1.08 ? 'large' : 'average';
+  $('hpHint').textContent = binCfg.mode === 'inear'
+    ? 'In-ear: the model supplies everything your outer ears would, so each sound path is filtered for its direction (left/right, front/back, up/down) and distance. With AirPods, turn off Spatialize Stereo (Control Center → press and hold the volume slider → Spatial Audio → Off) so iOS does not spatialise it a second time.'
+    : binCfg.mode === 'overear' ? 'Over-ear: your own ears still shape the sound a little, so the outer-ear cues are applied more gently. Turn off any spatial-audio setting on the headphones.'
+    : 'Speakers: the room and box are panned in stereo; your real head and ears do the rest.';
+  try { localStorage.setItem('musicbox.binaural', JSON.stringify(binCfg)); } catch (e) { /* private mode */ }
+}
+$('hpMode').value = binCfg.mode; $('headC').value = binCfg.headC; $('pinna').value = binCfg.pinna;
+$('hpMode').addEventListener('change', (e) => { binCfg.mode = e.target.value; sendBin(); });
+$('headC').addEventListener('input', (e) => { binCfg.headC = +e.target.value; sendBin(); });
+$('pinna').addEventListener('input', (e) => { binCfg.pinna = +e.target.value; sendBin(); });
+sendBin();
+// head tracking from the device's motion sensors (browsers cannot read AirPods' own head tracking):
+// the direction out of the back of the device, from the W3C alpha/beta/gamma rotation, is where you face
+let track = null;
+if (typeof DeviceOrientationEvent === 'undefined') $('trackRow').style.display = 'none';
+function onOrient(ev) {
+  if (!track || ev.alpha == null) return;
+  const d2r = Math.PI / 180, a = ev.alpha * d2r, b = ev.beta * d2r, g = ev.gamma * d2r;
+  const cx = Math.cos(a) * Math.sin(g) + Math.sin(a) * Math.sin(b) * Math.cos(g);
+  const cy = Math.sin(a) * Math.sin(g) - Math.cos(a) * Math.sin(b) * Math.cos(g);
+  const cz = Math.cos(b) * Math.cos(g);
+  const heading = Math.atan2(-cy, -cx), pitch = Math.asin(Math.max(-1, Math.min(1, -cz)));
+  if (track.h0 === null) { track.h0 = heading; return; }
+  track.yaw = track.yaw0 + Math.atan2(Math.sin(heading - track.h0), Math.cos(heading - track.h0));
+  track.pitch = pitch;
+  if (!track.raf) track.raf = requestAnimationFrame(() => {
+    track.raf = 0; if (!track) return;
+    map.listener.yaw = track.yaw; map.emit();
+    if (scene.followListener) scene.lookPitch = track.pitch;
+  });
+}
+$('headTrack').addEventListener('change', async (e) => {
+  if (e.target.checked) {
+    try {
+      if (DeviceOrientationEvent.requestPermission) { const r = await DeviceOrientationEvent.requestPermission(); if (r !== 'granted') throw new Error('not allowed'); }
+    } catch (err) { e.target.checked = false; $('hpHint').textContent = 'Motion access was not allowed, so head tracking is off.'; return; }
+    track = { h0: null, yaw0: map.listener.yaw, yaw: map.listener.yaw, pitch: 0, raf: 0 };
+    map.faceBox = false; $('faceBox').checked = false;
+    window.addEventListener('deviceorientation', onOrient);
+  } else { window.removeEventListener('deviceorientation', onOrient); track = null; }
+});
+
 // follow perspective: the 3D view is your eyes; dragging it turns your head
 $('follow').addEventListener('change', (e) => scene.setFollow(e.target.checked));
 scene.onLook = (d) => {
   map.faceBox = false; $('faceBox').checked = false;
   map.listener.yaw -= d; map.emit();
 };
-// the fireplace crackles (cabin only), heard through an HRTF panner from where you stand
-let fire = null;
-function updateFire() {
-  const cabin = !!ROOMS[cfg.room].cabin;
-  $('fireRow').style.display = cabin ? '' : 'none';
-  if (!engine.ctx || !engine.running) return;
-  if (!fire) { fire = new FireSound(engine.ctx); storm = new StormSound(engine.ctx); fire.listen(map.listener); }
-  const F = CABIN_FEATURES.fireplace, W = CABIN_FEATURES.window;
-  fire.place(0.35, (F.y0 + F.y1) / 2, 0.55);
-  storm.place((W.x0 + W.x1) / 2, ROOMS[cfg.room].dims[1] + 0.3, (W.z0 + W.z1) / 2);
-  fire.set(cabin && $('fireOn').checked, +$('vol').value);
-  storm.set(cabin && $('stormOn').checked, +$('vol').value);
-}
-let storm = null;
-$('fireOn').addEventListener('change', updateFire);
-$('stormOn').addEventListener('change', updateFire);
 $('faceBox').addEventListener('change', (e) => { map.faceBox = e.target.checked; map.emit(); });
 $('earH').addEventListener('input', (e) => { map.listener.z = +e.target.value; $('earHv').textContent = (+e.target.value).toFixed(2) + ' m'; map.emit(); });
 $('yaw').addEventListener('input', (e) => { map.faceBox = false; $('faceBox').checked = false; map.listener.yaw = (+e.target.value * Math.PI) / 180; $('yawv').textContent = e.target.value + '°'; map.emit(); });
-$('vol').addEventListener('input', (e) => { engine.send({ type: 'gain', value: +e.target.value }); updateFire(); });
+$('vol').addEventListener('input', (e) => engine.send({ type: 'gain', value: +e.target.value }));
 function updateDist() {
   if (!built) return;
   const L = map.listener, b = built.room.boxPos;
@@ -547,7 +578,6 @@ function refreshAfterBuild() {
   map.setRoom(room, built.room.boxPos, surf.plate ? [surf.plate.a, surf.plate.b] : null, built.room.held);
   scene.placeRoom({ dims: room.dims, boxPos: built.room.boxPos, boxYaw: built.room.boxYaw, tableTop: built.room.tableTop, held: built.room.held, cabin: !!room.cabin });
   scene.setListener(map.listener);
-  updateFire();
   if (placeListenerNextBuild) {
     placeListenerNextBuild = false;
     const [X, Y] = room.dims;

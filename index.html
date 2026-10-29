@@ -62,8 +62,6 @@
         <label>Room <select id="room"></select></label>
         <label class="chk"><input type="checkbox" id="faceBox" checked> Face the box</label>
         <label class="chk"><input type="checkbox" id="follow"> Follow perspective <span class="small">(see from where you stand)</span></label>
-        <span id="fireRow" style="display:contents"><label class="chk"><input type="checkbox" id="fireOn" checked> Fire crackling</label>
-        <label class="chk"><input type="checkbox" id="stormOn" checked> Storm outside</label></span>
       </div>
       <div class="mapWrap"><canvas id="map"></canvas></div>
       <p class="small">Drag your head around the room. Two-finger twist (or the dial) turns it. With Follow perspective on, the 3D view is your eyes: drag on it to look around. Distance, direction, the floor and walls, your head's shadow and air absorption are all computed.</p>
@@ -71,6 +69,14 @@
         <label class="grow">Ear height <input type="range" id="earH" min="0.3" max="1.9" step="0.01" value="1.2"><span id="earHv">1.20 m</span></label>
         <label class="grow">Facing <input type="range" id="yaw" min="-180" max="180" step="1" value="90"><span id="yawv">90°</span></label>
       </div>
+      <h3>Your ears <span class="small">a head-related transfer function for every sound path</span></h3>
+      <div class="row">
+        <label>Listening on <select id="hpMode"><option value="inear">In-ear (AirPods, earbuds)</option><option value="overear">Over-ear headphones</option><option value="speakers">Speakers</option></select></label>
+        <label class="grow">Head size <input type="range" id="headC" min="50" max="64" step="0.5" value="57"><span id="headCv">57 cm around</span></label>
+        <label class="grow">Ear size <input type="range" id="pinna" min="0.8" max="1.25" step="0.01" value="1"><span id="pinnav">average</span></label>
+      </div>
+      <label class="chk" id="trackRow"><input type="checkbox" id="headTrack"> Head tracking: turn your device to turn your head</label>
+      <p class="small" id="hpHint"></p>
       <div class="row">
         <label class="grow">Volume <input type="range" id="vol" min="0" max="4" step="0.01" value="1"></label>
         <div id="distTxt" class="readout">—</div>

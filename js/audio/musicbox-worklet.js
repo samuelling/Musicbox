@@ -46,6 +46,9 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     this.meter = [0, 0];
     this.limEnv = 0; this.limRel = Math.exp(-1 / (0.08 * sampleRate));
     this.ham = new Hamster(sampleRate); this.hamHour = null;
+    // how you are listening: in-ear (full structural HRTF), over-ear (your own pinna helps a
+    // little), or loudspeakers (plain stereo panning); head radius and pinna scale
+    this.bin = { mode: 'inear', headA: HEAD_A, pinna: 1 };
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
 
@@ -74,6 +77,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
       case 'noise': this.noiseLevel = m.value; break;
       case 'gain': this.userGain = m.value; break;
       case 'setTurns': d.turns = m.turns; break;
+      case 'binaural': Object.assign(this.bin, m.bin); this.listenerDirty = true; break;
       case 'hamster':
         if (m.opts) { this.ham.set(m.opts); if (this.p) this.setupBelt(); }
         if (m.hour !== undefined) this.hamHour = m.hour;
@@ -188,6 +192,10 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     this.pAir = new Float64Array(P); this.pAirZ = new Float64Array(P);
     this.pB0 = new Float64Array(P).fill(1); this.pB1 = new Float64Array(P); this.pA1 = new Float64Array(P);
     this.pX1 = new Float64Array(P); this.pY1 = new Float64Array(P);
+    // structural HRTF per path and ear: 5 pinna echoes + a shoulder echo, read from a short ring
+    this.pRing = new Float64Array(P * 128); this.pRi = 0;
+    this.pTapD = new Float64Array(P * 6); this.pTapG = new Float64Array(P * 6);
+    this.pSh = new Float64Array(P); this.pRear = new Float64Array(P); this.pRearZ = new Float64Array(P);
     this.pFirst = true;
     this.renderTail = Math.round(((2 * Math.hypot(X, Y, Z)) / C) * this.sr) + 2048;
     // reverb
@@ -260,7 +268,10 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
     const cb = Math.cos(boxYaw), sb = Math.sin(boxYaw);
     const H = [L.x, L.y, L.z];
     const cosW = Math.cos((TWO_PI * 8000) / this.sr);
-    const tau = 1 / (2 * (C / HEAD_A)), K2 = 2 * this.sr;
+    const bin = this.bin, A_HEAD = bin.headA, spk = bin.mode === 'speakers';
+    const pinnaK = spk ? 0 : bin.mode === 'overear' ? 0.6 : 1;
+    const tau = 1 / (2 * (C / A_HEAD)), K2 = 2 * this.sr, sScale = (this.sr / 44100) * bin.pinna;
+    const RHO_P = [0.5, -1, 0.5, -0.25, 0.25], AP = [1, 5, 5, 5, 5], BP = [2, 4, 7, 11, 13], DP = [1, 0.6, 0.6, 0.6, 0.6];
     let pi = 0;
     const doSet = (src, imgs, bottom) => {
       for (const [axis, plane, bL, bH] of imgs) {
@@ -273,13 +284,34 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         // mirrored direction into the (unmirrored) box frame
         const mx = vx * m[0], my = vy * m[1], mz = vz * m[2];
         const bx = cb * mx + sb * my, by = -sb * mx + cb * my, bz = mz;
+        // direction of arrival in head coordinates
+        const uf = -(vx * fx + vy * fy), ur = -(vx * rx + vy * ry), uu = -vz;
+        const polar = Math.atan2(uu, uf) * 180 / Math.PI;                  // 0 front, 90 up, ±180 behind
+        const front = Math.abs(polar) <= 90;
+        const elev = front ? polar : (polar > 0 ? 180 - polar : -180 - polar); // pinna cues are front/back folded
+        const rear = Math.min(1, Math.max(0, (Math.abs(polar) - 75) / 60));
         for (let ear = 0; ear < 2; ear++) {
           const ex = ear ? rx : -rx, ey = ear ? ry : -ry;
           const cosT = -(ex * vx + ey * vy);      // ear axis vs direction to source
           const th = Math.acos(Math.max(-1, Math.min(1, cosT)));
-          const extra = th < Math.PI / 2 ? -HEAD_A * cosT : HEAD_A * (th - Math.PI / 2);
+          const extra = spk ? 0 : th < Math.PI / 2 ? -A_HEAD * cosT : A_HEAD * (th - Math.PI / 2);
           this.pDelayT[pi] = Math.min(DL - 8, ((rr + extra) / C) * this.sr);
-          const g = bL;
+          // near field: each ear's own distance sets its level (the held box is 30 cm away)
+          let g = bL * (spk ? Math.SQRT2 * Math.sqrt(0.5 * (1 + (ear ? ur : -ur))) : rr / Math.max(0.05, rr + extra));
+          // Brown & Duda structural pinna: echoes whose delays depend on elevation and lateral angle
+          const lat = Math.abs(Math.asin(Math.max(-1, Math.min(1, ear ? ur : -ur)))) * 180 / Math.PI;
+          const d2r = Math.PI / 180;
+          for (let q = 0; q < 5; q++) {
+            this.pTapD[pi * 6 + q] = Math.max(0.5, (AP[q] * Math.cos(lat * d2r / 2) * Math.sin(DP[q] * (90 - elev) * d2r) + BP[q]) * sScale);
+            this.pTapG[pi * 6 + q] = RHO_P[q] * pinnaK * (ear ? 1 : 1) * (0.55 + 0.45 * Math.cos(lat * d2r * 0.5));
+          }
+          // shoulder/torso reflection for sound from above, ~0.3–1.2 ms later
+          const tsh = 1.2e-3 * ((180 - lat) / 180) * Math.max(0.15, 1 - 0.00004 * Math.pow((elev - 80) * 180 / (180 + lat), 2));
+          this.pTapD[pi * 6 + 5] = Math.min(120, tsh * this.sr);
+          this.pTapG[pi * 6 + 5] = spk ? 0 : 0.3 * Math.max(0, Math.min(1, (elev + 30) / 60)) * pinnaK;
+          this.pRear[pi] = spk ? 0 : rear * 0.55;
+          // reflections arrive diffuse-ish and later: three pinna echoes are enough for them (saves CPU)
+          if (pi >= 2) { this.pTapG[pi * 6 + 3] = 0; this.pTapG[pi * 6 + 4] = 0; this.pTapG[pi * 6 + 5] = 0; }
           const o = pi * 7;
           this.pGT[o] = (RHO / (4 * Math.PI * rr)) * g;
           if (!bottom) {
@@ -298,8 +330,8 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
             a = Math.min(0.999, Math.max(0, a));
           }
           this.pAir[pi] = a;
-          // Brown–Duda spherical-head shadow
-          const al = 1.05 + 0.95 * Math.cos((th / (150 * Math.PI / 180)) * Math.PI);
+          // Brown–Duda spherical-head shadow (none on loudspeakers: your real head does that)
+          const al = spk ? 1 : 1.05 + 0.95 * Math.cos((th / (150 * Math.PI / 180)) * Math.PI);
           const at = al * tau * K2, t1 = tau * K2;
           this.pB0[pi] = (1 + at) / (1 + t1); this.pB1[pi] = (1 - at) / (1 + t1); this.pA1[pi] = (1 - t1) / (1 + t1);
           pi++;
@@ -847,10 +879,24 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         }
         const a = this.pAir[k];
         const ya = (1 - a) * x + a * this.pAirZ[k]; this.pAirZ[k] = ya;
-        const ys = this.pB0[k] * ya + this.pB1[k] * this.pX1[k] - this.pA1[k] * this.pY1[k];
+        let ys = this.pB0[k] * ya + this.pB1[k] * this.pX1[k] - this.pA1[k] * this.pY1[k];
         this.pX1[k] = ya; this.pY1[k] = ys;
-        if (k & 1) yr += ys; else yl += ys;
+        // pinna echoes and the shoulder reflection, from a short per-path ring buffer
+        const rb = k * 128, ri = this.pRi;
+        this.pRing[rb + ri] = ys;
+        const tb = k * 6;
+        let yp = ys;
+        for (let q = 0; q < 6; q++) {
+          const gq = this.pTapG[tb + q]; if (gq === 0) continue;
+          const dq = this.pTapD[tb + q], ip = Math.floor(dq), fq = dq - ip;
+          yp += gq * (this.pRing[rb + ((ri - ip) & 127)] * (1 - fq) + this.pRing[rb + ((ri - ip - 1) & 127)] * fq);
+        }
+        // behind you the pinna flap shades the highs
+        const rr0 = this.pRear[k];
+        if (rr0 > 0) { const z = (this.pRearZ[k] += 0.45 * (yp - this.pRearZ[k])); yp = yp - rr0 * (yp - z); }
+        if (k & 1) yr += yp; else yl += yp;
       }
+      this.pRi = (this.pRi + 1) & 127;
       if (rev) {
         const pre = (w - rev.pre) & DM;
         const xin = (RHO / (4 * Math.PI)) * (lines[0][pre] + lines[7][pre] * 0.7 + (Math.abs(lines[6][pre]) + 0.7 * lines[5][pre]) / C);

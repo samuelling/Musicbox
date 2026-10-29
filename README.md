@@ -32,8 +32,7 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   soundboard, or a Swiss rosewood cabinet. Lid open or closed. Set it on oak (with
   or without felt feet), glass, marble or a spruce resonance box, or hold it in
   your hand.
-* **Listen** — by default you're in a timber hut in the Alps, snowed in by a storm (fire
-  crackling, wind outside). "Follow perspective" makes the 3D view your eyes. Or drag your head around a nursery, living room, parlour, stone chapel,
+* **Listen** — by default you're in a timber hut in the Alps, snowed in by a storm. "Follow perspective" makes the 3D view your eyes. Sound is rendered binaurally with a structural HRTF (head, pinna, shoulder) on every path — choose in-ear (AirPods), over-ear or speakers, set your head and ear size, and turn your device to turn your head. Or drag your head around a nursery, living room, parlour, stone chapel,
   garden or anechoic chamber; turn it with two fingers. Distance, direction,
   reflections, Doppler and head shadow are all simulated. The header shows the dB
   SPL at your ears.

@@ -456,6 +456,53 @@ All radiators are written into 8 delay lines (Ṁ, Ḋ_xyz, D̈_xyz, table-botto
   box measures.
 
 
+
+### Your ears: a structural HRTF on every path
+
+The sound reaching you is rendered as binaural audio, one signal per ear. Each path is
+filtered for the direction it arrives from relative to your head, then summed per ear. There
+is one path for the direct sound and one for each first-order reflection off the table, floor,
+walls and ceiling. The filtering follows Brown & Duda's structural model (1998), built from
+physical parts.
+
+- **Head.** A sphere of radius a, by default 8.75 cm, scaled with the head circumference
+  you set. Woodworth's formula gives the interaural time difference (ITD), up to about
+  0.66 ms at 90°. Brown & Duda's one-pole/one-zero shadow filter gives the level difference
+  (ILD), up to about 15 dB at high frequencies on the far side. Each ear also uses its own
+  distance to the source, so near sources such as the box held in your hands have the
+  larger ILD of the near field.
+- **Pinna.** Five echoes with gains (0.5, −1, 0.5, −0.25, 0.25). Their delays are
+  τ = A cos(θ/2) sin(D(90° − φ)) + B, in samples at 44.1 kHz, with A = (1, 5, 5, 5, 5) and
+  B = (2, 4, 7, 11, 13), scaled by the ear size you set. These echoes cut the elevation-
+  dependent notches at 6–12 kHz that tell up from down. Front/back is folded into elevation.
+  For sources behind you, a one-pole shelf adds the high-frequency shadow of the pinna flap.
+  The echo gains sum to 1, so the model is flat at low frequency; it is not given a fixed
+  concha boost, because headphones are already tuned to a diffuse-field-like target.
+- **Shoulder.** For sound from above, a reflection about 0.3–1.2 ms later, using Brown &
+  Duda's elevation formula.
+
+**Headphone and speaker settings.**
+
+- **In-ear headphones** bypass your own outer ear, so they get the full model.
+- **Over-ear headphones** apply the pinna cues at 60 %, because your own pinna contributes
+  a little.
+- **Speakers** turn the binaural processing off and pan in stereo; your real head does the
+  rest.
+
+**Cost.** Reflections use the first three pinna echoes only, which keeps the cost down;
+they arrive later and more diffuse.
+
+**Measured versus modelled HRTFs.** Measured HRTFs, such as KEMAR or CIPIC, are
+individual and long. The structural model is parametric, cheap enough to run on every path
+at the audio rate, and its parameters (head size, ear size) can be fitted to you.
+
+**Head tracking.** Browsers cannot read AirPods' head tracking. With "Head tracking" on,
+the direction out of the back of your iPad or iPhone, computed from its orientation sensor,
+becomes your facing. Turning the device turns your head in the room.
+
+**AirPods setting.** With AirPods, set Spatial Audio to Off (not Fixed or Head Tracked) so
+iOS does not spatialise the result a second time.
+
 ## 8b. The cabin, and hearing from where you stand
 
 The default room is a farmer's hut in the Alps on a stormy night: 5.8 × 4.6 × 2.5 m. Its
@@ -474,16 +521,6 @@ from the room map are mapped into the scene through the same room → box transf
 acoustics use. So what you see and what you hear come from the same place. Dragging the
 view turns your head, which updates the acoustic listener; with "face the box" on, your
 gaze tilts to the box.
-
-**Ambient sounds.**
-
-- **Fire:** a synthesised crackle (resin pops, gas hiss, flame roar) through an HRTF panner
-  at the hearth.
-- **Storm:** gusting wind with a howl whose pitch follows the gusts, and sleet ticking on the
-  glass. It is low-passed by the walls and panned at the window.
-
-Both are Web Audio sources outside the physical model. They are atmosphere, not part of the
-box's radiation.
 
 ## 9. Melodies on a cylinder
 
