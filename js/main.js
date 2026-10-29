@@ -179,8 +179,9 @@ const pad = new CrankPad($('pad'), $('padCanvas'), {
 function setCovered(on) {
   cfg.ham.covered = on;
   if (scene.hamRig) scene.hamRig.setCovered(on);
-  if (on && life && life.where === 'wheel') { life.where = 'cage'; life.act = 'sleep'; life.timer = 60; life.x = life.cage.house.bed.x; life.z = life.cage.house.bed.z; life.y = 0; }
-  engine.send({ type: 'hamster', silent: on, ...(on ? { inWheel: false } : {}) });
+  // under the blanket he settles down to sleep in his nest, whatever he was doing
+  if (on && life) { if (life.where === 'wheel' && life.onWheel) life.onWheel(false); life.where = 'cage'; life.act = 'sleep'; life.plan = []; life.timer = 60; life.x = life.cage.house.bed.x; life.z = life.cage.house.bed.z; life.y = 0; life.v = 0; }
+  engine.send({ type: 'hamster', silent: on, ...(on ? { inWheel: false, stopWheel: true } : {}) });
   if (on && cfg.mode === 'auto') setMode('crank');
   // the first time the blanket comes off, Frisky is lifted straight into his wheel
   if (!on && !unveiled) { unveiled = true; const put = (k) => { if (life) life.placeInWheel(); else if (k < 20) setTimeout(() => put(k + 1), 250); }; setTimeout(() => put(0), 700); }
@@ -197,6 +198,8 @@ function setMode(mode) {
   $('pad').classList.toggle('hidden', mode === 'auto');
   if ($('follow').checked && scene.everLit) settleEyes();
   if (mode === 'auto') {
+    // Hamster play style: he's lifted into the wheel to drive the box (he may hop out later, as hamsters do)
+    if (unveiled && life && life.where !== 'wheel') setTimeout(() => { if (cfg.mode === 'auto' && life && life.where !== 'wheel') life.placeInWheel(); }, 600);
     sendHam(); $('hamWatch').classList.remove('on'); $('hamWatch').innerHTML = '<span class="ic">👀</span>Watch him';
     // the first time you meet him, make it plain he can be put to work, watched, or put to bed
     try { if (!localStorage.getItem('musicbox.metHer')) { localStorage.setItem('musicbox.metHer', '1'); $('hamInfo').classList.add('intro'); setTimeout(() => $('hamInfo').classList.remove('intro'), 9000); } } catch (e) { /* private mode */ }
@@ -245,9 +248,21 @@ $('hamCover').addEventListener('click', () => setCovered(true));
 function tapCage() {
   if (!life) return;
   if (cfg.ham.covered) { setCovered(false); return; }
-  const what = life.tap();
+  const r = life.tap();
   const b = $('hamTap'); b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 400);
-  return what;
+  const SAY = {
+    wheel: 'and he heads straight for the wheel', eat: 'and he stomps off for a snack', pee: 'and he heads for his toilet corner',
+    poop: 'and he heads for his toilet corner', groom: 'and he sits up and washes his face, crossly', explore: 'and he potters about, sniffing',
+    drink: 'and he goes for a drink',
+  };
+  const msg = r.what === 'ignore' ? 'Tap! He ignores you and keeps running.' : r.what === 'hopOut' ? 'Tap! He hops out of the wheel to see what that was.'
+    : r.what === 'busy' ? 'Tap! He\'s a bit busy right now.' : (r.asleep ? 'Tap! He wakes up, grumpy, ' : 'Tap! He startles, up on his hind legs, ') + (SAY[r.what] || 'and potters about') + '.';
+  toast(msg);
+  return r;
+}
+function toast(text) {
+  let t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; $('stage').appendChild(t); }
+  t.textContent = text; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 3200);
 }
 $('hamTap').addEventListener('click', () => { ensureStarted(); tapCage(); });
 scene.onTapCage = () => { ensureStarted(); tapCage(); };
@@ -308,6 +323,7 @@ function hamText(h) {
   let what;
   if (inW && h.state === 'run') what = `<b>${({ walk: 'Walking', trot: 'Trotting', bound: 'Half-bounding' })[h.gait]}</b> in the wheel, ${(Math.abs(h.v) * 3.6).toFixed(1)} km/h${h.slip ? ' · paws slipping' : ''}`;
   else if (inW) what = `<b>Pausing</b> in the wheel`;
+  else if (cfg.ham.covered) what = '<b>Under the blanket</b>, fast asleep in his nest';
   else what = `<b>${life ? life.desc : 'Asleep in his nest'}</b>`;
   if (life && !inW && (life.act === 'sleep' || life.act === 'nap') && life.activity < 0.5) {
     const t = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -391,7 +407,7 @@ function leanPose(L, b, dist = 0.3, up = 0.32) {
 // where your eyes go: the box, Frisky, or the whole rig (between them), in room coordinates
 function gazePoint(kind) {
   if (kind === 'box' || !scene.hamRig) return built && built.room.boxPos;
-  return scene.toRoom(scene.gazeWorld());
+  return scene.toRoom(scene.gazeWorld(kind));
 }
 function gazeAt(kind) {
   scene.gaze = kind; scene.lookPitch = null;
@@ -490,7 +506,7 @@ function walkLoop() {
     const f = (held('KeyW') || P.has('fwd') ? 1 : 0) - (held('KeyS') || P.has('back') ? 1 : 0);
     const sd = (held('KeyD') || P.has('sr') ? 1 : 0) - (held('KeyA') || P.has('sl') ? 1 : 0);
     const look = (P.has('lu') || held('ArrowUp') ? 1 : 0) - (P.has('ld') || held('ArrowDown') ? 1 : 0);
-    const turn = (held('KeyQ') || held('ArrowLeft') || P.has('tl') ? 1 : 0) - (held('KeyE') || held('ArrowRight') || P.has('tr') ? 1 : 0);
+    const turn = (held('ArrowLeft') || P.has('tl') ? 1 : 0) - (held('ArrowRight') || P.has('tr') ? 1 : 0);
     let moved = false;
     if (look) scene.tilt(look * 0.8 * dt);      // through your eyes: look up or down; otherwise tilt the view
     if (turn) { map.faceBox = false; $('faceBox').checked = false; L.yaw += turn * 1.5 * dt; moved = true; }
@@ -531,7 +547,7 @@ const release = () => { const a = document.activeElement; if (a && a !== documen
 document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') e.target.blur(); }, true);
 document.addEventListener('pointerup', (e) => { const t = e.target; if (t && (t.type === 'range' || t.tagName === 'BUTTON')) setTimeout(() => t.blur(), 0); }, true);
 $('view').addEventListener('pointerdown', release);
-const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { release(); return; }
   if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -539,13 +555,14 @@ window.addEventListener('keydown', (e) => {
   const t = e.target;
   if (ARROWS.has(e.code) && t && (t.tagName === 'SELECT' || t.type === 'range') && t.matches(':focus-visible')) return;
   if (WALK_KEYS.has(e.code)) { e.preventDefault(); walk.keys.add(e.code); lean = null; litKey(e.code, true); walkLoop(); return; }
+  // Q zooms out, E zooms in (hold to keep zooming), as do − and +
+  if (e.code === 'KeyQ' || e.code === 'Minus' || e.code === 'NumpadSubtract') { scene.dolly(1.12); litKey(e.code, true); return; }
+  if (e.code === 'KeyE' || e.code === 'Equal' || e.code === 'NumpadAdd') { scene.dolly(0.89); litKey(e.code, true); return; }
   if (e.repeat) return;
   if (e.code === 'Space' && e.target.tagName !== 'BUTTON') { e.preventDefault(); posture(+1); }
   else if (e.code === 'KeyC') posture(-1);
-  else if (e.code === 'Equal' || e.code === 'NumpadAdd') scene.dolly(0.8);
-  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') scene.dolly(1.25);
 });
-const litKey = (code, on) => document.querySelectorAll(`.keys [data-key="${code}"]`).forEach((k) => k.classList.toggle('held', on));
+const litKey = (code, on) => document.querySelectorAll(`.navCtl [data-key="${code}"]`).forEach((k) => k.classList.toggle('held', on));
 window.addEventListener('keyup', (e) => { walk.keys.delete(e.code); litKey(e.code, false); });
 window.addEventListener('blur', () => { walk.keys.clear(); walk.pad.clear(); document.querySelectorAll('[data-move].held').forEach((b) => b.classList.remove('held')); });
 document.querySelectorAll('button[data-move]').forEach((b) => {

@@ -84,6 +84,7 @@ class MusicBoxProcessor extends AudioWorkletProcessor {
         if (m.inWheel !== undefined) this.ham.setInWheel(m.inWheel);
         if (m.silent !== undefined) this.ham.silent = m.silent;
         if (m.vol !== undefined) this.hamVol = m.vol;
+        if (m.stopWheel) this.ham.ww = 0;            // the blanket goes over: the empty wheel is stilled
         if (m.wake) this.ham.wake();
         break;
       case 'seek': d.theta = m.theta; d.thetaMod = ((m.theta % TWO_PI) + TWO_PI) % TWO_PI; this.initPointers(); break;

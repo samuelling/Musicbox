@@ -79,14 +79,26 @@ export class HamsterLife {
   // a tap on the glass: asleep, he wakes (and stays up a while); awake, he startles and rears up.
   // Then he does whatever he likes: maybe the wheel, maybe not. Returns what he chose.
   tap() {
-    this.roused = 180; this.awake = true;
-    if (this.where === 'wheel' || ['lifted', 'climbIn', 'climbOut'].includes(this.act)) return 'busy';
+    // irritated awake: he stays up and busy for a while (longer if you keep tapping)
+    this.irritation = Math.min(3, (this.irritation || 0) + 1);
+    this.roused = 90 + 60 * this.irritation; this.awake = true;
+    if (['lifted', 'climbIn', 'climbOut'].includes(this.act)) return { what: 'busy' };
+    if (this.where === 'wheel') {
+      if (Math.random() < 0.5) return { what: 'ignore' };
+      // he hops out to see what that was
+      this.wheelCap = 0; this.where = 'cage'; this.act = 'climbOut'; this.onWheel && this.onWheel(false);
+      this.climb = { t: 0 }; const c = this.cage; this.x = c.wheel.x; this.z = c.wheel.z; this.y = c.wheel.y; this.h = 0;
+      this.plan = [{ act: 'startle', dur: 1.2 }, ...this.planFor(pick({ explore: 0.5, groom: 0.3, eat: 0.2 }))];
+      return { what: 'hopOut' };
+    }
     const asleep = this.act === 'sleep' || this.act === 'nap';
-    const choice = pick(this.mode === 'lover' ? { wheel: 0.7, eat: 0.1, groom: 0.05, pee: 0.05, poop: 0.05, explore: 0.05 } : { wheel: 0.3, pee: 0.14, poop: 0.12, eat: 0.16, groom: 0.1, explore: 0.1, drink: 0.08 });
-    const c = this.cage, atNest = Math.hypot(this.x - c.house.bed.x, this.z - c.house.bed.z) < 30;
-    this.plan = [...(asleep && atNest ? [{ act: 'walk', to: c.house.door }] : []), ...this.planFor(choice)];
-    this.start(asleep ? { act: 'wake', dur: 2.2 } : { act: 'startle', dur: 1.3 });
-    return choice;
+    const w = this.mode === 'lover' ? { wheel: 0.7, eat: 0.1, groom: 0.05, pee: 0.05, poop: 0.05, explore: 0.05 } : { wheel: 0.3, pee: 0.14, poop: 0.12, eat: 0.16, groom: 0.1, explore: 0.1, drink: 0.08 };
+    const choice = pick(w), c = this.cage, atNest = Math.hypot(this.x - c.house.bed.x, this.z - c.house.bed.z) < 30;
+    // a grumpy first thing, then a couple more (unless it's the wheel, which he stays on a while)
+    const then = choice === 'wheel' ? [] : this.planFor(pick({ explore: 0.35, groom: 0.25, eat: 0.2, dig: 0.2 }));
+    this.plan = [...(asleep && atNest ? [{ act: 'walk', to: c.house.door }] : []), ...this.planFor(choice), ...then];
+    this.start(asleep ? { act: 'wake', dur: 1.6 } : { act: 'startle', dur: 1.3 });
+    return { what: choice, asleep };
   }
 
   // ---- planning ----
@@ -148,7 +160,7 @@ export class HamsterLife {
     const c = this.cage;
     if (!audioOn && !this.awake) { this.pose = { curl: 1 }; this.v = 0; return; }
     if (audioOn && !this.awake) this.wakeUp();
-    this.timer -= dt; if (this.roused > 0) this.roused -= dt;
+    this.timer -= dt; if (this.roused > 0) this.roused -= dt; else this.irritation = 0;
     this.pose = {};
     this.v = 0;
     switch (this.act) {

@@ -34,7 +34,7 @@ export class MusicBoxScene {
     this.controls.enableDamping = true; this.controls.target.set(0, 12, 0);
     this.dirty = 3;
     this.controls.addEventListener('change', () => { this.dirty = Math.max(this.dirty, 2); });
-    this.controls.addEventListener('start', () => { this.camAnim = null; this.zoomAnim = null; });
+    this.controls.addEventListener('start', () => { const A = this.camAnim; this.camAnim = null; this.zoomAnim = null; if (A && A.done) A.done(); });   // a move that was taking you somewhere (into your eyes) finishes at once
     this.controls.minDistance = 25; this.controls.maxDistance = 9000;
     const hemi = (this.hemi = new THREE.HemisphereLight(0x8a7a6a, 0x120c08, 0.16)); this.scene.add(hemi);
     const key = (this.keyLight = new THREE.DirectionalLight(0x9db4ff, 0.32));   // moonlight through a window
@@ -811,10 +811,10 @@ export class MusicBoxScene {
     this.camAnim = { t: 0, t0: performance.now(), dur, fromT: this.controls.target.clone(), fromP: this.camera.position.clone(), tgt, pos, fov0: this.camera.fov, fov1: fovTo };
   }
   // what your eyes settle on when you aren't steering them: the box, the hamster, or between the two
-  gazeWorld() {
+  gazeWorld(kind = this.gaze) {
     const box = this.tipWorld || new THREE.Vector3();
-    if (this.gaze === 'ham' && this.hamRig) return this.hamRig.focus();
-    if (this.gaze === 'rig' && this.hamRig) return box.clone().lerp(this.hamRig.focus(), 0.5);
+    if (kind === 'ham' && this.hamRig) return this.hamRig.focus();
+    if (kind === 'rig' && this.hamRig) return box.clone().lerp(this.hamRig.focus(), 0.5);
     return box;
   }
   toRoom(v) { const q = this.roomInner.worldToLocal(v.clone()); return [q.x / 1000, q.z / 1000, q.y / 1000]; }
