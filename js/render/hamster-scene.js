@@ -558,10 +558,8 @@ export class HamsterRig {
     const pine = new THREE.MeshStandardMaterial({ color: 0xc89a62, roughness: 0.75 });
     const shell = (w, h, d, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pine); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; hut.add(b); };
     shell(150, 110, 10, 0, 55, -55); shell(10, 110, 120, -70, 55, 0); shell(10, 110, 120, 70, 55, 0);
-    // front with a round door: two jambs, a lintel, and a dark doorway disc
+    // front: two jambs and a lintel around an open doorway, so you can see her inside
     shell(45, 110, 10, -52, 55, 60); shell(45, 110, 10, 52, 55, 60); shell(60, 34, 10, 0, 93, 60);
-    const doorway = new THREE.Mesh(new THREE.CircleGeometry(31, 24, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a1a0e, roughness: 1, side: THREE.DoubleSide }));
-    doorway.position.set(0, 46, 56); hut.add(doorway);
     for (const s of [-1, 1]) { const r = new THREE.Mesh(new THREE.BoxGeometry(170, 10, 100), pine); r.position.set(0, 140, s * 35); r.rotation.x = s * 0.6; r.castShadow = true; hut.add(r); }
     const hay = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xc8b060, roughness: 1 })); hay.scale.set(60, 18, 45); hay.position.set(0, 4, -5); hut.add(hay);
     this.hut = hut;
