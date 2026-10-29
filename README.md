@@ -45,7 +45,10 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   Settings slide in from ☰ Settings (Tab on a keyboard): a side panel on a wide screen, the whole screen on a phone.
   Or play in a nursery (a cuckoo clock), a living room (a mantel clock), a wood-panelled parlour
   (a longcase clock with the real phase of the moon), a stone chapel (a great painted dial) or an
-  anechoic chamber (a lab clock). Every clock shows the real time. Moving about borrows Ashland's
+  anechoic chamber (a lab clock). Every clock shows the real time. Every door is locked from the inside (the hut's barred with a beam; the nursery's chained,
+  deadbolted and a chair wedged under the knob; the chapel's barred and chained; the anechoic chamber has only a
+  ladder up to a sealed, padlocked hatch). From 1 December to Epiphany the hut has a Swiss Christmas tree in the
+  corner, strung with C9 bulbs, and a garland on the mantel (Listener → 🎄 Christmas decorations, any time of year). Moving about borrows Ashland's
   controls. At a desk: W A S D walks (Shift hurries), and a click on an empty part of the room hands it the mouse,
   so the mouse looks around and a click acts on whatever the dot in the middle is on; Esc frees the mouse, and Tab
   opens the settings (letting go of it) and closes them again (taking it back). ← → ↑ ↓ turn and look too, and the

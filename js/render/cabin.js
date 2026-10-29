@@ -3,6 +3,7 @@
 // millimetres with x = room x, y = height, z = room y (so it lines up with the acoustic room).
 import * as THREE from 'three';
 import { lockedDoor, mountDoor } from './doors.js';
+import { swissTree, garland } from './christmas.js';
 import { woodMaterial } from './materials.js';
 import { regulator, wallMount } from './clocks.js';
 
@@ -434,6 +435,8 @@ export class Cabin {
     // an Alpine watercolour over the mantel, in a carved Swiss frame; the alphorn in the corner
     wallMount(g, [RX, RY], { g: framedWatercolour() }, 'x0', fc, hearthH + openH + 640, fd + 2);
     const horn = alphorn(); horn.position.set(110, 0, RY - 110); horn.rotation.y = Math.PI / 4; g.add(horn);
+    // where Christmas goes (built the first time it's wanted): the tree in the corner by the hearth, a garland on the mantel
+    this.xmasAt = { mantelX: fd + 105, mantelY: hearthH + openH + 135, z0: fy0 - 60, z1: fy1 + 60 };
 
     // ---- a corner bench (the Eckbank of a farmhouse Stube) and firewood by the hearth ----
     const benchM = timber(2); benchM.color = new THREE.Color(0x9a7a60);
@@ -455,6 +458,15 @@ export class Cabin {
   }
 
   setFire(on) { this.fireTarget = on ? 1 : 0.06; }
+  setXmas(on) {
+    if (on && !this.xmas) {
+      const A = this.xmasAt, x = (this.xmas = new THREE.Group());
+      const tree = swissTree(2050, 620); tree.position.set(760, 0, 780); tree.rotation.y = 0.4; x.add(tree);
+      x.add(garland(new THREE.Vector3(A.mantelX, A.mantelY, A.z0), new THREE.Vector3(A.mantelX, A.mantelY, A.z1), 3, 150));
+      this.group.add(x);
+    }
+    if (this.xmas) this.xmas.visible = on;
+  }
   update(dt) {
     this.t += dt;
     this.clock.tick(new Date(), performance.now() / 1000);

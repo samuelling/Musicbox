@@ -1,5 +1,6 @@
 import { Engine } from './audio/engine.js';
 import { strikeMatch } from './audio/match.js';
+import { christmasTime } from './render/christmas.js';
 import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physics/hamster.js';
 import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
@@ -714,6 +715,15 @@ document.addEventListener('pointerlockchange', () => {
   if (!on) { walk.keys.clear(); document.querySelectorAll('.navCtl [data-key].held').forEach((k) => k.classList.remove('held')); }
 });
 document.addEventListener('pointerlockerror', () => scene.onGrabFail());
+// Christmas decorations: on by themselves from 1 December to Epiphany; your own choice holds until the season
+// next starts or ends
+{
+  const season = christmasTime();
+  let on = season;
+  try { const s = JSON.parse(localStorage.getItem('frisky.xmas') || 'null'); if (s && s.season === season) on = s.on; } catch (e) { /* none */ }
+  $('xmas').checked = on; scene.setXmas(on);
+  $('xmas').addEventListener('change', (e) => { scene.setXmas(e.target.checked); try { localStorage.setItem('frisky.xmas', JSON.stringify({ on: e.target.checked, season })); } catch (err) { /* private mode */ } });
+}
 $('standBtn').addEventListener('click', () => posture(+1));
 $('crouchBtn').addEventListener('click', () => posture(-1));
 $('zoomIn').addEventListener('click', () => scene.dolly(0.8));
