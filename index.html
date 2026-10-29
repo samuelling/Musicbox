@@ -13,39 +13,11 @@
 <div id="app">
   <header>
     <div class="brand" aria-label="Frisky">
-      <svg class="logo" viewBox="0 0 64 56" aria-hidden="true">
-        <defs>
-          <linearGradient id="lgWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b9824c"/><stop offset="1" stop-color="#7a4a26"/></linearGradient>
-          <linearGradient id="lgLid" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a6234"/><stop offset="1" stop-color="#6a3c1c"/></linearGradient>
-          <radialGradient id="lgFur" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#f6d6a4"/><stop offset="0.6" stop-color="#e2a35e"/><stop offset="1" stop-color="#b97434"/></radialGradient>
-          <radialGradient id="lgGlow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#ffd27a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
-        </defs>
-        <circle cx="32" cy="30" r="27" fill="url(#lgGlow)"/>
-        <!-- the open lid, tipped back, with a pearl rosette -->
-        <path d="M14 30 L18 10 Q19 7 22 7 L50 9 Q53 9.5 52.5 12.5 L50 30 Z" fill="url(#lgLid)"/>
-        <circle cx="35" cy="18" r="4" fill="#efe6d8" opacity=".9"/><circle cx="35" cy="18" r="1.6" fill="#c9a050"/>
-        <!-- the hamster, peeking over the front of the box -->
-        <ellipse cx="32" cy="33" rx="13" ry="10" fill="url(#lgFur)"/>
-        <ellipse cx="22.5" cy="24.5" rx="3.6" ry="4" fill="#d08d4a"/><ellipse cx="22.5" cy="25" rx="2" ry="2.4" fill="#f2b9a8"/>
-        <ellipse cx="41.5" cy="24.5" rx="3.6" ry="4" fill="#d08d4a"/><ellipse cx="41.5" cy="25" rx="2" ry="2.4" fill="#f2b9a8"/>
-        <ellipse cx="32" cy="36" rx="8" ry="5.5" fill="#fbecd4"/>
-        <circle cx="27" cy="30.5" r="2.1" fill="#1b120c"/><circle cx="37" cy="30.5" r="2.1" fill="#1b120c"/>
-        <circle cx="27.6" cy="29.9" r=".6" fill="#fff"/><circle cx="37.6" cy="29.9" r=".6" fill="#fff"/>
-        <ellipse cx="32" cy="34" rx="1.5" ry="1.1" fill="#c96a6a"/>
-        <path d="M24 35 l-6 -1 M24 36.5 l-6 1 M40 35 l6 -1 M40 36.5 l6 1" stroke="#8a6040" stroke-width=".6" stroke-linecap="round"/>
-        <!-- the box: front, brass escutcheon, little paws over the edge -->
-        <rect x="10" y="37" width="44" height="15" rx="2.5" fill="url(#lgWood)"/>
-        <rect x="10" y="37" width="44" height="2.6" rx="1.2" fill="#d9a466"/>
-        <ellipse cx="27" cy="38" rx="2.6" ry="1.8" fill="#f0c896"/><ellipse cx="37" cy="38" rx="2.6" ry="1.8" fill="#f0c896"/>
-        <rect x="30.5" y="43.5" width="3" height="4" rx="1" fill="#e3b45a"/>
-        <!-- a note drifting up -->
-        <path d="M55 6 v9.5" stroke="#e3b45a" stroke-width="1.4"/><ellipse cx="53" cy="15.5" rx="2.4" ry="1.8" fill="#e3b45a" transform="rotate(-20 53 15.5)"/><path d="M55 6 q4 1 4 5" stroke="#e3b45a" stroke-width="1.4" fill="none"/>
-      </svg>
-      <span class="wordmark">Frisky</span>
+      <span class="wordmark" data-text="Frisky">Frisky</span>
     </div>
-    <button id="aboutBtn" class="aboutBtn" title="About Frisky">About</button>
     <div id="nowPlaying" class="now">—</div>
     <div id="spl" class="spl" title="Sound pressure level at your ears">— dB</div>
+    <button id="aboutBtn" class="aboutBtn" title="What is this?">Huh?</button>
   </header>
 
   <section id="stage">
