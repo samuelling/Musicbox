@@ -11,8 +11,8 @@ const pick = (w) => { let s = 0; for (const k in w) s += w[k]; let r = Math.rand
 const ang = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 const BUDGET = {
-  real:  { tier: 0.06, wheel: 0.22, eat: 0.1, hoard: 0.09, drink: 0.06, groom: 0.08, explore: 0.1, dig: 0.06, nap: 0.06, pee: 0.03, poop: 0.02, gnaw: 0.05, surf: 0.03, nest: 0.03, peek: 0.02, sand: 0.03, flank: 0.02 },
-  lover: { tier: 0.02, wheel: 0.74, eat: 0.05, hoard: 0.03, drink: 0.04, groom: 0.04, explore: 0.03, dig: 0.01, nap: 0.02, pee: 0.01, poop: 0.01, gnaw: 0.01, sand: 0.01 },
+  real:  { tier: 0.06, wheel: 0.22, eat: 0.1, hoard: 0.09, drink: 0.06, groom: 0.08, explore: 0.1, dig: 0.06, nap: 0.06, pee: 0.03, poop: 0.02, gnaw: 0.05, surf: 0.03, nest: 0.03, peek: 0.02, flank: 0.02 },
+  lover: { tier: 0.02, wheel: 0.74, eat: 0.05, hoard: 0.03, drink: 0.04, groom: 0.04, explore: 0.03, dig: 0.01, nap: 0.02, pee: 0.01, poop: 0.01, gnaw: 0.01 },
 };
 const DESC = {
   sleep: 'Asleep, curled up in his nest', wake: 'Waking up and stretching', walk: 'Pottering about',
@@ -24,7 +24,7 @@ const DESC = {
   startle: 'Startled by the tap, up on his hind legs', freeze: 'Frozen stock-still, eyes wide', flee: 'Bolting for his house',
   yawn: 'A big yawn', scratch: 'Scratching behind his ear with a hind foot', gnaw: 'Gnawing his chew stick',
   surf: 'Up against the glass, pacing it on his hind legs', gather: 'Stuffing bedding into his pouches', carryNest: 'Carrying bedding home',
-  arrange: 'Fluffing up his nest', peek: 'Peeking out of his house', sand: 'Rolling in his sand bath', flank: 'Rubbing his flank along the house (scent marking)',
+  arrange: 'Fluffing up his nest', peek: 'Peeking out of his house', flank: 'Rubbing his flank along the house (scent marking)',
   creep: 'Creeping forward, stretched out and cautious',
   tier: 'Up on the top deck',
 };
@@ -153,7 +153,6 @@ export class HamsterLife {
       case 'surf': { const x = R(80, c.L - 120); return [go({ x, z: c.D - 28 }, true), { act: 'surf', dur: R(4, 9), x0: x }]; }
       case 'nest': return [go({ x: c.dig.x + R(-25, 25), z: c.dig.z + R(10, 40) }), { act: 'gather', dur: R(3, 5), face: c.dig }, { act: 'carryNest', to: c.house.door, fast: true }, { act: 'walk', to: c.house.bed }, { act: 'arrange', dur: R(3, 6) }];
       case 'peek': return [go(c.house.door), { act: 'walk', to: c.house.bed }, { act: 'walk', to: { x: c.house.door.x, z: c.house.door.z - 32 } }, { act: 'peek', dur: R(4, 9), face: { x: c.house.door.x, z: c.D } }];
-      case 'sand': return [go(c.sand), { act: 'sand', dur: R(4, 8) }, { act: 'groom', dur: R(3, 6) }];
       case 'flank': { const y0 = c.house.door.z - 20, xL = c.house.bed.x - 90; return [go({ x: xL, z: y0 }), { act: 'flank', to: { x: xL, z: y0 - 90 } }, { act: 'flank', to: { x: xL, z: y0 } }]; }
       case 'pee': return [go({ x: this.toilet.x + R(-8, 8), z: this.toilet.z + R(-8, 8) }), { act: 'pee', dur: R(2.5, 4) }];
       case 'poop': return [go({ x: this.toilet.x + R(-20, 20), z: this.toilet.z + R(-20, 20) }), { act: 'poop', dur: R(2, 3.5) }];
@@ -280,7 +279,6 @@ export class HamsterLife {
       case 'arrange': this.pouch = Math.max(0, this.pouch - dt / 2); this.pose = { dig: 1, pouch: this.pouch }; if (this.timer <= 0) { this.pouch = 0; this.nest = Math.min(1, this.nest + 0.25); this.next(); } break;
       case 'peek': this.faceTo(dt); this.pose = { rear: 0.18, sniff: 1 }; if (this.timer <= 0) this.next(); break;
       case 'freeze': this.pose = { rear: 0.05 }; if (this.timer <= 0) this.next(); break;
-      case 'sand': { this.t0 += dt; const k = Math.min(1, this.t0 / 0.6, this.timer / 0.6); this.pose = { squat: 1, roll: k * 1.1 * Math.sin(this.t0 * 5.5), stretch: 0.3 }; if (this.timer <= 0) this.next(); break; }
       case 'sniff': case 'startle': this.pose = { rear: this.act === 'startle' ? 0.75 : 0.62, sniff: 1 }; if (this.timer <= 0) this.next(); break;
       case 'pee': case 'poop':
         this.pose = { squat: 1, rear: 0.12 };

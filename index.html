@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Frisky — a physically modelled music box</title>
-<link rel="stylesheet" href="css/style.css?v=1793305291">
+<link rel="stylesheet" href="css/style.css?v=1793305748">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }</script>
 </head>
 <body>
@@ -17,6 +17,7 @@
     </div>
     <div id="nowPlaying" class="now">—</div>
     <div id="spl" class="spl" title="Sound pressure level at your ears">— dB</div>
+    <button id="menuBtn" class="menuBtn" aria-expanded="false" aria-controls="drawer" title="Tunes, the music box, the listener (Tab)">☰ Settings</button>
     <button id="aboutBtn" class="aboutBtn" title="What is this?">Huh?</button>
   </header>
 
@@ -37,6 +38,7 @@
     <div id="hamInfo" class="hamInfo hidden">
       <div id="hamTxt" class="hamTxt">He's waking up…</div>
       <div class="hamBtns"><button id="hamPlace"><span class="ic">🎡</span>Place him in the wheel</button><button id="hamWatch"><span class="ic">👀</span>Watch him</button><button id="hamTap"><span class="ic">✋</span>Tap his cage</button><button id="hamCover"><span class="ic">🧺</span>Cover the cage</button></div>
+      <details id="hamMore" class="hamMore"><summary>More</summary>
       <label class="hamGear">Wheel sound <input type="range" id="hamVol" min="0" max="2" step="0.05" value="1"><span id="hamVolv">100%</span></label>
       <label class="hamGear">Belt ratio <input type="range" id="hamGear" min="0.5" max="2" step="0.05" value="0.75"><span id="hamGearv">×0.75</span></label>
       <div class="hamNature" role="group" aria-label="His nature">
@@ -44,6 +46,7 @@
         <div class="seg"><button data-lover="0" class="on">Real hamster</button><button data-lover="1">♥ Wheel lover</button></div>
         <input type="checkbox" id="hamLover" hidden>
       </div>
+      </details>
     </div>
     <div id="gaitCard" class="gaitCard hidden" aria-label="Footfall diagram"><canvas id="gaitCanvas"></canvas></div>
     <div id="windInfo" class="windInfo hidden">
@@ -90,6 +93,8 @@
     <div id="busy" class="busy hidden">Tuning tines…</div>
   </section>
 
+  <aside id="drawer" class="drawer" aria-label="Settings">
+  <div class="drawerHead"><span class="grab" aria-hidden="true"></span><button id="drawerClose" class="drawerClose" aria-label="Close settings">✕</button></div>
   <nav class="tabs">
     <button data-tab="tunes" class="on">Tunes</button>
     <button data-tab="musicbox">Music Box</button>
@@ -226,6 +231,7 @@
       <p class="small">The derivations behind every number are in <a href="https://github.com/samuelling/Musicbox/blob/main/PHYSICS.md" target="_blank" rel="noopener">PHYSICS.md</a>.</p>
     </section>
   </main>
+  </aside>
 </div>
 
 <dialog id="about" class="about">
@@ -255,6 +261,6 @@
   the code is <a href="https://github.com/samuelling/Musicbox" target="_blank" rel="noopener">on GitHub</a>.
   All tunes are public domain, traditional or original.</p>
 </dialog>
-<script type="module" src="js/main.js?v=1793305291"></script>
+<script type="module" src="js/main.js?v=1793305748"></script>
 </body>
 </html>

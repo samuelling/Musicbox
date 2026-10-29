@@ -535,7 +535,7 @@ export class HamsterRig {
       wheel: { x: xw - cx0, z: zw - cz0, y: yw - this.treadR - yB, entry: { x: xw - cx0, z: zw - cz0 + Wd / 2 + 60 } },
       house: { door: { x: hx, z: hz + 115 }, bed: { x: hx, z: hz + 10 } },
       bowl: { x: this.bowlAt.x, z: this.bowlAt.z }, drink: { x: L - 80, z: this.bottleZ }, dig: { x: (xw - cx0 + Rs + hx - 75) / 2, z: 80 },
-      chew: { ...this.chewAt }, sand: { ...this.sandAt },
+      chew: { ...this.chewAt },
     };
   }
 
@@ -590,15 +590,12 @@ export class HamsterRig {
       const board = new THREE.Mesh(new THREE.BoxGeometry(len, 6, rw2), ply); board.position.y = -3; board.castShadow = board.receiveShadow = true; ramp.add(board);
       for (let k = -len / 2 + 14; k < len / 2 - 8; k += 22) { const slat = new THREE.Mesh(new THREE.BoxGeometry(4, 4, rw2 - 6), ply); slat.position.set(k, 2, 0); ramp.add(slat); }
     }
-    // an apple-wood chew stick lying in the bedding, and a ceramic dish of chinchilla sand
+    // an apple-wood chew stick lying in the bedding
     this.chewAt = { x: 560, z: 255 };
     const stick = new THREE.Mesh(new THREE.CylinderGeometry(9, 10, 95, 10), new THREE.MeshStandardMaterial({ color: 0x8a6440, roughness: 0.85 }));
     stick.rotation.set(0, 0.5, Math.PI / 2); stick.position.set(X(this.chewAt.x), yB + 8, Z(this.chewAt.z)); stick.castShadow = true; g.add(stick);
     for (const s2 of [-1, 1]) { const end = new THREE.Mesh(new THREE.CircleGeometry(8.5, 10), new THREE.MeshStandardMaterial({ color: 0xc9a476, roughness: 0.9 })); end.position.set(s2 * 47.6, 0, 0); end.rotation.y = s2 * Math.PI / 2; stick.add(end); end.rotation.x = Math.PI / 2; }
-    this.sandAt = { x: 300, z: 335 };
-    const dish = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [62, 0], [68, 16], [64, 18], [58, 5], [0, 5]].map(([a, b]) => new THREE.Vector2(a, b)), 36), new THREE.MeshStandardMaterial({ color: 0xd9cdb8, roughness: 0.4 }));
-    dish.position.set(X(this.sandAt.x), yB - 2, Z(this.sandAt.z)); dish.receiveShadow = true; dish.castShadow = true; g.add(dish);
-    const sand = new THREE.Mesh(new THREE.CircleGeometry(57, 32), new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 1 })); sand.rotation.x = -Math.PI / 2; sand.position.set(X(this.sandAt.x), yB + 9, Z(this.sandAt.z)); g.add(sand);
+
     // ceramic bowl with seeds; water bottle clipped to the right-hand glass
     this.bowlAt = { x: 545, z: D - 70 };
     const bowl = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [38, 0], [46, 22], [42, 24], [33, 6], [0, 6]].map(([a, b]) => new THREE.Vector2(a, b)), 32), new THREE.MeshStandardMaterial({ color: 0x5f7d9a, roughness: 0.25 }));

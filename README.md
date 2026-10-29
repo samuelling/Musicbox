@@ -25,7 +25,7 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   far up the wheel he rides, his bouts and rests (he's nocturnal), heart rate and metabolic
   power are all simulated. His pace is the tempo. "Watch him" leans you in close; "Tap his cage" (or tap the glass) wakes him, and then he does as he likes:
   maybe the wheel, maybe a snack, maybe a pee in his toilet corner. He keeps a toilet corner away from his nest and food. He also yawns, scratches behind his ears, gnaws his
-  chew stick, rolls in his sand bath, builds up his nest with bedding, peeks out of his house, paces the glass on
+  chew stick, builds up his nest with bedding, peeks out of his house, paces the glass on
   his hind legs, scent-marks along the house, creeps about stretched out when wary, and climbs the ramp to the
   half tier over his house to look around (or doze up there).
 * **Music Box** (Tines · Box · Physics) — start from a **box type**: keepsake 30-note, child's plastic
@@ -42,6 +42,7 @@ candle goes out; tap it to relight. On a phone, draw circles on the round pad to
   your hand.
 * **Listener** — by default you're in a timber hut in the Alps, snowed in by a storm: a fire you light
   with the candle, an oak regulator on the wall, a watercolour over the mantel and an alphorn in the corner.
+  Settings slide in from ☰ Settings (Tab on a keyboard): a side panel on a wide screen, the whole screen on a phone.
   Or play in a nursery (a cuckoo clock), a living room (a mantel clock), a wood-panelled parlour
   (a longcase clock with the real phase of the moon), a stone chapel (a great painted dial) or an
   anechoic chamber (a lab clock). Every clock shows the real time. Walk with W A S D or the on-screen

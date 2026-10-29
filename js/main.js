@@ -87,6 +87,25 @@ function onBuilt(res) {
 const scene = new MusicBoxScene($('view'));
 scene.onPick = (i) => selectTine(i, true);
 
+// ---- the settings drawer: slides over the room when you want it, out of the way when you don't
+const drawer = $('drawer');
+function setDrawer(open) {
+  drawer.classList.toggle('open', open); document.body.classList.toggle('drawer-open', open); $('menuBtn').setAttribute('aria-expanded', String(open));
+  document.documentElement.style.setProperty('--hdr', document.querySelector('header').getBoundingClientRect().height + 'px');
+  // the room's canvas follows the stage as it widens or narrows
+  const t0 = performance.now(); const step = () => { scene.resize(); if (performance.now() - t0 < 380) requestAnimationFrame(step); }; requestAnimationFrame(step);
+  if (open) setTimeout(() => { map.resize(); roll.resize(); strip.resize(); insp.resize(); }, 340);
+}
+$('menuBtn').addEventListener('click', () => setDrawer(!drawer.classList.contains('open')));
+$('drawerClose').addEventListener('click', () => setDrawer(false));
+// swipe the sheet down to close it
+{ let y0 = null; drawer.querySelector('.drawerHead').addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+  window.addEventListener('pointerup', (e) => { if (y0 !== null && e.clientY - y0 > 60) setDrawer(false); y0 = null; }); }
+window.addEventListener('keydown', (e) => { if (e.code === 'Tab' && !e.target.closest('input, select, textarea, button, summary') && !e.target.closest('#drawer')) { e.preventDefault(); setDrawer(!drawer.classList.contains('open')); } });
+// open by default on wide screens; closed on phones so you see the room
+setDrawer(matchMedia('(min-width: 640px) and (min-aspect-ratio: 5/4)').matches);
+if (!matchMedia('(max-width: 520px)').matches) $('hamMore').open = true;
+
 $('aboutBtn').addEventListener('click', () => { const d = $('about'); if (d.showModal) d.showModal(); else d.setAttribute('open', ''); });
 
 // ------------------------------------------------------------------ audio start
@@ -254,7 +273,7 @@ function tapCage() {
     wheel: 'and he heads straight for the wheel', eat: 'and he stomps off for a snack', pee: 'and he heads for his toilet corner',
     poop: 'and he heads for his toilet corner', groom: 'and he sits up and washes his face, crossly', explore: 'and he potters about, sniffing',
     drink: 'and he goes for a drink', gnaw: 'and he takes it out on his chew stick', surf: 'and he paces the glass on his hind legs',
-    nest: 'and he fusses with his nest', peek: 'and he retreats to peek out of his house', sand: 'and he has a roll in his sand bath', flank: 'and he goes round marking his territory',
+    nest: 'and he fusses with his nest', peek: 'and he retreats to peek out of his house', flank: 'and he goes round marking his territory',
   };
   const msg = r.what === 'ignore' ? 'Tap! He ignores you and keeps running.' : r.what === 'hopOut' ? 'Tap! He hops out of the wheel to see what that was.'
     : r.what === 'freeze' ? 'Tap! He freezes, eyes wide… then bolts for his house.' : r.what === 'busy' ? 'Tap! He\'s a bit busy right now.' : (r.asleep ? 'Tap! He wakes up, grumpy, ' : 'Tap! He startles, up on his hind legs, ') + (SAY[r.what] || 'and potters about') + '.';
@@ -851,7 +870,7 @@ function selectTine(i, fromScene) {
   const m1 = t.modes[0];
   $('tineName').textContent = `${t.name} · ${t.f0.toFixed(1)} Hz · L ${(t.L * 1e3).toFixed(2)} mm · t ${(t.t0 * 1e3).toFixed(2)}→${(t.t1 * 1e3).toFixed(2)} mm${t.lead ? ` · lead ${(t.lead * 1e3).toFixed(3)} g` : ''}${t.damper ? ' · damper' : ''}`;
   if (fromScene) {
-    showPanel('comb');
+    showPanel('comb'); setDrawer(true);
   }
 }
 
