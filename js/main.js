@@ -89,6 +89,7 @@ scene.onPick = (i) => selectTine(i, true);
 
 // ---- the settings drawer: slides over the room when you want it, out of the way when you don't
 const drawer = $('drawer');
+try { if (localStorage.getItem('frisky.hamTried')) document.body.classList.add('ham-tried'); } catch (e) { /* private mode */ }
 const wideScreen = () => matchMedia('(min-width: 640px) and (min-aspect-ratio: 5/4)').matches;
 let heldBeforeDrawer = false;
 function setDrawer(open, viaKey) {
@@ -233,6 +234,7 @@ function setCovered(on) {
 let unveiled = false;
 scene.onUncover = () => setCovered(false);
 function setMode(mode) {
+  if (mode === 'auto') { document.body.classList.add('ham-tried'); try { localStorage.setItem('frisky.hamTried', '1'); } catch (e) { /* private mode */ } }
   if (mode === 'auto' && cfg.ham.covered) setCovered(false);   // hooking him up lifts the blanket
   cfg.mode = mode;
   document.querySelectorAll('.modeSwitch button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
