@@ -249,7 +249,7 @@ function setMode(mode) {
   if (mode === 'auto') {
     // Hamster play style: he's lifted into the wheel to drive the box (he may hop out later, as hamsters do)
     if (unveiled && life && life.where !== 'wheel') setTimeout(() => { if (cfg.mode === 'auto' && life && life.where !== 'wheel') life.placeInWheel(); }, 600);
-    sendHam(); $('hamWatch').classList.remove('on'); $('hamWatch').innerHTML = '<span class="ic">👀</span>Watch him';
+    sendHam(); $('hamWatch').classList.remove('on'); $('hamWatch').innerHTML = '<span class="ic">👀</span><span class="lb">Watch him</span><span class="sh">Watch</span>';
     // the first time you meet him, make it plain he can be put to work, watched, or put to bed
     try { if (!localStorage.getItem('musicbox.metHer')) { localStorage.setItem('musicbox.metHer', '1'); $('hamInfo').classList.add('intro'); setTimeout(() => $('hamInfo').classList.remove('intro'), 9000); } } catch (e) { /* private mode */ }
   }
@@ -293,6 +293,18 @@ function buildRig() {
 $('hamMass').addEventListener('input', (e) => { cfg.ham.mass = +e.target.value / 1000; $('hamMassv').textContent = e.target.value + ' g'; sendHam(); clearTimeout(buildRig.t); buildRig.t = setTimeout(buildRig, 250); });
 for (const [id, key] of [['hamWheel', 'wheel'], ['hamTread', 'surface'], ['hamAxle', 'axle']]) $(id).addEventListener('change', (e) => { cfg.ham[key] = e.target.value; sendHam(); buildRig(); });
 $('hamCover').addEventListener('click', () => setCovered(true));
+// the hamster panel folds down to its one-line status (remembered); handy on a phone
+{
+  const setMini = (on) => {
+    $('hamInfo').classList.toggle('mini', on); $('hamMin').setAttribute('aria-expanded', String(!on));
+    $('hamMin').textContent = on ? '▸' : '–'; $('hamMin').title = on ? 'Show his buttons' : 'Fold this panel down';
+    try { localStorage.setItem('frisky.hamMini', on ? '1' : ''); } catch (e) { /* private mode */ }
+  };
+  let on = false; try { on = !!localStorage.getItem('frisky.hamMini'); } catch (e) { /* private mode */ }
+  setMini(on);
+  $('hamMin').addEventListener('click', () => setMini(!$('hamInfo').classList.contains('mini')));
+  $('hamTxt').addEventListener('click', () => { if ($('hamInfo').classList.contains('mini')) setMini(false); });
+}
 // tap the glass: asleep, he wakes and potters; awake, he startles. What he does next is up to him.
 function tapCage() {
   if (!life) return;
@@ -345,7 +357,7 @@ $('hamWatch').addEventListener('click', () => {
     else if (lean) scene.onLean();
     return;
   }
-  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch him';
+  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span><span class="lb">Whole rig</span><span class="sh">Rig</span>' : '<span class="ic">👀</span><span class="lb">Watch him</span><span class="sh">Watch</span>';
   scene.frame(on ? 'hamster' : 'rig');
 });
 // the footfall diagram folds to a paw button (remembered)
@@ -528,7 +540,7 @@ scene.onLean = (what = 'box') => {
 };
 function syncWatch() {
   const on = !!(lean && lean.what === 'ham');
-  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span>Whole rig' : '<span class="ic">👀</span>Watch him';
+  $('hamWatch').classList.toggle('on', on); $('hamWatch').innerHTML = on ? '<span class="ic">🔭</span><span class="lb">Whole rig</span><span class="sh">Rig</span>' : '<span class="ic">👀</span><span class="lb">Watch him</span><span class="sh">Watch</span>';
 }
 // the first light, with Follow perspective on: lean over the table and fly from the opening view
 // down into your own eyes, looking into the box (double-tap to sit back)
