@@ -608,7 +608,7 @@ function walkLoop() {
     if (walk.vf || walk.vs) {
       const fx = Math.cos(L.yaw), fy = Math.sin(L.yaw), rx = Math.sin(L.yaw), ry = -Math.cos(L.yaw);
       let x = L.x + (walk.vf * fx + walk.vs * rx) * dt, y = L.y + (walk.vf * fy + walk.vs * ry) * dt;
-      [x, y] = collide(x, y);
+      [x, y] = collide(x, y, L.x, L.y);
       L.x = x; L.y = y; moved = true;
     }
     if (Math.abs(walk.zT - L.z) > 0.002) { L.z += (walk.zT - L.z) * Math.min(1, dt * 5); moved = true; $('earH').value = L.z; $('earHv').textContent = L.z.toFixed(2) + ' m'; }
@@ -618,16 +618,22 @@ function walkLoop() {
   walk.raf = requestAnimationFrame(step);
 }
 // keep inside the walls, and out of the table (and the hamster's cage beside the box)
-function collide(x, y) {
+// The table (and the cage beside the box) can't be walked into, but if you're already over it (leaning in
+// to watch him) you can always walk back out: we only stop you crossing into it, sliding along its edge.
+function collide(x, y, ox = x, oy = y) {
   if (!built) return [x, y];
   const room = ROOMS[cfg.room], [X, Y] = room.dims, m = 0.25;
-  if (room.walls) { x = Math.min(Math.max(x, m), X - m); y = Math.min(Math.max(y, m), Y - m); }
+  const clampW = (a, b) => (room.walls ? [Math.min(Math.max(a, m), X - m), Math.min(Math.max(b, m), Y - m)] : [a, b]);
+  [x, y] = clampW(x, y);
   const b = built.room.boxPos, t = map.table;
   if (b && t && !built.room.held) {
     const x0 = b[0] - t[0] / 2 - m, x1 = b[0] + t[0] / 2 + m + 0.35, y0 = b[1] - t[1] / 2 - m, y1 = b[1] + t[1] / 2 + m;
-    if (x > x0 && x < x1 && y > y0 && y < y1) {
-      const d = [[x - x0, x0, null], [x1 - x, x1, null], [y - y0, null, y0], [y1 - y, null, y1]].sort((p, q) => p[0] - q[0])[0];
-      if (d[1] !== null) x = d[1]; else y = d[2];
+    const inside = (px, py) => px > x0 && px < x1 && py > y0 && py < y1;
+    if (inside(x, y) && !inside(ox, oy)) {
+      // try keeping just one axis of the step (slide along the edge), else stay put
+      if (!inside(x, oy)) return clampW(x, oy);
+      if (!inside(ox, y)) return clampW(ox, y);
+      return [ox, oy];
     }
   }
   return [x, y];

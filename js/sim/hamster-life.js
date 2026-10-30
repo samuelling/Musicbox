@@ -152,7 +152,7 @@ export class HamsterLife {
       }
       case 'sand': return [{ act: 'walk', to: c.sand, tier: true }, { act: 'sand', dur: R(4, 8) }, { act: 'groom', dur: R(3, 6) }];
       case 'gnaw': return [go({ x: c.chew.x - 40, z: c.chew.z }), { act: 'gnaw', dur: R(5, 14), face: c.chew }];
-      case 'surf': { const x = R(80, c.L - 120); return [go({ x, z: c.D - 28 }, true), { act: 'surf', dur: R(4, 9), x0: x }]; }
+      case 'surf': { const x = R(80, c.L - 120); return [go({ x, z: c.D - 70 }, true), { act: 'surf', dur: R(4, 9), x0: x }]; }
       case 'nest': return [go({ x: c.dig.x + R(-25, 25), z: c.dig.z + R(10, 40) }), { act: 'gather', dur: R(3, 5), face: c.dig }, { act: 'carryNest', to: c.house.door, fast: true }, { act: 'walk', to: c.house.bed }, { act: 'arrange', dur: R(3, 6) }];
       case 'peek': return [go(c.house.door), { act: 'walk', to: c.house.bed }, { act: 'walk', to: { x: c.house.door.x, z: c.house.door.z - 32 } }, { act: 'peek', dur: R(4, 9), face: { x: c.house.door.x, z: c.D } }];
       case 'flank': { const y0 = c.house.door.z - 20, xL = c.house.bed.x - 90; return [go({ x: xL, z: y0 }), { act: 'flank', to: { x: xL, z: y0 - 90 } }, { act: 'flank', to: { x: xL, z: y0 } }]; }
@@ -245,7 +245,7 @@ export class HamsterLife {
         if (this.act === 'carry' || this.act === 'carryNest') this.pose.pouch = 1;
         if (this.act === 'creep') this.pose.stretch = 0.7;
         if (this.act === 'flank') { this.pose.roll = -0.28; this.pose.squat = 1; }
-        if (d < 5) { if (this.arriveLevel) this.level = this.arriveLevel; this.next(); }
+        if (d < 5 || (this.clamped && d < 45)) { if (this.arriveLevel) this.level = this.arriveLevel; this.next(); }
         break;
       }
       case 'climbIn': {
@@ -319,11 +319,23 @@ export class HamsterLife {
       case 'nap': case 'sleep': this.pose = { curl: 1 }; if (this.timer <= 0) this.next(); break;
       default: this.next();
     }
-    if (this.where === 'cage' && this.act !== 'climbIn' && this.act !== 'lifted' && this.act !== 'climbOut') this.y = this.heightAt(this.x, this.z);
+    if (this.where === 'cage' && this.act !== 'climbIn' && this.act !== 'lifted' && this.act !== 'climbOut') { this.keepInside(); this.y = this.heightAt(this.x, this.z); }
     // stride clock for walking
     if (this.v > 0.02) { this.phase = (this.phase + strideFreq(this.v) * dt) % 1; }
     if (this.pouch > 0 && !['pouch', 'carry', 'empty', 'walk', 'gather', 'carryNest', 'arrange'].includes(this.act)) this.pose.pouch = this.pouch;
     if (this.act === 'walk' && this.pouch > 0) this.pose.pouch = this.pouch;
+  }
+  // keep all of him inside the glass: his nose (further when he stretches out), his rump and his flanks
+  keepInside() {
+    const c = this.cage, pad = 8, cx = Math.cos(this.h), cz = Math.sin(this.h);
+    const nose = 92 + (this.pose.stretch ? 14 * this.pose.stretch : 0) - (this.pose.rear ? 30 * Math.min(1, this.pose.rear) : 0), rump = 76, side = this.pose.pouch ? 46 : 38;
+    let sx = 0, sz = 0;
+    for (const [f, l] of [[nose, 0], [-rump, 0], [0, side], [0, -side], [nose * 0.6, side * 0.8], [nose * 0.6, -side * 0.8]]) {
+      const px = this.x + cx * f - cz * l, pz = this.z + cz * f + cx * l;
+      if (px < pad) sx = Math.max(sx, pad - px); if (px > c.L - pad) sx = Math.min(sx, c.L - pad - px);
+      if (pz < pad) sz = Math.max(sz, pad - pz); if (pz > c.D - pad) sz = Math.min(sz, c.D - pad - pz);
+    }
+    this.x += sx; this.z += sz; this.clamped = Math.abs(sx) + Math.abs(sz) > 0.5;
   }
   faceTo(dt) { if (!this.face) return; const want = Math.atan2(this.face.z - this.z, this.face.x - this.x); this.h += ang(want - this.h) * Math.min(1, dt * 5); }
 
