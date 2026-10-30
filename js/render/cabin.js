@@ -3,6 +3,7 @@
 // millimetres with x = room x, y = height, z = room y (so it lines up with the acoustic room).
 import * as THREE from 'three';
 import { lockedDoor, mountDoor } from './doors.js';
+import { addOldMan } from './oldman.js';
 import { hanukkiah, dreidel, gelt, starOfDavid, flickerHanukkah } from './hanukkah.js';
 import { swissTree, garland, stocking, lightString, moravianStar, adventWreath, onWall } from './christmas.js';
 import { woodMaterial } from './materials.js';
@@ -373,6 +374,7 @@ export class Cabin {
     bx(ww + 200, 40, 200, cx, win.y0 - 70, RY - 70);                          // inner sill
     bx(40, wh, 60, cx, cy, zf); for (const f of [1 / 3, 2 / 3]) bx(ww, 40, 60, cx, win.y0 + wh * f, zf);
     const frost = frostTexture();
+    this.oldMan = addOldMan(g, { x0: win.x0, x1: win.x1, y0: win.y0, zGlass: zf });      // a very rare visitor
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshPhysicalMaterial({ color: 0xdfe8f5, roughness: 0.08, transparent: true, opacity: 0.12, depthWrite: false }));
     glass.position.set(cx, cy, zf); glass.rotation.y = Math.PI; g.add(glass);
     for (let i = 0; i < 2; i++) for (let j = 0; j < 3; j++) {
@@ -517,6 +519,7 @@ export class Cabin {
   }
   update(dt) {
     this.t += dt;
+    this.oldMan(dt);
     this.clock.tick(new Date(), performance.now() / 1000);
     // snow: falling, drifting in a light wind, recycled at the bottom
     // the storm: wind in gusts (a few seconds each), snow driven sideways and swirling

@@ -6,6 +6,7 @@ import { woodMaterial } from './materials.js';
 import { Cabin, valleyTexture, flakeTexture, stoneTexture } from './cabin.js';
 import { cuckoo, mantel, longcase, chapelDial, labClock, wallMount } from './clocks.js';
 import { lockedDoor, mountDoor, sealedHatch } from './doors.js';
+import { addOldMan } from './oldman.js';
 import { hanukkiah, dreidel, gelt, starOfDavid, flickerHanukkah } from './hanukkah.js';
 import { swissTree, garland, wreath, stocking, poinsettia, lightString, snowflake, bow, onWall } from './christmas.js';
 
@@ -115,6 +116,7 @@ class Room {
     const back = new THREE.Mesh(new THREE.PlaneGeometry(14000, 6200), new THREE.MeshBasicMaterial({ map: sky || valleyTexture(), fog: false, color: 0xb8c0d0 }));
     back.position.set(cx, 2000, RY + 5000); back.rotation.y = Math.PI; this.group.add(back);
     if (snow) this.snow(cx, RY);
+    this.updaters.push(addOldMan(this.group, { x0, x1, y0: z0, zGlass: zf }));   // a very rare visitor
     if (curtain) for (const s of [-1, 1]) {
       const cw = 520, chh = wh + 520, geo = new THREE.PlaneGeometry(cw, chh, 24, 1), p = geo.attributes.position;
       for (let i = 0; i < p.count; i++) p.setZ(i, 26 * Math.sin(p.getX(i) / cw * Math.PI * 7));
