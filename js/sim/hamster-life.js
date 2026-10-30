@@ -209,17 +209,39 @@ export class HamsterLife {
     this.timer -= dt; if (this.roused > 0) this.roused -= dt; else this.irritation = 0;
     this.pose = {};
     this.v = 0;
+    if (!['walk', 'toWheel', 'carry', 'carryNest', 'creep', 'flee', 'flank'].includes(this.act)) this.vs = 0;
     switch (this.act) {
       case 'wake': this.pose = { stretch: Math.max(0, Math.sin(Math.PI * (1 - this.timer / 2.2))) }; if (this.timer <= 0) { if (Math.random() < 0.7) this.plan.unshift({ act: 'yawn', dur: 1.3 }); this.next(); } break;
       case 'yawn': this.pose = { yawn: 1 - this.timer / 1.3, rear: 0.15 }; if (this.timer <= 0) this.next(); break;
       case 'walk': case 'toWheel': case 'carry': case 'carryNest': case 'creep': case 'flee': case 'flank': {
         const t = this.target, dx = t.x - this.x, dz = t.z - this.z, d = Math.hypot(dx, dz);
         const want = Math.atan2(dz, dx), turn = ang(want - this.h);
-        this.h += Math.max(-dt * 5, Math.min(dt * 5, turn));
-        const vmax = this.act === 'flee' ? 0.4 : this.act === 'creep' ? 0.05 : this.act === 'flank' ? 0.04 : this.fast ? 0.3 : 0.14;
-        this.v = d < 4 ? 0 : vmax * Math.max(0.2, Math.cos(turn)) * Math.min(1, d / 40);
+        // stop-and-go: an ordinary walk comes in short scurries, with pauses to sniff and look about
+        // (a flight, a run with full pouches or a creep doesn't stop)
+        const bouts = (this.act === 'walk' || this.act === 'toWheel') && !this.fast;
+        if (bouts) {
+          this.boutT = (this.boutT ?? R(0.6, 1.6)) - dt;
+          if (this.boutT <= 0) {
+            if (this.paused) { this.paused = false; this.boutT = R(0.5, 1.7); }
+            else if (d > 70) { this.paused = true; this.boutT = R(0.25, 0.9); this.pauseRear = Math.random() < 0.35 ? R(0.15, 0.45) : 0.04; }
+            else this.boutT = R(0.5, 1.2);
+          }
+        } else this.paused = false;
+        // he turns head-first and quickly, and a sharp turn is made on the spot, stepping round
+        const turnRate = this.act === 'flee' ? 10 : this.act === 'creep' || this.act === 'flank' ? 3 : 7;
+        const dh = Math.max(-dt * turnRate, Math.min(dt * turnRate, turn)); this.h += dh;
+        const pivot = Math.abs(turn) > 1.1 && d > 8;
+        const vmax = this.act === 'flee' ? 0.4 : this.act === 'creep' ? 0.05 : this.act === 'flank' ? 0.04 : this.fast ? 0.3 : 0.16;
+        const vT = d < 4 || this.paused || pivot ? 0 : vmax * Math.max(0.25, Math.cos(turn)) * Math.min(1, d / 50);
+        // speed builds and falls away (quick off the mark, quicker still to stop)
+        const acc = vT > (this.vs || 0) ? (this.act === 'flee' ? 6 : 2.4) : 5;
+        this.vs = (this.vs || 0) + Math.max(-acc * dt, Math.min(acc * dt, vT - (this.vs || 0)));
+        this.v = this.vs;
         const step = Math.min(d, this.v * 1000 * dt);
         this.x += Math.cos(this.h) * step; this.z += Math.sin(this.h) * step;
+        if (pivot) { this.pose.pivot = Math.sign(turn); this.phase = (this.phase + dt * 3.4) % 1; }
+        if (this.paused && this.vs < 0.03) { this.pose.sniff = 1; this.pose.rear = this.pauseRear; }
+        this.pose.headYaw = Math.max(-0.55, Math.min(0.55, turn * 0.55));
         if (this.act === 'carry' || this.act === 'carryNest') this.pose.pouch = 1;
         if (this.act === 'creep') this.pose.stretch = 0.7;
         if (this.act === 'flank') { this.pose.roll = -0.28; this.pose.squat = 1; }
@@ -281,7 +303,7 @@ export class HamsterLife {
       case 'arrange': this.pouch = Math.max(0, this.pouch - dt / 2); this.pose = { dig: 1, pouch: this.pouch }; if (this.timer <= 0) { this.pouch = 0; this.nest = Math.min(1, this.nest + 0.25); this.next(); } break;
       case 'sand': { this.t0 += dt; const k = Math.min(1, this.t0 / 0.6, this.timer / 0.6); this.pose = { squat: 1, roll: k * 1.1 * Math.sin(this.t0 * 5.5), stretch: 0.3 }; if (this.timer <= 0) this.next(); break; }
       case 'peek': this.faceTo(dt); this.pose = { rear: 0.18, sniff: 1 }; if (this.timer <= 0) this.next(); break;
-      case 'freeze': this.pose = { rear: 0.05 }; if (this.timer <= 0) this.next(); break;
+      case 'freeze': this.pose = { rear: 0.05, freeze: 1 }; if (this.timer <= 0) this.next(); break;
       case 'sniff': case 'startle': this.pose = { rear: this.act === 'startle' ? 0.75 : 0.62, sniff: 1 }; if (this.timer <= 0) this.next(); break;
       case 'pee': case 'poop':
         this.pose = { squat: 1, rear: 0.12 };
@@ -308,6 +330,6 @@ export class HamsterLife {
   // what the renderer needs for walking in the cage
   gaitState() {
     const v = this.v;
-    return { f: v > 0.02 ? strideFreq(v) : 0, v, phase: this.phase, D: dutyFactor(v), gait: v > 0.24 ? 'trot' : 'walk', act: this.pose.groom ? 'groom' : this.pose.sniff ? 'look' : 'sit', br: this.act === 'sleep' || this.act === 'nap' ? 45 : 90 };
+    return { f: v > 0.02 ? strideFreq(v) : 0, v, phase: this.phase, D: dutyFactor(v), gait: v > 0.24 ? 'trot' : 'walk', act: this.pose.groom ? 'groom' : this.pose.sniff ? 'look' : 'sit', br: this.act === 'sleep' || this.act === 'nap' ? 45 : this.act === 'freeze' ? 160 : v > 0.2 ? 140 : 90 };
   }
 }

@@ -331,25 +331,36 @@ export class HamsterModel {
       this.body.position.y = bob - 4 * k;
     } else this.body.position.y = pose.curl ? -5 : pose.squat ? -4 : 0;
     const rearT = running ? 0 : (pose.rear ?? (groom ? 0.42 : 0));
-    this.pose.rear += (rearT - this.pose.rear) * Math.min(1, dt * 4);
+    { const h = Math.min(dt, 0.033), P = this.pose; P.rearV = (P.rearV || 0) + ((rearT - P.rear) * 130 - (P.rearV || 0) * 19) * h; P.rear += P.rearV * h; }
     this.pose.curl = (this.pose.curl || 0) + ((pose.curl ? 1 : 0) - (this.pose.curl || 0)) * Math.min(1, dt * 2);
     const curl = this.pose.curl, stretch = pose.stretch || (pose.yawn ? 0.5 * Math.sin(Math.PI * Math.min(1, pose.yawn)) : 0);
     const breath = Math.sin(2 * Math.PI * ((st ? st.br : 70) / 60) * t);
     this.spine.rotation.z = pitch + this.pose.rear + (pose.dig ? -0.12 : 0) - 0.12 * curl;
+    // walking and trotting, the body swings side to side with each step (and rolls a little); bounding is
+    // up-and-down, not side-to-side
+    const swayK = running ? (st.gait === 'bound' ? 0.015 : st.gait === 'trot' ? 0.05 : 0.08 * Math.min(1, Math.abs(st.v) / 0.12)) : pose.pivot ? 0.05 : 0;
+    this.sway = (this.sway || 0) + (swayK * Math.sin(2 * Math.PI * ph) - (this.sway || 0)) * Math.min(1, dt * 20);
+    this.body.rotation.set(this.sway * 0.4, this.sway, 0);
     this.torso.scale.set(1 + flex - (running ? 0 : 0.03) - 0.16 * curl + 0.12 * stretch,
       1 - flex * 0.6 + 0.012 * breath * (1 + curl) + (running ? -0.04 : 0.03) + 0.06 * curl - 0.06 * stretch,
       1 + 0.015 * breath + 0.06 * curl);
 
     // ---- head ----
     this.nextLook -= dt;
-    if (this.nextLook <= 0) {
-      this.nextLook = running ? 0.6 + Math.random() * 1.2 : 0.8 + Math.random() * 2.5;
+    if (this.nextLook <= 0 && !pose.freeze) {
+      const alert = pose.sniff || (st && st.act === 'look');
+      this.nextLook = running ? 0.6 + Math.random() * 1.2 : alert ? 0.25 + Math.random() * 0.9 : 0.6 + Math.random() * 2.2;
       this.lookT.set((Math.random() - 0.5) * (running ? 0.15 : 0.9), (Math.random() - 0.4) * (running ? 0.1 : 0.4));
     }
-    this.look.lerp(this.lookT, Math.min(1, dt * 5));
-    let hp = -pitch * 0.85 - this.pose.rear * 0.5 + this.look.y, hy = this.look.x;
-    if (groom) { hp = -0.55 + 0.08 * Math.sin(t * 9); hy = 0.1 * Math.sin(t * 2.3); }
-    if (pose.eat) { hp = -0.15 + 0.06 * Math.sin(t * 2 * Math.PI * 5); hy = 0; }          // chewing
+    this.look.lerp(this.lookT, Math.min(1, dt * 16));      // a quick dart of the head, then stillness
+    let hp = -pitch * 0.85 - this.pose.rear * 0.5 + this.look.y, hy = this.look.x + (pose.headYaw || 0) - (this.sway || 0) * 0.9;
+    if (pose.sniff) hp += 0.025 * Math.sin(2 * Math.PI * 9 * t);   // the little nodding of a sniffing nose
+    const gStage = Math.floor(t / 3.2) % 4, gPh = 2 * Math.PI * 4.2 * t;      // face, face, flank left, flank right
+    if (groom) {
+      if (gStage < 2) { hp = -0.42 + 0.14 * Math.sin(gPh); hy = 0.05 * Math.sin(t * 1.9); }
+      else { hp = -0.55 + 0.05 * Math.sin(gPh * 1.2); hy = (gStage === 2 ? 1 : -1) * 0.95; }
+    }
+    if (pose.eat) { hp = -0.12 + 0.035 * Math.sin(t * 2 * Math.PI * 5.5); hy = 0.04 * Math.sin(t * 0.9); }   // chewing fast
     if (pose.peck) { hp = -0.45 + 0.3 * Math.max(0, Math.sin(t * 2 * Math.PI * 1.6)); hy = 0.15 * Math.sin(t * 1.3); }
     if (pose.drink) { hp = 0.35 + 0.04 * Math.sin(t * 2 * Math.PI * 6); hy = 0; }        // lapping at the spout
     if (pose.sniff) { hp = 0.25 + this.look.y * 0.5; }
@@ -368,7 +379,7 @@ export class HamsterModel {
     if (this.twitch > 0) { this.twitch -= dt; this.body.position.y += 0.8 * Math.sin(this.twitch * 70); }
     const pch = pose.pouch || 0;
     this.head.scale.set(1.14, 1.14 * (1 + 0.07 * pch), 1.14 * (1 + 0.32 * pch));   // cheek pouches swell out to the shoulders
-    const whisk = (pose.sniff || (!running && st && st.act === 'look')) ? 0.22 * Math.sin(2 * Math.PI * 8 * t) : running ? 0.06 * Math.sin(2 * Math.PI * 6 * t) : 0.03 * Math.sin(t * 3);
+    const whisk = pose.freeze ? 0 : (pose.sniff || (!running && st && st.act === 'look')) ? 0.22 * Math.sin(2 * Math.PI * 8 * t) : running ? 0.06 * Math.sin(2 * Math.PI * 6 * t) : 0.03 * Math.sin(t * 3);
     this.whiskerPivot.rotation.y = whisk * (1 - curl);
     this.nextBlink -= dt;
     if (this.nextBlink <= 0) { this.blink = 0.14; this.nextBlink = 1.5 + Math.random() * 5; }
@@ -380,7 +391,8 @@ export class HamsterModel {
     for (let i = 0; i < 2; i++) {
       if (Math.random() < dt * 0.25) this.earTw[i] = 0.25;
       this.earTw[i] = Math.max(0, this.earTw[i] - dt);
-      this.ears[i].rotation.x = (i ? -1 : 1) * (0.35 * Math.sin(this.earTw[i] * 40) * (this.earTw[i] > 0 ? 1 : 0) + (running ? -0.25 : 0) - 0.5 * curl);
+      const alertEar = pose.freeze || pose.sniff || this.pose.rear > 0.4 ? 0.18 : 0;
+      this.ears[i].rotation.x = (i ? -1 : 1) * (0.35 * Math.sin(this.earTw[i] * 40) * (this.earTw[i] > 0 && !pose.freeze ? 1 : 0) + (running ? -0.25 : 0) + alertEar - 0.5 * curl);
     }
 
     // ---- limbs ----
@@ -399,10 +411,19 @@ export class HamsterModel {
         else { const a = (u - D) / (1 - D); fx = neutral + reach * (-0.5 + a); fy = (L.fore ? 7 : 9) * Math.sin(Math.PI * a); pawPitch = L.fore ? -0.9 * Math.sin(Math.PI * a) : -0.7 * Math.sin(Math.PI * a); }
       } else if (L.fore && handsUp) {
         // forepaws up to the muzzle: washing, nibbling a seed, pushing food out of the pouches, or held to the chest when sniffing
-        const sp = pose.sniff ? 0.3 : pose.eat ? 2.5 : 8;
-        fx = (pose.sniff ? 26 : 36) + 2 * Math.sin(t * sp + k); fy = (pose.sniff ? 26 : 34) + 3 * Math.cos(t * sp + k * 1.3); pawPitch = -1.2; bodySpace = false;
+        if (groom && gStage < 2) { fx = 34 + 6 * Math.cos(gPh); fy = 31 + 8 * Math.sin(gPh); }                  // both paws, nose to ears
+        else if (groom) { fx = 22 + 3 * Math.sin(gPh); fy = 24 + 3 * Math.cos(gPh); }                              // holding the flank fur
+        else if (pose.eat) { fx = 35 + 1.2 * Math.sin(t * 2 * Math.PI * 1.4); fy = 30 + 1.5 * Math.sin(t * 2 * Math.PI * 1.4 + 1); }   // turning a seed
+        else { const sp = pose.sniff ? 0.3 : 8; fx = (pose.sniff ? 26 : 36) + 2 * Math.sin(t * sp + k); fy = (pose.sniff ? 26 : 34) + 3 * Math.cos(t * sp + k * 1.3); }
+        pawPitch = -1.2; bodySpace = false;
       } else if (L.fore && pose.dig) { const a = t * 2 * Math.PI * 7 + k * Math.PI; fx = neutral + 9 * Math.sin(a); fy = 3 * Math.max(0, Math.cos(a)); pawPitch = -0.6; }
       else if (L.fore && pose.drink) { fx = neutral + 14; fy = 22; pawPitch = -0.8; }
+      else if (pose.pivot) {
+        // stepping round on the spot: short, quick steps in diagonal pairs
+        let u = ph - (k === 0 || k === 3 ? 0 : 0.5); u -= Math.floor(u);
+        const a = u < 0.6 ? u / 0.6 : (u - 0.6) / 0.4;
+        fx = neutral + (u < 0.6 ? 4 * (0.5 - a) : 4 * (-0.5 + a)); fy = u < 0.6 ? 0 : (L.fore ? 5 : 6) * Math.sin(Math.PI * a); pawPitch = u < 0.6 ? 0 : -0.5 * Math.sin(Math.PI * a);
+      }
       else if (curl) { fx = neutral * (1 - 0.3 * curl) + (L.fore ? -6 : 8) * curl; fy = 0; }
       else { fx = neutral; fy = 0; }
       const target = new THREE.Vector3(fx, fy, L.hip[2]);
@@ -414,7 +435,12 @@ export class HamsterModel {
         target.x = (dx * ca - dy * sa - this.torso.position.x) / this.torso.scale.x;
         target.y = (dx * sa + dy * ca - this.torso.position.y) / this.torso.scale.y;
       }
-      const ankle = target.clone().add(new THREE.Vector3(0, L.fore ? 3 : 4, 0));
+      // ease between poses (standing, stepping, hands up) rather than snapping; a planted foot in a run is
+      // followed closely so it doesn't skate
+      if (!L.cur) L.cur = target.clone();
+      L.cur.lerp(target, Math.min(1, dt * (running ? 40 : 14)));
+      L.pp = (L.pp ?? pawPitch) + (pawPitch - (L.pp ?? pawPitch)) * Math.min(1, dt * (running ? 40 : 14)); pawPitch = L.pp;
+      const ankle = L.cur.clone().add(new THREE.Vector3(0, L.fore ? 3 : 4, 0));
       const dx = ankle.x - hip.x, dy = ankle.y - hip.y;
       let d = Math.hypot(dx, dy); const dmax = L.L1 + L.L2 - 0.5, dmin = Math.abs(L.L1 - L.L2) + 1;
       d = Math.max(dmin, Math.min(dmax, d));
