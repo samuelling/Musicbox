@@ -72,14 +72,27 @@ function oldMan() {
   // hands (in woollen mittens) to cup against the glass
   const hands = [];
   for (const sx of [-1, 1]) { const h = add(new THREE.SphereGeometry(55, 12, 8), std(0x4a3a2c, 0.95, { emissive: 0x100804 }), sx * 230, 900, 120, body); h.scale.set(0.8, 1.15, 0.6); hands.push(h); }
-  g.userData = { body, head, hands };
+  // an old felling axe, held behind his back (on some visits): a worn ash haft, the head peeking over his shoulder
+  const axe = new THREE.Group(); axe.visible = false; body.add(axe);
+  const haft = std(0x6a4a2c, 0.7, { emissive: 0x140a04 }), steel = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: 0.85, roughness: 0.38, emissive: 0x101214 });
+  const h = add(new THREE.CylinderGeometry(15, 19, 1050, 10), haft, 0, 0, 0, axe);
+  const head2 = new THREE.Group(); head2.position.y = 500; axe.add(head2);
+  add(new THREE.BoxGeometry(70, 95, 42), steel, 0, 0, 0, head2);                                  // eye and poll
+  const blade = new THREE.Shape(); blade.moveTo(0, -40); blade.lineTo(150, -85); blade.quadraticCurveTo(178, 0, 150, 85); blade.lineTo(0, 40);
+  const bl = add(new THREE.ExtrudeGeometry(blade, { depth: 14, bevelEnabled: true, bevelThickness: 6, bevelSize: 3, bevelSegments: 1 }), steel, 30, 0, -7, head2);
+  const edge = add(new THREE.BoxGeometry(6, 160, 4), new THREE.MeshStandardMaterial({ color: 0xd8dce2, metalness: 1, roughness: 0.15 }), 186, 0, 0, head2); edge.scale.y = 1.02;
+  void h; void bl;
+  // held in his right hand at the small of his back, slanting up so the head clears his right shoulder
+  axe.position.set(205, 1060, -292); axe.rotation.set(0.1, 0, -0.22);
+  g.userData = { body, head, hands, axe };
   return g;
 }
 
 // at a window in the y1 wall (x0..x1 along it, sill height y0, top y1, glass at zGlass, the outside beyond),
 // returns an update(dt) to call every frame
 export function addOldMan(parent, { x0, x1, y0, zGlass }) {
-  const man = oldMan(), { body, head, hands } = man.userData;
+  const man = oldMan(), { body, head, hands, axe } = man.userData;
+  let withAxe = false;
   man.rotation.y = Math.PI;                // facing into the room (-z)
   man.visible = false; parent.add(man);
   const fog = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: fogTexture(), transparent: true, opacity: 0, depthWrite: false }));
@@ -88,7 +101,11 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
   // set his body for a given lean (0 standing, 1 nose to the glass)
   const setLean = (lean) => {
     body.rotation.x = 0.12 + 0.12 * lean;
-    for (const [i, h] of hands.entries()) { const sx = i ? 1 : -1; h.position.set(sx * (230 - 90 * lean), 900 + 650 * lean, 120 + 120 * lean); }
+    for (const [i, h] of hands.entries()) {
+      const sx = i ? 1 : -1;
+      if (withAxe && i) h.position.set(185, 700, -300);                       // gripping the haft behind his back
+      else h.position.set(sx * (230 - 90 * lean), 900 + 650 * lean, 120 + 120 * lean);
+    }
   };
   // how far in front of his feet his frontmost part (nose, beard, mittens) reaches, standing and leaning,
   // so he can be placed with it just outside the glass whatever he's doing
@@ -110,7 +127,8 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
   };
   const front0 = reach(0), front1 = reach(1), clear = 12;      // and a little air between him and the pane
   man.rotation.y = Math.PI;
-  const params = (() => { try { return /[?&]oldman\b/i.test(location.search); } catch (e) { return false; } })();
+  const q = (() => { try { return location.search; } catch (e) { return ''; } })();
+  const params = /[?&]oldman\b/i.test(q), forceAxe = /[?&]oldman=axe\b/i.test(q);
   let wait = params ? 6 : R(900, 3600), t = 0, phase = 'away', side = 1;
   const z0 = zGlass + clear + front0 + 250;   // standing back from the house, outside
   // so he stands at the window from the waist up whatever the sill height (a little rise of snow outside)
@@ -120,6 +138,7 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
       if (document.hidden) return;
       wait -= dt; if (wait > 0) return;
       phase = 'walkIn'; t = 0; side = Math.random() < 0.5 ? -1 : 1; man.visible = true;
+      withAxe = forceAxe || Math.random() < 0.35; axe.visible = withAxe;      // some visits, he's brought the axe
     }
     t += dt;
     const ease = (u) => u * u * (3 - 2 * u);
