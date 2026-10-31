@@ -85,9 +85,34 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
   const fog = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: fogTexture(), transparent: true, opacity: 0, depthWrite: false }));
   fog.rotation.y = Math.PI; parent.add(fog);
   const cx = (x0 + x1) / 2;
+  // set his body for a given lean (0 standing, 1 nose to the glass)
+  const setLean = (lean) => {
+    body.rotation.x = 0.12 + 0.12 * lean;
+    for (const [i, h] of hands.entries()) { const sx = i ? 1 : -1; h.position.set(sx * (230 - 90 * lean), 900 + 650 * lean, 120 + 120 * lean); }
+  };
+  // how far in front of his feet his frontmost part (nose, beard, mittens) reaches, standing and leaning,
+  // so he can be placed with it just outside the glass whatever he's doing
+  const reach = (lean) => {
+    let front = 0; const b = new THREE.Box3(), v = new THREE.Vector3();
+    // over the whole range his head moves through while he peers (a tipped head swings the beard forward)
+    const heads = lean ? [-0.19, 0.0, 0.09].flatMap((hx) => [-0.66, 0, 0.66].flatMap((hy) => [-0.13, 0.13].map((hz) => [hx, hy, hz]))) : [[0, 0, 0]];
+    for (const hr of heads) {
+    setLean(lean); head.rotation.set(...hr); man.position.set(0, 0, 0); man.rotation.y = Math.PI; man.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(man.matrixWorld).invert();
+    man.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); b.copy(o.boundingBox); } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.copy(o.geometry.boundingBox); }
+      for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld).applyMatrix4(inv); front = Math.max(front, v.z); }
+    });
+    }
+    head.rotation.set(0, 0, 0);
+    return front;
+  };
+  const front0 = reach(0), front1 = reach(1), clear = 12;      // and a little air between him and the pane
+  man.rotation.y = Math.PI;
   const params = (() => { try { return /[?&]oldman\b/i.test(location.search); } catch (e) { return false; } })();
   let wait = params ? 6 : R(900, 3600), t = 0, phase = 'away', side = 1;
-  const z0 = zGlass + 700;                 // standing back from the house, outside
+  const z0 = zGlass + clear + front0 + 250;   // standing back from the house, outside
   // so he stands at the window from the waist up whatever the sill height (a little rise of snow outside)
   const lift = Math.max(0, y0 - 650);
   return (dt) => {
@@ -106,9 +131,10 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
     else if (phase === 'walkOut') { const u = Math.min(1, t / 5); x = cx - side * 1900 * ease(u); bob = Math.abs(Math.sin(t * 4.2)) * 30; man.rotation.y = Math.PI + side * 0.9 * ease(Math.min(1, u * 2)); if (u >= 1) { phase = 'away'; man.visible = false; wait = R(1800, 4200); } }
     if (phase === 'lean' || phase === 'peer' || phase === 'back') man.rotation.y = Math.PI;
     // leaning in until his nose is nearly on the glass, hands cupped either side of his face
-    man.position.set(x, lift + bob, z - lean * 150);
-    body.rotation.x = 0.12 + 0.12 * lean;
-    for (const [i, h] of hands.entries()) { const sx = i ? 1 : -1; h.position.set(sx * (230 - 90 * lean), 900 + 650 * lean, 120 + 120 * lean); }
+    // never nearer than his frontmost point allows: the glass stays between him and the room
+    const zMin = zGlass + clear + front0 + (front1 - front0) * lean;
+    man.position.set(x, lift + bob, Math.max(zMin, z - lean * (z - zMin)));
+    setLean(lean);
     // peering: slow, suspicious looks round the room, a tilt of the head
     head.rotation.set(-0.1 * lean + (peer ? 0.08 * Math.sin(t * 0.7) : 0), peer ? 0.5 * Math.sin(t * 0.45) + 0.15 * Math.sin(t * 1.7) : 0, peer ? 0.12 * Math.sin(t * 0.33) : 0);
     // his breath on the cold pane
