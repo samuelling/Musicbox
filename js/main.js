@@ -281,6 +281,7 @@ function buildRig() {
   if (!life) { life = new HamsterLife(scene.hamRig.layout); life.onWheel = (on, placed) => engine.send({ type: 'hamster', inWheel: on, ...(placed ? { wake: true } : {}) }); }
   else life.setCage(scene.hamRig.layout);
   life.mode = cfg.ham.nature;
+  life.scale = Math.cbrt(cfg.ham.mass / 0.125);   // the same scale the model is drawn at, so he stays inside the glass at any weight
   scene.hamLife = life;
   scene.hamRig.setCovered(cfg.ham.covered);
   const M = cfg.ham.mass;

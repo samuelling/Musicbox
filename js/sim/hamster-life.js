@@ -245,7 +245,7 @@ export class HamsterLife {
         if (this.act === 'carry' || this.act === 'carryNest') this.pose.pouch = 1;
         if (this.act === 'creep') this.pose.stretch = 0.7;
         if (this.act === 'flank') { this.pose.roll = -0.28; this.pose.squat = 1; }
-        if (d < 5 || (this.clamped && d < 45)) { if (this.arriveLevel) this.level = this.arriveLevel; this.next(); }
+        if (d < 5 || (this.clamped && d < 45 * (this.scale || 1))) { if (this.arriveLevel) this.level = this.arriveLevel; this.next(); }
         break;
       }
       case 'climbIn': {
@@ -327,8 +327,8 @@ export class HamsterLife {
   }
   // keep all of him inside the glass: his nose (further when he stretches out), his rump and his flanks
   keepInside() {
-    const c = this.cage, pad = 8, cx = Math.cos(this.h), cz = Math.sin(this.h);
-    const nose = 92 + (this.pose.stretch ? 14 * this.pose.stretch : 0) - (this.pose.rear ? 30 * Math.min(1, this.pose.rear) : 0), rump = 76, side = this.pose.pouch ? 46 : 38;
+    const c = this.cage, pad = 8, cx = Math.cos(this.h), cz = Math.sin(this.h), k = this.scale || 1;   // he's bigger or smaller with his weight
+    const nose = k * (92 + (this.pose.stretch ? 14 * this.pose.stretch : 0) - (this.pose.rear ? 30 * Math.min(1, this.pose.rear) : 0)), rump = 76 * k, side = (this.pose.pouch ? 46 : 38) * k;
     let sx = 0, sz = 0;
     for (const [f, l] of [[nose, 0], [-rump, 0], [0, side], [0, -side], [nose * 0.6, side * 0.8], [nose * 0.6, -side * 0.8]]) {
       const px = this.x + cx * f - cz * l, pz = this.z + cz * f + cx * l;
