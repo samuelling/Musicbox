@@ -92,6 +92,9 @@ scene.onPick = (i) => selectTine(i, true);
 
 // ---- the settings drawer: slides over the room when you want it, out of the way when you don't
 const drawer = $('drawer');
+// the drawer hangs from just under the header, however tall the header is
+const setHdr = () => document.documentElement.style.setProperty('--hdr', document.querySelector('header').getBoundingClientRect().height + 'px');
+setHdr(); window.addEventListener('resize', setHdr); if (document.fonts) document.fonts.ready.then(setHdr);
 try { if (localStorage.getItem('frisky.hamTried')) document.body.classList.add('ham-tried'); } catch (e) { /* private mode */ }
 const wideScreen = () => matchMedia('(min-width: 640px) and (min-aspect-ratio: 5/4)').matches;
 let heldBeforeDrawer = false;

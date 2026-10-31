@@ -8,12 +8,12 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); 
 header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 6px; }
 .brand { display: flex; align-items: center; gap: 6px; flex: none; }
 .logo { width: 58px; height: 51px; display: block; filter: drop-shadow(0 2px 4px #0008); }
-.wordmark { position: relative; isolation: isolate; font-weight: 700; letter-spacing: 0.05em; font-family: Georgia, "Times New Roman", serif; font-size: 34px; font-style: italic; line-height: 1.15; padding-top: 3px;
-  color: #e3b45a; text-shadow: 0 0 14px #e3b45a40; }
+.wordmark { position: relative; isolation: isolate; font-weight: 700; letter-spacing: 0.05em; font-family: Georgia, "Times New Roman", serif; font-size: 68px; font-style: italic; line-height: 1.1; padding-top: 6px;
+  color: #e3b45a; text-shadow: 0 0 24px #e3b45a40; }
 /* snow settled on the letters: a white copy of the word, nudged up and cut off below the tops,
    peeks out above each glyph, so the cap follows every curve and serif of the letters */
-.wordmark::before { content: attr(data-text); position: absolute; inset: 3px 0 0 0; z-index: -1; color: #f7fbff; -webkit-text-stroke: 1.5px #f7fbff;
-  transform: translateY(-0.07em); clip-path: inset(0 0 52% 0); text-shadow: 0 -1px 1px #fff, 1px -1px 1px #eef5ff, -1px -1px 1px #eef5ff; }
+.wordmark::before { content: attr(data-text); position: absolute; inset: 6px 0 0 0; z-index: -1; color: #f7fbff; -webkit-text-stroke: 3px #f7fbff;
+  transform: translateY(-0.07em); clip-path: inset(0 0 52% 0); text-shadow: 0 -2px 2px #fff, 2px -2px 2px #eef5ff, -2px -2px 2px #eef5ff; }
 .aboutBtn { flex: none; border: 1px solid #5a4632; background: transparent; color: var(--dim); border-radius: 12px; padding: 4px 10px; font-size: 12px; }
 .aboutBtn:hover { color: var(--accent); border-color: var(--accent); }
 .about { max-width: min(560px, 92vw); max-height: 86vh; overflow: auto; background: #1a130e; color: var(--ink); border: 1px solid #5a4632; border-radius: 16px; padding: 20px 22px; line-height: 1.5; font-size: 14px; }
@@ -23,7 +23,7 @@ header { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-a
 .about ul { padding-left: 18px; margin: 0; } .about li { margin: 4px 0; }
 .about a { color: var(--accent); }
 .aboutClose { position: sticky; top: 0; float: right; border: 0; background: #3a2d22; color: var(--ink); border-radius: 50%; width: 28px; height: 28px; }
-@media (max-width: 420px) { .logo { width: 46px; height: 40px; } .wordmark { font-size: 25px; } .aboutBtn { padding: 3px 7px; } }
+@media (max-width: 420px) { .logo { width: 46px; height: 40px; } .wordmark { font-size: 50px; } .aboutBtn { padding: 3px 7px; } }
 .now { flex: 1; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .spl { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--accent2); min-width: 60px; text-align: right; }
 #stage { position: relative; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
@@ -249,7 +249,7 @@ details.advanced[open] summary { margin-bottom: 6px; }
   .hamInfo { width: calc(100% - 64px); padding: 6px 8px; }
   .hamTxt { height: calc(4 * 1.35em); }
   .hamBtns button { padding: 5px 8px; font-size: 12px; }
-  .wordmark { font-size: 27px; }
+  .wordmark { font-size: 54px; }
   #nowPlaying { display: none; }
 }
 
