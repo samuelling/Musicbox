@@ -171,8 +171,8 @@ export class SnowGlobe {
     man.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     man.position.set(0, 0, 0); man.rotation.y = Math.PI; man.updateMatrixWorld(true);
     this.front0 = this.kit.reach(0); this.front1 = this.kit.reach(1);
-    this.ell = { rx: 4400, rz: 3800 };
-    this.walker = { phi: -Math.PI / 2, dir: 1, mode: 'walk', t: 0, next: rnd(6, 14), heading: Math.PI / 2, x: 0, z: -3800, cool: 0 };
+    this.ell = { rx: 4400, rz: 3800, rzF: 5300 };    // his round keeps well back from the front of the hut
+    this.walker = { phi: -Math.PI / 2, dir: 1, mode: 'walk', t: 0, next: rnd(6, 14), heading: Math.PI / 2, x: 0, z: -3800, cool: 0, nerve: 0, need: rnd(90, 200) };
 
     // footprints: pressed into the snow, slowly filling back in
     const fpG = new THREE.CircleGeometry(1, 10); fpG.rotateX(-Math.PI / 2);
@@ -411,11 +411,16 @@ export class SnowGlobe {
     const W = this.walker, man = this.man, { head, axe } = man.userData, kit = this.kit, { rx, rz } = this.ell;
     W.t += dt; W.cool -= dt;
     const ease = (u) => u * u * (3 - 2 * u);
-    let lean = 0, peer = 0, bob = 0, stare = 0, walking = false, want = W.heading;
-    const ellAt = (phi) => [rx * Math.cos(phi), rz * Math.sin(phi)];
+    let lean = 0, peer = 0, bob = 0, stare = 0, walking = false, want = W.heading, glance = null;
+    // he's a lurker: it takes him minutes to work up the nerve to look in
+    if (W.mode === 'walk' || W.mode === 'pause' || W.mode === 'lurk' || W.mode === 'falter') W.nerve += dt;
+    const lookAtWin = () => { const a = Math.atan2(this.win.x - W.x, this.win.z - W.z) - W.heading; return Math.atan2(Math.sin(a), Math.cos(a)); };
+    const rzF = this.ell.rzF, rzAt = (phi) => (Math.sin(phi) > 0 ? rzF : rz);
+    const ellAt = (phi) => [rx * Math.cos(phi), rzAt(phi) * Math.sin(phi)];
     const winPhi = Math.acos(this.win.x / rx);   // where the path passes the front window
     const zGlass = this.win.z + 60, clear = 10;
     const stand = [this.win.x, zGlass + clear + this.front0 + 260];
+    const cornerPhi = [1, -1].map((sx) => Math.atan2((RY / 2 + LOG) / this.ell.rzF, sx * (RX / 2 + LOG) / rx));
     if (W.mode === 'tossed') {
       // up in the snow, slowed by the water, tumbling; he bounces off the hut and off the glass
       const T = this.toss, g = 3400, drag = Math.exp(-dt * 0.7);
@@ -458,14 +463,27 @@ export class SnowGlobe {
       const st = Math.min(d, speed * dt); W.x += dx / d * st; W.z += dz / d * st; want = Math.atan2(dx, dz); walking = true; return false;
     };
     if (W.mode === 'walk') {
-      const v = 650, [ex, ez] = [-rx * Math.sin(W.phi), rz * Math.cos(W.phi)], sp = Math.hypot(ex, ez);
+      const v = 650, [ex, ez] = [-rx * Math.sin(W.phi), rzAt(W.phi) * Math.cos(W.phi)], sp = Math.hypot(ex, ez);
       const before = Math.sin(W.phi - winPhi);
       W.phi += W.dir * v / sp * dt;
       [W.x, W.z] = ellAt(W.phi); want = Math.atan2(W.dir * ex, W.dir * ez); walking = true;
       // round the back of the hut he sometimes picks up (or leaves) the axe at the stump
       if (Math.sin(W.phi) < -0.97 && W.cool < -10) { W.cool = 0; const take = Math.random() < 0.4; kit.withAxe = take; axe.visible = take; this.stumpAxe.visible = !take; }
-      if (Math.sign(before) !== Math.sign(Math.sin(W.phi - winPhi)) && Math.cos(W.phi - winPhi) > 0 && W.cool < 0 && Math.random() < 0.7) { W.mode = 'toWin'; W.t = 0; }
-      else if (W.t > W.next) { W.mode = 'pause'; W.t = 0; W.len = rnd(2.5, 5); W.stare = Math.random() < 0.45; }
+      const crossed = (p0) => Math.sign(Math.sin(W.phi - W.dir * v / sp * dt - p0)) !== Math.sign(Math.sin(W.phi - p0)) && Math.cos(W.phi - p0) > 0;
+      const front = Math.sin(W.phi) > 0.55;
+      // along the front he sidles past, eyes on the window, not quite looking in
+      if (front) glance = Math.max(-1.1, Math.min(1.1, lookAtWin())) * 0.8;
+      void before;
+      if (crossed(winPhi)) {
+        if (W.nerve >= W.need) { W.mode = 'toWin'; W.t = 0; W.nerve = 0; W.need = rnd(150, 330); }
+        else if (Math.random() < 0.12 + 0.4 * W.nerve / W.need) {
+          // nearly: a few steps toward the glass, a stop, and he thinks better of it
+          W.mode = 'falter'; W.t = 0; W.back = [W.x, W.z]; W.to = [W.x + (stand[0] - W.x) * rnd(0.3, 0.55), W.z + (stand[1] - W.z) * rnd(0.3, 0.55)]; W.len = rnd(1.2, 2.6);
+        }
+      } else if ((crossed(cornerPhi[0]) || crossed(cornerPhi[1])) && Math.random() < 0.3) {
+        // hanging about at the corner of the hut, peering round it at the window
+        W.mode = 'lurk'; W.t = 0; W.len = rnd(4, 9);
+      } else if (W.t > W.next) { W.mode = 'pause'; W.t = 0; W.len = rnd(2.5, 5); W.stare = Math.random() < 0.25; }
     } else if (W.mode === 'pause') {
       if (W.stare && W.t > 0.6) {
         // he turns and looks straight out at you
@@ -474,12 +492,22 @@ export class SnowGlobe {
         W.stareUp = Math.atan2(c.y - 1600, Math.hypot(c.x - W.x, c.z - W.z));
       }
       if (W.t > W.len + (W.stare ? 2 : 0)) { W.mode = 'walk'; W.t = 0; W.next = rnd(8, 20); if (Math.random() < 0.3) W.dir = -W.dir; }
+    } else if (W.mode === 'lurk') {
+      // half hidden by the corner, turned toward the window, leaning out a little to see; then he slinks off
+      want = W.heading + Math.max(-0.7, Math.min(0.7, lookAtWin())) * Math.min(1, W.t);
+      glance = Math.max(-1.1, Math.min(1.1, lookAtWin()));
+      lean = 0.3 * Math.min(1, W.t / 1.5) * (W.t < W.len - 1 ? 1 : Math.max(0, W.len - W.t));
+      if (W.t > W.len) { W.mode = 'walk'; W.t = 0; W.next = rnd(8, 20); if (Math.random() < 0.4) W.dir = -W.dir; }
+    } else if (W.mode === 'falter') {
+      if (W.stage !== 'back') {
+        if (goTo(W.to[0], W.to[1], 380)) { want = W.heading + lookAtWin(); glance = 0.15 * Math.sin(this.t * 3); if ((W.hold = (W.hold || 0) + dt) > W.len) { W.stage = 'back'; W.hold = 0; } }
+      } else if (goTo(W.back[0], W.back[1], 720)) { W.mode = 'walk'; W.t = 0; W.stage = null; W.next = rnd(8, 20); }
     } else if (W.mode === 'flustered') {
       // picks himself up, flails, shakes his head, stamps about in a little circle
       if (W.t > 0.7) { want = W.heading + Math.sin(W.t * 2.3) * 1.2; if (Math.sin(W.t * 9) > 0.92) { this.stepT += 0.2; } }
       if (W.t > W.len) { W.mode = 'brush'; W.t = 0; }
     } else if (W.mode === 'brush') {
-      if (W.t > 1.4) { W.mode = 'rejoin'; W.t = 0; W.phi = Math.atan2(W.z / rz, W.x / rx); }
+      if (W.t > 1.4) { W.mode = 'rejoin'; W.t = 0; W.phi = Math.atan2(W.z / (W.z > 0 ? rzF : rz), W.x / rx); }
     } else if (W.mode === 'rejoin') {
       const [tx, tz] = ellAt(W.phi);
       if (goTo(tx, tz, 750)) { W.mode = 'walk'; W.t = 0; W.next = rnd(8, 20); }
@@ -524,7 +552,7 @@ export class SnowGlobe {
     }
     head.rotation.set(
       -0.1 * lean + (peer ? 0.08 * Math.sin(tP * 0.7) : 0) - stare * Math.max(-0.4, Math.min(0.5, W.stareUp || 0)),
-      peer ? 0.5 * Math.sin(tP * 0.45) + 0.15 * Math.sin(tP * 1.7) : (walking ? 0.25 * Math.sin(tP * 0.5) : 0),
+      peer ? 0.5 * Math.sin(tP * 0.45) + 0.15 * Math.sin(tP * 1.7) : glance !== null ? (W.glance = (W.glance || 0) + (glance - (W.glance || 0)) * Math.min(1, dt * 2.5)) : (W.glance = (W.glance || 0) * 0.9) + (walking ? 0.25 * Math.sin(tP * 0.5) : 0),
       peer ? 0.12 * Math.sin(tP * 0.33) : stare * 0.15);
   }
 
