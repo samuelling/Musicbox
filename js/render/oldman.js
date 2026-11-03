@@ -17,7 +17,7 @@ function fogTexture() {
 }
 
 // the man himself, built facing +z, his feet at the origin (mm)
-function oldMan() {
+export function oldMan() {
   const g = new THREE.Group();
   // lit faintly by the room's glow from inside, so he reads against the night
   const coat = std(0x3a2c22, 0.95, { emissive: 0x120804 }), skin = std(0xc39278, 0.7, { emissive: 0x3a1c10, emissiveIntensity: 0.6 });
@@ -90,41 +90,49 @@ function oldMan() {
 
 // at a window in the y1 wall (x0..x1 along it, sill height y0, top y1, glass at zGlass, the outside beyond),
 // returns an update(dt) to call every frame
+// his posing kit: setLean (0 standing .. 1 nose to the glass) and reach, how far in front of his feet
+// his frontmost part gets (in his own units), over every way his head turns while he peers
+export function poseKit(man) {
+  const { body, head, hands } = man.userData;
+  const kit = { withAxe: false };
+  kit.setLean = (lean) => {
+    body.rotation.x = 0.12 + 0.12 * lean;
+    for (const [i, h] of hands.entries()) {
+      const sx = i ? 1 : -1;
+      if (kit.withAxe && i) h.position.set(185, 700, -300);                       // gripping the haft behind his back
+      else h.position.set(sx * (230 - 90 * lean), 900 + 650 * lean, 120 + 120 * lean);
+    }
+  };
+  kit.reach = (lean) => {
+    const p0 = man.position.clone(), r0 = man.rotation.y;
+    let front = 0; const b = new THREE.Box3(), v = new THREE.Vector3();
+    const heads = lean ? [-0.19, 0.0, 0.09].flatMap((hx) => [-0.66, 0, 0.66].flatMap((hy) => [-0.13, 0.13].map((hz) => [hx, hy, hz]))) : [[0, 0, 0]];
+    for (const hr of heads) {
+      kit.setLean(lean); head.rotation.set(...hr); man.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(man.matrixWorld).invert();
+      man.traverse((o) => {
+        if (!o.isMesh || !o.visible) return;
+        if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); b.copy(o.boundingBox); } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.copy(o.geometry.boundingBox); }
+        for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld).applyMatrix4(inv); front = Math.max(front, v.z); }
+      });
+    }
+    head.rotation.set(0, 0, 0); man.position.copy(p0); man.rotation.y = r0;
+    return front;
+  };
+  return kit;
+}
+
 export function addOldMan(parent, { x0, x1, y0, zGlass }) {
-  const man = oldMan(), { body, head, hands, axe } = man.userData;
+  const man = oldMan(), { head, axe } = man.userData;
   let withAxe = false;
   man.rotation.y = Math.PI;                // facing into the room (-z)
   man.visible = false; parent.add(man);
   const fog = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: fogTexture(), transparent: true, opacity: 0, depthWrite: false }));
   fog.rotation.y = Math.PI; parent.add(fog);
   const cx = (x0 + x1) / 2;
-  // set his body for a given lean (0 standing, 1 nose to the glass)
-  const setLean = (lean) => {
-    body.rotation.x = 0.12 + 0.12 * lean;
-    for (const [i, h] of hands.entries()) {
-      const sx = i ? 1 : -1;
-      if (withAxe && i) h.position.set(185, 700, -300);                       // gripping the haft behind his back
-      else h.position.set(sx * (230 - 90 * lean), 900 + 650 * lean, 120 + 120 * lean);
-    }
-  };
-  // how far in front of his feet his frontmost part (nose, beard, mittens) reaches, standing and leaning,
-  // so he can be placed with it just outside the glass whatever he's doing
-  const reach = (lean) => {
-    let front = 0; const b = new THREE.Box3(), v = new THREE.Vector3();
-    // over the whole range his head moves through while he peers (a tipped head swings the beard forward)
-    const heads = lean ? [-0.19, 0.0, 0.09].flatMap((hx) => [-0.66, 0, 0.66].flatMap((hy) => [-0.13, 0.13].map((hz) => [hx, hy, hz]))) : [[0, 0, 0]];
-    for (const hr of heads) {
-    setLean(lean); head.rotation.set(...hr); man.position.set(0, 0, 0); man.rotation.y = Math.PI; man.updateMatrixWorld(true);
-    const inv = new THREE.Matrix4().copy(man.matrixWorld).invert();
-    man.traverse((o) => {
-      if (!o.isMesh) return;
-      if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); b.copy(o.boundingBox); } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.copy(o.geometry.boundingBox); }
-      for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld).applyMatrix4(inv); front = Math.max(front, v.z); }
-    });
-    }
-    head.rotation.set(0, 0, 0);
-    return front;
-  };
+  const kit = poseKit(man), setLean = kit.setLean;
+  man.rotation.y = Math.PI;
+  const reach = (lean) => { man.position.set(0, 0, 0); man.updateMatrixWorld(true); return kit.reach(lean); };
   const front0 = reach(0), front1 = reach(1), clear = 12;      // and a little air between him and the pane
   man.rotation.y = Math.PI;
   const q = (() => { try { return location.search; } catch (e) { return ''; } })();
@@ -138,7 +146,7 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
       if (document.hidden) return;
       wait -= dt; if (wait > 0) return;
       phase = 'walkIn'; t = 0; side = Math.random() < 0.5 ? -1 : 1; man.visible = true;
-      withAxe = forceAxe || Math.random() < 0.35; axe.visible = withAxe;      // some visits, he's brought the axe
+      withAxe = forceAxe || Math.random() < 0.35; axe.visible = withAxe; kit.withAxe = withAxe;      // some visits, he's brought the axe
     }
     t += dt;
     const ease = (u) => u * u * (3 - 2 * u);

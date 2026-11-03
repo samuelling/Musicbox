@@ -651,10 +651,53 @@ const release = () => { const a = document.activeElement; if (a && a !== documen
 document.addEventListener('change', (e) => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') e.target.blur(); }, true);
 document.addEventListener('pointerup', (e) => { const t = e.target; if (t && (t.type === 'range' || t.tagName === 'BUTTON')) setTimeout(() => t.blur(), 0); }, true);
 $('view').addEventListener('pointerdown', release);
+// ---- snow globe mode (the hut only): fade, then the camera pulls back out through the window to the globe;
+// the view holds there (tap or shake to stir the snow) until you go back inside
+const globe = {
+  on: false, busy: false, motion: false,
+  fade(on) { $('globeFade').classList.toggle('on', on); },
+  enter() {
+    if (this.on || this.busy || cfg.room !== 'cabin') return;
+    this.busy = true; walk.keys.clear(); walk.pad.clear(); walk.stick.x = walk.stick.y = 0;
+    if (drawer.classList.contains('open')) setDrawer(false);
+    this.fade(true);
+    setTimeout(() => {
+      this.on = true; document.body.classList.add('globe'); scene.enterGlobe(); this.fade(false); this.busy = false;
+      $('globeHint').classList.remove('gone'); clearTimeout(this.hintT); this.hintT = setTimeout(() => $('globeHint').classList.add('gone'), 7000);
+    }, 340);
+  },
+  leave(now) {
+    if (!this.on || this.busy) return;
+    const back = () => { this.on = false; scene.leaveGlobe(); document.body.classList.remove('globe'); this.fade(false); this.busy = false; };
+    if (now) { back(); return; }
+    this.busy = true;
+    scene.exitGlobe(() => { this.fade(true); setTimeout(back, 340); });
+  },
+  toggle() { if (this.on) this.leave(); else this.enter(); },
+};
+$('globeBtn').addEventListener('click', () => globe.enter());
+$('globeBack').addEventListener('click', () => globe.leave());
+$('globeShake').addEventListener('click', () => {
+  scene.shakeGlobe(1);
+  // on a phone, shaking the phone stirs it too (iOS asks first)
+  if (globe.motion || typeof DeviceMotionEvent === 'undefined') return;
+  globe.motion = true;
+  const listen = () => {
+    let last = 0;
+    window.addEventListener('devicemotion', (e) => {
+      const a = e.acceleration; if (!globe.on || !a || a.x == null) return;
+      const m = Math.hypot(a.x, a.y, a.z), t = performance.now();
+      if (m > 13 && t - last > 250) { last = t; scene.shakeGlobe(Math.min(1, m / 30)); }
+    });
+  };
+  try { if (DeviceMotionEvent.requestPermission) DeviceMotionEvent.requestPermission().then((r) => { if (r === 'granted') listen(); }).catch(() => {}); else listen(); } catch (err) { /* no motion */ }
+});
 const WALK_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 window.addEventListener('keydown', (e) => {
   walk.shift = e.shiftKey;
-  if (e.code === 'Escape') { release(); return; }
+  if (e.code === 'Escape') { release(); if (globe.on) globe.leave(); return; }
+  if (e.code === 'KeyG' && !typing(e) && !e.metaKey && !e.ctrlKey && !e.repeat && cfg.room === 'cabin') { e.preventDefault(); globe.toggle(); return; }
+  if (globe.on) return;          // the globe holds still: no walking, no zooming
   if (typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
   // an arrow key on a slider or dropdown you reached with Tab still works that control
   const t = e.target;
@@ -683,7 +726,7 @@ document.querySelectorAll('button[data-move]').forEach((b) => {
   let joy = null;
   const reset = () => { joy = null; walk.stick.x = walk.stick.y = 0; walk.stick.run = false; knob.style.transform = ''; stick.style.transform = ''; stick.classList.remove('held'); };
   $('stage').addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'touch' || joy) return;
+    if (e.pointerType !== 'touch' || joy || globe.on) return;
     const onStick = e.target === stick, r = $('stage').getBoundingClientRect();
     const inZone = e.target === view && scene.followListener && !$('navCtl').classList.contains('hidden')
       && e.clientX - r.left < r.width * 0.42 && e.clientY - r.top > r.height * 0.5;
@@ -1084,6 +1127,8 @@ function refreshAfterBuild() {
   const surf = SURFACES[cfg.surface];
   map.boxZ = built.room.boxPos ? built.room.boxPos[2] : 0;
   map.setRoom(room, built.room.boxPos, surf.plate ? [surf.plate.a, surf.plate.b] : null, built.room.held);
+  if (cfg.room !== 'cabin' && globe.on) globe.leave(true);
+  $('globeBtn').classList.toggle('hidden', cfg.room !== 'cabin');
   scene.placeRoom({ dims: room.dims, boxPos: built.room.boxPos, boxYaw: built.room.boxYaw, tableTop: built.room.tableTop, held: built.room.held, kind: cfg.room });
   scene.setListener(map.listener);
   if (placeListenerNextBuild) {

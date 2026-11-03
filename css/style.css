@@ -320,3 +320,18 @@ body.mouse-held .escBadge { opacity: 1; transform: translate(-50%, 0); animation
   .hamMore summary { font-size: 11px; }
   .hamMin { width: 22px; height: 22px; top: 4px; right: 4px; font-size: 12px; }
 }
+
+/* ---------- snow globe mode (the hut) ---------- */
+.globeBtn { position: absolute; right: 44px; top: 12px; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px 11px 6px 8px; border-radius: 18px; font-size: 12px; background: #120d0acc; border: 1px solid #5a4632; color: var(--ink); }
+.globeBtn svg { width: 20px; height: 20px; color: #cfe0f4; }
+@media (hover: none), (pointer: coarse) { .globeBtn { top: 58px; } }
+.globeUI { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 4; display: none; flex-direction: column; align-items: center; gap: 6px; }
+.globeRow { display: flex; gap: 8px; }
+.globeUI button { padding: 7px 13px; border-radius: 16px; font-size: 13px; background: #120d0acc; border: 1px solid #5a4632; color: var(--ink); white-space: nowrap; }
+.globeHint { font-size: 11px; color: var(--dim); background: #0008; padding: 2px 8px; border-radius: 8px; transition: opacity 1s; pointer-events: none; }
+.globeHint.gone { opacity: 0; }
+.globeFade { position: absolute; inset: 0; background: #070504; opacity: 0; pointer-events: none; transition: opacity .32s; z-index: 5; }
+.globeFade.on { opacity: 1; }
+body.globe .globeUI { display: flex; }
+body.globe .modeWrap, body.globe #hamInfo, body.globe #gaitCard, body.globe #navCtl, body.globe #lookPad, body.globe #reticle,
+body.globe #mouseHint, body.globe #escBadge, body.globe #lightPrompt, body.globe #globeBtn { display: none !important; }

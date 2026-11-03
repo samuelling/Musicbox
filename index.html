@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Frisky — a physically modelled music box</title>
-<link rel="stylesheet" href="css/style.css?v=1793448837">
+<link rel="stylesheet" href="css/style.css?v=1793449300">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }</script>
 </head>
 <body>
@@ -84,6 +84,10 @@
     <div id="reticle" class="reticle" aria-hidden="true"></div>
     <div id="mouseHint" class="mouseHint">The mouse looks around · click acts on the dot · double-click leans in</div>
     <div id="escBadge" class="escBadge" aria-live="polite"><kbd>Esc</kbd> frees the mouse <span class="sep"></span> <kbd>Tab</kbd> settings</div>
+    <!-- the hut only: step back out of the window and see it whole, in a snow globe -->
+    <button id="globeBtn" class="globeBtn hidden" title="Snow globe: step outside and see the hut in a snow globe (G)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="7.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.6 12.6h6.8v-2.4L12 7.4l-3.4 2.8z" fill="currentColor"/><path d="M5.2 19.5h13.6l-1.4-3H6.6z" fill="currentColor"/><circle cx="8" cy="7.5" r=".8" fill="currentColor"/><circle cx="15.8" cy="6.2" r=".7" fill="currentColor"/><circle cx="16.4" cy="11" r=".6" fill="currentColor"/></svg><span>Snow globe</span></button>
+    <div id="globeUI" class="globeUI"><div class="globeRow"><button id="globeBack" title="Back inside the hut (G or Esc)">↩ Back inside</button><button id="globeShake" title="Shake the globe">❄ Shake it</button></div><span id="globeHint" class="globeHint">drag to turn it · tap or shake it to stir the snow</span></div>
+    <div id="globeFade" class="globeFade"></div>
     <div id="busy" class="busy hidden">Tuning tines…</div>
   </section>
 
@@ -259,6 +263,6 @@
   the code is <a href="https://github.com/samuelling/Musicbox" target="_blank" rel="noopener">on GitHub</a>.
   All tunes are public domain, traditional or original.</p>
 </dialog>
-<script type="module" src="js/main.js?v=1793448837"></script>
+<script type="module" src="js/main.js?v=1793449300"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { HamsterRig, CAGE } from './hamster-scene.js';
 import { woodMaterial, boxGeo, velvetMaterial, inlayMaterial } from './materials.js';
 import { makeRoom } from './rooms.js';
+import { SnowGlobe } from './snowglobe.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TINE_MATERIALS, PLATE_MATERIALS, ENCLOSURES, SURFACES, PIN } from '../physics/constants.js';
@@ -71,7 +72,7 @@ export class MusicBoxScene {
     this.mouseHeld = held;
     const centre = (e) => { const r = canvas.getBoundingClientRect(); return { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, timeStamp: e.timeStamp }; };
     document.addEventListener('mousemove', (e) => {
-      if (!held() || !this.followListener || (!e.movementX && !e.movementY)) return;
+      if (!held() || !this.followListener || this.globeOn() || (!e.movementX && !e.movementY)) return;
       const k = 0.0022 * (this.camera.fov / 62);              // slower when you've zoomed in
       if (this.onLook && e.movementX) this.onLook(e.movementX * k);
       const cur = this.lookPitch ?? this.autoPitch ?? 0;
@@ -83,12 +84,19 @@ export class MusicBoxScene {
     this.grabMouse = () => { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => this.onGrabFail && this.onGrabFail()); } catch (err) { if (this.onGrabFail) this.onGrabFail(); } };
     // through your own eyes the wheel (or a trackpad's two-finger scroll or pinch) zooms
     canvas.addEventListener('wheel', (e) => {
+      if (this.globeOn()) { e.preventDefault(); return; }
       if (!this.followListener) return;
       e.preventDefault();
       this.dolly(Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * (e.ctrlKey ? 0.01 : 0.002)));
     }, { passive: false });
-    canvas.addEventListener('pointerdown', (e) => { if (held()) { const c = centre(e); down = [c.clientX, c.clientY, e.timeStamp]; return; } down = [e.clientX, e.clientY, e.timeStamp]; if (this.followListener) look = [e.clientX, e.clientY]; });
+    canvas.addEventListener('pointerdown', (e) => { if (this.globeOn()) { down = [e.clientX, e.clientY, e.timeStamp]; this.gDrag = [e.clientX, e.clientY, e.timeStamp]; this.globe.grab(); try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* synthetic */ } return; } if (held()) { const c = centre(e); down = [c.clientX, c.clientY, e.timeStamp]; return; } down = [e.clientX, e.clientY, e.timeStamp]; if (this.followListener) look = [e.clientX, e.clientY]; });
     canvas.addEventListener('pointermove', (e) => {
+      if (this.globeOn()) {
+        const G = this.gDrag; if (!G) return;
+        const h = Math.max(200, canvas.clientHeight);
+        this.globe.drag((e.clientX - G[0]) / h, (e.clientY - G[1]) / h, (e.timeStamp - G[2]) / 1000);
+        this.gDrag = [e.clientX, e.clientY, e.timeStamp]; return;
+      }
       if (!look || !this.followListener || held()) return;
       const dx = e.clientX - look[0], dy = e.clientY - look[1]; look = [e.clientX, e.clientY];
       // a mouse grabs the world one-to-one; a thumb turns faster (as in Ashland): about 115° per phone-width swipe
@@ -100,10 +108,12 @@ export class MusicBoxScene {
       if (Math.abs(dy) > 0) this.lookPitch = Math.max(-1.2, Math.min(1.2, cur - dy * k));
       this.dirty = Math.max(this.dirty, 2);
     });
-    canvas.addEventListener('pointerup', () => { look = null; });
+    canvas.addEventListener('pointerup', () => { look = null; if (this.gDrag) { this.gDrag = null; if (this.globe) this.globe.release(); } });
+    canvas.addEventListener('pointercancel', () => { if (this.gDrag) { this.gDrag = null; if (this.globe) this.globe.release(); } });
     canvas.addEventListener('pointerup', (e) => {
       if (!down) return;
       const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]);
+      if (this.globeOn()) { if (moved < 12 && e.timeStamp - down[2] < 500) this.globe.tap(); down = null; return; }
       if (held()) { if (e.timeStamp - down[2] < 400) this.tapAt(centre(e)); down = null; return; }
       if (moved < 6 && e.timeStamp - down[2] < 400) {
         const hit = this.tapAt(e);
@@ -128,6 +138,7 @@ export class MusicBoxScene {
     const w = this.canvas.clientWidth || 300, h = this.canvas.clientHeight || 300;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+    if (this.globe) this.globe.resize(w, h);
   }
 
   // double tap: zoom into the music box (or onto the hamster's cage); again to come back out
@@ -687,10 +698,24 @@ export class MusicBoxScene {
   hamState(h) { if (this.hamRig) this.hamRig.setState(h); }
 
   // ---------------------------------------------------------------- the room and you
+  // snow globe mode (the hut only): the camera steps back out of the window and holds still on the globe
+  globeOn() { return !!(this.globe && this.globe.active); }
+  enterGlobe() {
+    if (!this.globe) this.globe = new SnowGlobe(this.renderer);
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.globePrevCtl = this.controls.enabled; this.controls.enabled = false;
+    const G = this.globe;
+    G.setFire(this.litTarget === 1); G.setXmas(!!this.xmas); G.setHanukkah(!!this.hanukkah);
+    G.resize(this.canvas.clientWidth || 300, this.canvas.clientHeight || 300);
+    G.enter();
+  }
+  exitGlobe(done) { if (this.globeOn()) this.globe.exit(done); else if (done) done(); }
+  leaveGlobe() { if (!this.globe) return; this.globe.active = false; this.globe.anim = null; this.controls.enabled = this.globePrevCtl ?? true; this.dirty = 4; }
+  shakeGlobe(k) { if (this.globeOn()) this.globe.shake(k); }
   // r: { dims, boxPos (m, room), boxYaw, tableTop (m) or null if held, cabin }
   // Christmas decorations (the hut has a tree and a garland)
-  setXmas(on) { this.xmas = on; if (this.roomObj && this.roomObj.setXmas) this.roomObj.setXmas(on); this.dirty = 4; }
-  setHanukkah(on) { this.hanukkah = on; if (this.roomObj && this.roomObj.setHanukkah) this.roomObj.setHanukkah(on); this.dirty = 4; }
+  setXmas(on) { this.xmas = on; if (this.globe) this.globe.setXmas(on); if (this.roomObj && this.roomObj.setXmas) this.roomObj.setXmas(on); this.dirty = 4; }
+  setHanukkah(on) { this.hanukkah = on; if (this.globe) this.globe.setHanukkah(on); if (this.roomObj && this.roomObj.setHanukkah) this.roomObj.setHanukkah(on); this.dirty = 4; }
   placeRoom(r) {
     this.roomDef = r;
     const key = [r.kind, r.dims.join(), r.boxPos ? r.boxPos.map((v) => v.toFixed(2)).join() : 'held'].join('|');
@@ -881,6 +906,7 @@ export class MusicBoxScene {
   }
   // zoom buttons: dolly toward or away from what you are looking at
   dolly(k) {
+    if (this.globeOn()) return;
     if (this.followListener) {
       // through your own eyes, zoom narrows or widens your field of view
       this.camera.fov = Math.max(22, Math.min(85, this.camera.fov * k)); this.camera.updateProjectionMatrix(); this.dirty = 3; return;
@@ -951,6 +977,12 @@ export class MusicBoxScene {
         const d = f.clone().sub(this.controls.target).multiplyScalar(Math.min(1, dt * 4));
         this.controls.target.add(d); this.camera.position.add(d);
       }
+    }
+    if (this.globeOn()) {
+      const cw = this.canvas.clientWidth, chh = this.canvas.clientHeight;      // the stage can change size under it (the drawer)
+      if (cw && chh && (cw !== this.gw || chh !== this.gh)) { this.gw = cw; this.gh = chh; this.resize(); }
+      if (this.globe.fire !== (this.litTarget === 1)) this.globe.setFire(this.litTarget === 1);
+      this.globe.frame(dt); this.renderer.render(this.globe.scene, this.globe.camera); return;
     }
     if (this.controls.enabled) this.controls.update();
     if (!this.followListener) this.keepInRoom();
