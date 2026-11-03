@@ -335,7 +335,8 @@ export class SnowGlobe {
   tossMan(k) {
     const W = this.walker; if (!W || k < 0.3) return;
     const a = rnd(0, Math.PI * 2), h = rnd(900, 2200) * k;
-    if (W.mode === 'tossed') { const T = this.toss; T.vx += Math.cos(a) * h * 0.6; T.vz += Math.sin(a) * h * 0.6; T.vy += rnd(1500, 2800) * k; T.vrx += rnd(-5, 5); T.vrz += rnd(-5, 5); return; }
+    if (W.mode === 'tossed') { const T = this.toss; T.vx += Math.cos(a) * h * 0.6; T.vz += Math.sin(a) * h * 0.6; T.vy = Math.min(5200, T.vy + rnd(1500, 2800) * k); T.vrx += rnd(-5, 5); T.vrz += rnd(-5, 5);
+      const hv = Math.hypot(T.vx, T.vz); if (hv > 3500) { T.vx *= 3500 / hv; T.vz *= 3500 / hv; } return; }
     this.toss = { y: this.man.position.y - H(W.x, W.z), vx: Math.cos(a) * h, vz: Math.sin(a) * h, vy: rnd(3600, 5600) * k, rx: 0, rz: 0, vrx: rnd(-9, 9) * k, vrz: rnd(-9, 9) * k, vh: rnd(-6, 6), bounces: 0 };
     W.mode = 'tossed'; W.t = 0;
   }
@@ -427,6 +428,18 @@ export class SnowGlobe {
       const rr = Math.hypot(W.x, W.z), rmax = RG * 0.82;
       if (rr > rmax) { W.x *= rmax / rr; W.z *= rmax / rr; const vn = (T.vx * W.x + T.vz * W.z) / rmax; if (vn > 0) { T.vx -= 1.6 * vn * W.x / rmax; T.vz -= 1.6 * vn * W.z / rmax; } }
       T.rx += T.vrx * dt; T.rz += T.vrz * dt; W.heading += T.vh * dt;
+      // the glass: his middle (wherever the tumble has put it) stays far enough inside that no part of him pokes through
+      {
+        const cy = (CY - YG) / S, room = 0.95 * R / S - 1350;
+        const o = new THREE.Vector3(0, 1100, 0).applyEuler(new THREE.Euler(T.rx, W.heading, T.rz));
+        const fy = H(W.x, W.z) + T.y, px = W.x + o.x, py = fy + o.y - cy, pz = W.z + o.z, d = Math.hypot(px, py, pz);
+        if (d > room) {
+          const nx = px / d, ny = py / d, nz = pz / d, over = d - room;
+          W.x -= nx * over; W.z -= nz * over; T.y -= ny * over;
+          const vn = T.vx * nx + T.vy * ny + T.vz * nz;
+          if (vn > 0) { T.vx -= 1.5 * vn * nx; T.vy -= 1.5 * vn * ny; T.vz -= 1.5 * vn * nz; }
+        }
+      }
       if (T.y <= 0 && T.vy < 0) {
         if (T.vy < -1800 && T.bounces < 2) { T.vy = -T.vy * 0.35; T.vrx *= 0.6; T.vrz *= 0.6; T.bounces++; T.y = 0; this.footprint(W.x, W.z, W.heading); this.footprint(W.x, W.z, W.heading); }
         else { T.y = 0; W.mode = 'flustered'; W.t = 0; W.len = rnd(2.8, 4.2); this.footprint(W.x, W.z, W.heading); this.footprint(W.x, W.z, W.heading);
