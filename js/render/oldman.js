@@ -16,19 +16,29 @@ function fogTexture() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
+// the twelve days of Christmas (Christmas Day to Twelfth Night), when he turns up in a Santa suit.
+// ?santa in the address forces it, for a look out of season
+export function santaSeason(d = new Date()) {
+  try { if (/[?&]santa\b/.test(location.search)) return true; } catch (e) { /* no location */ }
+  const m = d.getMonth(), day = d.getDate();
+  return (m === 11 && day >= 25) || (m === 0 && day <= 5);
+}
+
 // the man himself, built facing +z, his feet at the origin (mm)
-export function oldMan() {
+export function oldMan({ santa = santaSeason() } = {}) {
   const g = new THREE.Group();
   // lit faintly by the room's glow from inside, so he reads against the night
-  const coat = std(0x3a2c22, 0.95, { emissive: 0x120804 }), skin = std(0xc39278, 0.7, { emissive: 0x3a1c10, emissiveIntensity: 0.6 });
+  // in season, a cheap Santa suit, the red gone a bit brown, the fur a bit grey
+  const coat = santa ? std(0x8e1a14, 0.9, { emissive: 0x2a0402 }) : std(0x3a2c22, 0.95, { emissive: 0x120804 }), skin = std(0xc39278, 0.7, { emissive: 0x3a1c10, emissiveIntensity: 0.6 });
   const greys = [0xc9c6c2, 0xa9a6a2, 0xe2e0dc, 0x8c8986, 0xf0eeea].map((c) => std(c, 0.95, { emissive: 0x2a2a2c, emissiveIntensity: 0.5 }));
-  const cap = std(0x6a2420, 0.95, { emissive: 0x1a0806 });
+  const cap = santa ? std(0x9a1c16, 0.9, { emissive: 0x2a0402 }) : std(0x6a2420, 0.95, { emissive: 0x1a0806 });
+  const fur = std(0xe6e0d4, 1, { emissive: 0x2c2a28, emissiveIntensity: 0.6 });
   const add = (geo, m, x, y, z, parent = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); parent.add(o); return o; };
   // body: a heavy old coat, round shoulders, a little stooped
   const body = new THREE.Group(); g.add(body); body.rotation.x = 0.12;
   add(new THREE.CylinderGeometry(270, 310, 1250, 18), coat, 0, 700, 0, body);
   const sh = add(new THREE.SphereGeometry(250, 18, 12), coat, 0, 1330, 0, body); sh.scale.set(1.5, 0.6, 0.72);
-  const collar = add(new THREE.TorusGeometry(120, 45, 8, 20), coat, 0, 1430, 20, body); collar.rotation.x = Math.PI / 2;
+  const collar = add(new THREE.TorusGeometry(santa ? 135 : 120, santa ? 60 : 45, 8, 20), santa ? fur : coat, 0, 1430, 20, body); collar.rotation.x = Math.PI / 2;
   add(new THREE.CylinderGeometry(70, 85, 120, 12), skin, 0, 1450, 30, body);      // neck, mostly hidden
   // the head on its own pivot so he can peer about
   const head = new THREE.Group(); head.position.set(0, 1540, 175); head.scale.setScalar(1.3); body.add(head);   // jutting forward from a stoop
@@ -43,8 +53,19 @@ export function oldMan() {
   }
   // a knitted cap pulled down
   const cp = add(new THREE.SphereGeometry(128, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.4), cap, 0, 30, -6, head); cp.scale.set(1, 1.05, 1.05);
-  add(new THREE.TorusGeometry(112, 22, 8, 24), cap, 0, 74, -4, head).rotation.x = Math.PI / 2 - 0.12;
-  add(new THREE.SphereGeometry(40, 10, 8), cap, 0, 168, -10, head);   // the bobble
+  if (!santa) {
+    add(new THREE.TorusGeometry(112, 22, 8, 24), cap, 0, 74, -4, head).rotation.x = Math.PI / 2 - 0.12;
+    add(new THREE.SphereGeometry(40, 10, 8), cap, 0, 168, -10, head);   // the bobble
+  } else {
+    // a Santa hat: a fur brim, a long red point flopping over to one side and down his back, a grubby pompom
+    add(new THREE.TorusGeometry(120, 34, 8, 24), fur, 0, 70, -4, head).rotation.x = Math.PI / 2 - 0.12;
+    const flop = new THREE.Group(); flop.position.set(0, 120, -10); flop.rotation.set(-0.5, 0, 0.35); head.add(flop);
+    const seg1 = add(new THREE.CylinderGeometry(70, 110, 170, 14), cap, 0, 70, 0, flop);
+    const bend = new THREE.Group(); bend.position.set(0, 150, 0); bend.rotation.set(-0.9, 0, 0.5); flop.add(bend);
+    add(new THREE.ConeGeometry(70, 230, 12), cap, 0, 110, 0, bend);
+    add(new THREE.SphereGeometry(48, 10, 8), fur, 0, 230, 0, bend);
+    void seg1;
+  }
   // hair, brows, moustache and the beard: hundreds of grey tufts and strands, every which way
   const tuft = new THREE.ConeGeometry(1, 1, 5); tuft.translate(0, 0.5, 0);
   const M = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
@@ -71,7 +92,19 @@ export function oldMan() {
   spray(160, () => { const a = R(0.6, Math.PI - 0.6) * (Math.random() < 0.5 ? 1 : -1); return [new THREE.Vector3(Math.sin(a) * 112, R(-40, 40), Math.cos(a) * 112 - 20), new THREE.Vector3(Math.sin(a) * R(0.4, 1), R(-0.8, 0.5), Math.cos(a) * 0.5 - 0.4), R(60, 170), R(7, 14)]; }, head);   // straggling hair from under the cap
   // hands (in woollen mittens) to cup against the glass
   const hands = [];
-  for (const sx of [-1, 1]) { const h = add(new THREE.SphereGeometry(55, 12, 8), std(0x4a3a2c, 0.95, { emissive: 0x100804 }), sx * 230, 900, 120, body); h.scale.set(0.8, 1.15, 0.6); hands.push(h); }
+  for (const sx of [-1, 1]) {
+    const h = add(new THREE.SphereGeometry(55, 12, 8), santa ? std(0x1a1614, 0.8, { emissive: 0x060404 }) : std(0x4a3a2c, 0.95, { emissive: 0x100804 }), sx * 230, 900, 120, body); h.scale.set(0.8, 1.15, 0.6); hands.push(h);
+    if (santa) { const cuff = add(new THREE.TorusGeometry(52, 24, 6, 14), fur, 0, 50, 0, h); cuff.rotation.x = Math.PI / 2; cuff.scale.set(1 / 0.8, 1 / 0.6, 1 / 1.15); }   // fur cuffs on the black gloves
+  }
+  if (santa) {
+    // fur hem and a fur strip down the front, a wide black belt with a brass buckle
+    const hem = add(new THREE.TorusGeometry(312, 42, 8, 28), fur, 0, 110, 0, body); hem.rotation.x = Math.PI / 2;
+    const strip = add(new THREE.BoxGeometry(110, 1150, 50), fur, 0, 720, 288, body); strip.rotation.x = -0.035;
+    add(new THREE.CylinderGeometry(296, 300, 120, 22), std(0x141210, 0.5, { emissive: 0x040404 }), 0, 860, 0, body);
+    const buckle = add(new THREE.BoxGeometry(150, 120, 20), new THREE.MeshStandardMaterial({ color: 0xb08a3a, metalness: 1, roughness: 0.4, emissive: 0x1a1206 }), 0, 860, 302, body);
+    add(new THREE.BoxGeometry(90, 66, 24), std(0x141210, 0.5), 0, 860, 304, body);
+    void buckle;
+  }
   // an old felling axe, held behind his back (on some visits): a worn ash haft, the head peeking over his shoulder
   const axe = new THREE.Group(); axe.visible = false; body.add(axe);
   const haft = std(0x6a4a2c, 0.7, { emissive: 0x140a04 }), steel = new THREE.MeshStandardMaterial({ color: 0x8a8e94, metalness: 0.85, roughness: 0.38, emissive: 0x101214 });
