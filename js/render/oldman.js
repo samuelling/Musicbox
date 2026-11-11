@@ -16,12 +16,12 @@ function fogTexture() {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-// the twelve days of Christmas (Christmas Day to Twelfth Night), when he turns up in a Santa suit.
+// the twelve days leading up to Christmas (Dec 13 through Christmas Day), when he turns up in a Santa suit.
 // ?santa in the address forces it, for a look out of season
 export function santaSeason(d = new Date()) {
   try { if (/[?&]santa\b/.test(location.search)) return true; } catch (e) { /* no location */ }
   const m = d.getMonth(), day = d.getDate();
-  return (m === 11 && day >= 25) || (m === 0 && day <= 5);
+  return m === 11 && day >= 13 && day <= 25;
 }
 
 // the man himself, built facing +z, his feet at the origin (mm)
