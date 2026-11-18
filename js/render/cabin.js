@@ -8,6 +8,13 @@ import { hanukkiah, dreidel, gelt, starOfDavid, flickerHanukkah } from './hanukk
 import { swissTree, garland, stocking, lightString, moravianStar, adventWreath, onWall } from './christmas.js';
 import { woodMaterial } from './materials.js';
 import { regulator, wallMount } from './clocks.js';
+import { pbr, boxUV, planeUV } from './pbr.js';
+import { Q } from './quality.js';
+import { hewnBeam, roundBox, firewood, Fire, candleFlame } from './detail.js';
+import { fieldstone, stoneBlock } from './masonry.js';
+
+// what is outside is seen by firelight-adapted eyes: a deep-blue night, not a bright picture
+export const NIGHT = { valley: 0x33415f, frost: 0x3d4c6c, flake: 0x66728e, veil: 0x2c3650, sky: 0x33415f };
 
 const R = (a, b) => a + Math.random() * (b - a);
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
@@ -314,36 +321,29 @@ export class Cabin {
     const [RX, RY, RZ] = dims.map((v) => v * 1000);
     const g = (this.group = new THREE.Group());
     this.dims = [RX, RY, RZ];
-    const logWood = woodMaterial('walnut', { gloss: 0.04, mm: 900 });
-    logWood.color = new THREE.Color(0xd9b48a);           // weathered larch: lighten the walnut grain
-    const chink = new THREE.MeshStandardMaterial({ color: 0xcdbd9f, roughness: 0.95 });
-    const dark = woodMaterial('walnut', { gloss: 0.1, mm: 700 });
     const W = CABIN_FEATURES.window;
     const win = { x0: W.x0 * 1000, x1: W.x1 * 1000, y0: W.z0 * 1000, y1: W.z1 * 1000 };
     this.win = win;
+    const mesh = (geo, mat, x, y, z, { cast = true, receive = true } = {}) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = receive; g.add(m); return m; };
 
-    // ---- floor: old wide boards ----
-    const fl = oldPlanks(); fl.repeat.set(RX / 2600, RY / 2600);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(RX, RY), new THREE.MeshStandardMaterial({ map: fl, roughness: 0.88 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.set(RX / 2, 0, RY / 2); floor.receiveShadow = true; g.add(floor);
-    // ---- ceiling boards and heavy, smoke-blackened beams ----
-    const timberT = hewnTimber();
-    const timber = (rep) => { const t = timberT.clone(); t.needsUpdate = true; t.repeat.set(rep, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }); };
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(RX, RY), new THREE.MeshStandardMaterial({ map: (() => { const t = fl.clone(); t.needsUpdate = true; t.repeat.set(RX / 2200, RY / 2200); return t; })(), roughness: 0.9, color: 0x6a5444 }));
-    ceil.rotation.x = Math.PI / 2; ceil.position.set(RX / 2, RZ, RY / 2); g.add(ceil);
-    const beamM = timber(RX / 1400); beamM.color = new THREE.Color(0x6a5040);
-    for (let k = 1; k <= 3; k++) { const beam = new THREE.Mesh(new THREE.BoxGeometry(RX + 300, 220, 200), beamM); beam.position.set(RX / 2, RZ - 110, (k / 4) * RY); beam.castShadow = true; g.add(beam); }
+    // ---- floor: old, wide, worn boards (a scan), running the length of the room ----
+    const floorM = pbr('old_wood_floor', { color: new THREE.Color(2.3, 2.0, 1.75), rough: 1.0, normal: 1.3 });
+    const floor = mesh(planeUV(RX, RY, 4200), floorM, RX / 2, 0, RY / 2, { cast: false }); floor.rotation.x = -Math.PI / 2;
+    // ---- ceiling boards and heavy, smoke-darkened beams ----
+    const ceil = mesh(planeUV(RY, RX, 3600), pbr('old_wood_floor', { color: new THREE.Color(1.3, 1.05, 0.9), rough: 1.1 }), RX / 2, RZ, RY / 2, { cast: false }); ceil.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+    // (the roof above keeps the moon off everything but what the window lets in)
+    const roof = mesh(new THREE.PlaneGeometry(RX + 800, RY + 800), new THREE.MeshBasicMaterial({ color: 0x000000 }), RX / 2, RZ + 30, RY / 2, { receive: false }); roof.rotation.x = -Math.PI / 2; roof.material.side = THREE.DoubleSide;
+    const timberM = [0x604531, 0x573d2c, 0x684c36, 0x503a2a].map((c) => pbr('rough_wood', { gray: true, color: c, rough: 1.0, normal: 1.2 }));
+    const beamM = pbr('rough_wood', { gray: true, color: 0x3e2c20, rough: 0.95, normal: 1.2 });
+    for (let k = 1; k <= 3; k++) mesh(hewnBeam(RX + 300, 220, 200, { mm: 620, r: 20, wobble: 4 }), beamM, RX / 2, RZ - 110, (k / 4) * RY);
 
-    // ---- walls: square-hewn timbers laid flat (Blockbau), dark oakum caulking between ----
-    const th = 210, gap = 8, depth = 150;
-    const caulk = new THREE.MeshStandardMaterial({ color: 0x1e140c, roughness: 1 });
-    const mats = [0.85, 0.95, 1.05, 0.9, 1.0].map((k) => { const m = timber(1); m.color = new THREE.Color(k * 0.95, k * 0.88, k * 0.82); return m; });
+    // ---- walls: square-hewn timbers laid flat (Blockbau), eased and uneven, dark oakum between ----
+    const th = 210, gap = 7, depth = 150;
+    const caulk = new THREE.MeshStandardMaterial({ color: 0x1a120b, roughness: 1 });
     let mi = 0;
     const beamLog = (len, x, y, z, alongX) => {
-      const m = mats[mi++ % mats.length].clone(); m.map = m.map.clone(); m.map.needsUpdate = true; m.map.repeat.set(len / 1300, 1); m.map.offset.set(Math.random(), 0);
-      const geo = alongX ? new THREE.BoxGeometry(len, th - gap, depth) : new THREE.BoxGeometry(depth, th - gap, len);
-      if (!alongX) { const uv = geo.attributes.uv; for (let q = 0; q < uv.count; q++) { const u = uv.getX(q); uv.setX(q, u); } }
-      const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); b.receiveShadow = true; b.castShadow = true; g.add(b);
+      const b = mesh(hewnBeam(len, th - gap, depth, { mm: 640, r: 24, wobble: 3.2 }), timberM[mi++ % timberM.length], x, y, z);
+      if (!alongX) b.rotation.y = Math.PI / 2;
     };
     const n = Math.ceil(RZ / th);
     for (let i = 0; i < n; i++) {
@@ -356,36 +356,36 @@ export class Cabin {
       beamLog(RY + 2 * o2, -depth / 2, y, RY / 2, false);
       beamLog(RY + 2 * o2, RX + depth / 2, y, RY / 2, false);
     }
-    const plane = (w, h, x, y, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), caulk); m.position.set(x, y, z); m.rotation.y = ry; g.add(m); };
-    plane(RX, RZ, RX / 2, RZ / 2, -depth + 5, 0);
-    plane(RY, RZ, -depth + 5, RZ / 2, RY / 2, Math.PI / 2);
-    plane(RY, RZ, RX + depth - 5, RZ / 2, RY / 2, -Math.PI / 2);
-    const r = depth;   // (window wall caulking sits just behind the timbers)
-    // back wall chinking with the window hole
-    plane(win.x0, RZ, win.x0 / 2, RZ / 2, RY + depth - 5, Math.PI);
-    plane(RX - win.x1, RZ, (win.x1 + RX) / 2, RZ / 2, RY + depth - 5, Math.PI);
+    const plane = (w, h, x, y, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), caulk); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; g.add(m); };
+    plane(RX + 2 * depth, RZ, RX / 2, RZ / 2, -depth * 0.55, 0);
+    plane(RY + 2 * depth, RZ, -depth * 0.55, RZ / 2, RY / 2, Math.PI / 2);
+    plane(RY + 2 * depth, RZ, RX + depth * 0.55, RZ / 2, RY / 2, -Math.PI / 2);
+    plane(win.x0 + depth, RZ, (win.x0 - depth) / 2, RZ / 2, RY + depth * 0.55, Math.PI);
+    plane(RX - win.x1 + depth, RZ, (win.x1 + RX + depth) / 2, RZ / 2, RY + depth * 0.55, Math.PI);
+    plane(win.x1 - win.x0, win.y0, (win.x0 + win.x1) / 2, win.y0 / 2, RY + depth * 0.55, Math.PI);
+    plane(win.x1 - win.x0, RZ - win.y1, (win.x0 + win.x1) / 2, (RZ + win.y1) / 2, RY + depth * 0.55, Math.PI);
 
     // ---- the window: deep frame, six panes, frost, a sill with a little snow outside ----
-    const frameM = woodMaterial('walnut', { gloss: 0.3, mm: 600 });
+    const frameM = pbr('wood_table_worn', { color: new THREE.Color(1.5, 1.3, 1.15), rough: 0.9 });
     const ww = win.x1 - win.x0, wh = win.y1 - win.y0, cx = (win.x0 + win.x1) / 2, cy = (win.y0 + win.y1) / 2, zf = RY + 30;
-    const bx = (w, h, d, x, y, z, m = frameM) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
+    const bx = (w, h, d, x, y, z, grain = 'x') => mesh(roundBox(w, h, d, 6, 520, grain), frameM, x, y, z);
     bx(ww + 140, 80, 260, cx, win.y0 - 40, RY + 40); bx(ww + 140, 80, 240, cx, win.y1 + 40, RY + 40);
-    bx(80, wh + 160, 240, win.x0 - 40, cy, RY + 40); bx(80, wh + 160, 240, win.x1 + 40, cy, RY + 40);
+    bx(80, wh + 160, 240, win.x0 - 40, cy, RY + 40, 'y'); bx(80, wh + 160, 240, win.x1 + 40, cy, RY + 40, 'y');
     bx(ww + 200, 40, 200, cx, win.y0 - 70, RY - 70);                          // inner sill
-    bx(40, wh, 60, cx, cy, zf); for (const f of [1 / 3, 2 / 3]) bx(ww, 40, 60, cx, win.y0 + wh * f, zf);
+    bx(40, wh, 60, cx, cy, zf, 'y'); for (const f of [1 / 3, 2 / 3]) bx(ww, 40, 60, cx, win.y0 + wh * f, zf);
     const frost = frostTexture();
     this.oldMan = addOldMan(g, { x0: win.x0, x1: win.x1, y0: win.y0, zGlass: zf });      // a very rare visitor
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshPhysicalMaterial({ color: 0xdfe8f5, roughness: 0.08, transparent: true, opacity: 0.12, depthWrite: false }));
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshPhysicalMaterial({ color: 0xdfe8f5, roughness: 0.04, transparent: true, opacity: 0.1, depthWrite: false, envMapIntensity: 1.5 }));
     glass.position.set(cx, cy, zf); glass.rotation.y = Math.PI; g.add(glass);
     for (let i = 0; i < 2; i++) for (let j = 0; j < 3; j++) {
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww / 2 - 30, wh / 3 - 30), new THREE.MeshBasicMaterial({ color: 0xcfe0ff, alphaMap: frost, transparent: true, opacity: 0.6, depthWrite: false }));
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(ww / 2 - 30, wh / 3 - 30), new THREE.MeshBasicMaterial({ color: NIGHT.frost, alphaMap: frost, transparent: true, opacity: 0.6, depthWrite: false }));
       pane.position.set(win.x0 + ww * (i + 0.5) / 2, win.y0 + wh * (j + 0.5) / 3, zf - 2); pane.rotation.y = Math.PI; g.add(pane);
     }
-    const snowM = new THREE.MeshStandardMaterial({ color: 0xf2f6ff, roughness: 0.9, emissive: 0x223355, emissiveIntensity: 0.3 });
+    const snowM = new THREE.MeshStandardMaterial({ color: 0xf2f6ff, roughness: 0.9, emissive: 0x223355, emissiveIntensity: 0.12 });
     const drift = new THREE.Mesh(new THREE.CapsuleGeometry(45, ww - 60, 6, 12), snowM); drift.rotation.z = Math.PI / 2; drift.scale.set(1, 1, 1.6); drift.position.set(cx, win.y0 - 10, RY + 150); g.add(drift);
 
     // ---- outside: the valley, and snow falling past the window ----
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(20000, 8800), new THREE.MeshBasicMaterial({ map: valleyTexture(), fog: false }));
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(20000, 8800), new THREE.MeshBasicMaterial({ map: valleyTexture(), color: NIGHT.valley, fog: false }));
     back.position.set(cx, 2900, RY + 7000); back.rotation.y = Math.PI; g.add(back);
     const NF = 2600, pos = new Float32Array(NF * 3); this.flakes = [];
     for (let i = 0; i < NF; i++) {
@@ -393,64 +393,83 @@ export class Cabin {
       this.flakes.push(f);
     }
     this.snowGeo = new THREE.BufferGeometry(); this.snowGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const snow = new THREE.Points(this.snowGeo, new THREE.PointsMaterial({ size: 38, map: flakeTexture(), transparent: true, depthWrite: false, color: 0xdfe8ff, fog: false }));
+    const snow = new THREE.Points(this.snowGeo, new THREE.PointsMaterial({ size: 38, map: flakeTexture(), transparent: true, depthWrite: false, color: NIGHT.flake, fog: false }));
     snow.frustumCulled = false; g.add(snow);
     // blowing snow: a whiteout veil that thickens with each gust
-    this.veil = new THREE.Mesh(new THREE.PlaneGeometry(14000, 8000), new THREE.MeshBasicMaterial({ color: 0xaab4c4, transparent: true, opacity: 0.35, depthWrite: false, fog: false }));
+    this.veil = new THREE.Mesh(new THREE.PlaneGeometry(14000, 8000), new THREE.MeshBasicMaterial({ color: NIGHT.veil, transparent: true, opacity: 0.35, depthWrite: false, fog: false }));
     this.veil.position.set(cx, 2500, RY + 2600); this.veil.rotation.y = Math.PI; g.add(this.veil);
     this.cx = cx; this.wind = 0; this.gust = 0;
 
-    // ---- fireplace on the x = 0 wall: raised hearth, stone breast, mantel, logs, flames ----
+    // ---- fireplace on the x = 0 wall: raised hearth, dry-laid stone, a timber mantel, a wood fire ----
     const F = CABIN_FEATURES.fireplace, fy0 = F.y0 * 1000, fy1 = F.y1 * 1000, fd = F.depth * 1000, fc = (fy0 + fy1) / 2;
-    const st = stoneTexture(); st.repeat.set(2, 3);
-    const stone = new THREE.MeshStandardMaterial({ map: st, roughness: 0.92 });
-    const sb = (w, h, d, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stone); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); };
-    const openW = 820, openH = 640, hearthH = 300;
-    sb(fd, hearthH, fy1 - fy0 + 200, fd / 2, hearthH / 2, fc);                                       // hearth
-    sb(fd, RZ - hearthH - openH, fy1 - fy0, fd / 2, hearthH + openH + (RZ - hearthH - openH) / 2, fc); // breast above
-    sb(fd, openH, (fy1 - fy0 - openW) / 2, fd / 2, hearthH + openH / 2, fy0 + (fy1 - fy0 - openW) / 4);
-    sb(fd, openH, (fy1 - fy0 - openW) / 2, fd / 2, hearthH + openH / 2, fy1 - (fy1 - fy0 - openW) / 4);
-    const soot = new THREE.Mesh(new THREE.BoxGeometry(30, openH, openW), new THREE.MeshStandardMaterial({ color: 0x120c09, roughness: 1 }));
-    soot.position.set(40, hearthH + openH / 2, fc); g.add(soot);
-    const mantel = new THREE.Mesh(new THREE.BoxGeometry(fd + 120, 150, fy1 - fy0 + 260), dark); mantel.position.set(fd / 2 + 40, hearthH + openH + 75, fc); mantel.castShadow = true; g.add(mantel);
-    // logs, embers
-    const logM = new THREE.MeshStandardMaterial({ color: 0x3a2618, roughness: 0.9 });
-    for (const [a, dz, dy] of [[0.35, -90, 0], [-0.3, 90, 0], [0.05, 0, 110]]) {
-      const l = new THREE.Mesh(new THREE.CylinderGeometry(55, 60, 560, 12), logM); l.rotation.x = Math.PI / 2; l.rotation.y = a;
-      l.position.set(fd * 0.55, hearthH + 60 + dy, fc + dz); g.add(l);
-    }
-    const emberM = new THREE.MeshBasicMaterial({ color: 0xff5a14 });
-    this.embers = new THREE.Mesh(new THREE.BoxGeometry(fd * 0.6, 24, openW * 0.7), emberM); this.embers.position.set(fd * 0.55, hearthH + 14, fc); g.add(this.embers);
-    // flames: additive teardrops that flicker
-    this.flames = [];
-    const flameCols = [0xffd27a, 0xff9a3a, 0xff6a1a];
-    for (let i = 0; i < 9; i++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), new THREE.MeshBasicMaterial({ color: flameCols[i % 3], transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
-      const base = new THREE.Vector3(fd * R(0.45, 0.65), hearthH + 120, fc + R(-220, 220));
-      m.position.copy(base); g.add(m);
-      this.flames.push({ m, base, ph: R(0, 6.28), h: R(160, 300), w: R(45, 80) });
-    }
-    this.fireLight = new THREE.PointLight(0xff8a3c, 2.4e6, 0, 2);
-    this.fireLight.position.set(fd + 220, hearthH + 260, fc); g.add(this.fireLight);
-    this.fireN = 0; this.t = 0; this.fire = 0; this.fireTarget = 0;   // the fire is laid but unlit until you light the candle
+    // fieldstone: every stone its own lump (see masonry.js), bedded in recessed lime mortar
+    const rock = pbr('rock_boulder_dry', { gray: true, vertexColors: true, color: 0xc4c4c4, rough: 1.0, normal: 1.6 });
+    const sootRock = pbr('rock_boulder_dry', { gray: true, vertexColors: true, color: 0x2c2826, rough: 1.1, normal: 1.6 });
+    const mortar = pbr('painted_plaster_wall', { color: 0x74695c, rough: 1.15, normal: 2.2 });
+    const sb = (w, h, d, x, y, z, m = mortar) => mesh(boxUV(w, h, d, 900), m, x, y, z);
+    const openW = 820, openH = 640, hearthH = 300, jamb = (fy1 - fy0 - openW) / 2, fbk = 60, FW = fy1 - fy0, y0f = hearthH + 30;
+    sb(fd, hearthH, FW + 200, fd / 2, hearthH / 2, fc);                                       // hearth
+    sb(fd, RZ - hearthH - openH, FW, fd / 2, hearthH + openH + (RZ - hearthH - openH) / 2, fc); // breast above
+    sb(fd, openH, jamb, fd / 2, hearthH + openH / 2, fy0 + jamb / 2);
+    sb(fd, openH, jamb, fd / 2, hearthH + openH / 2, fy1 - jamb / 2);
+    sb(fbk, openH, openW, fbk / 2, hearthH + openH / 2, fc, new THREE.MeshStandardMaterial({ color: 0x0c0907, roughness: 1 }));
+    const panel = (geo, x, y, z, ry, mat = rock) => { const m = mesh(geo, mat, x, y, z); m.rotation.y = ry; return m; };
+    const hx0 = FW / 2 - openW / 2, hx1 = FW / 2 + openW / 2;
+    // the chimney breast: front (with the opening and the lintel's seat) and both sides
+    panel(fieldstone(FW, RZ - y0f, { over: [50, 50, 0, 0], holes: [{ x0: hx0, x1: hx1, y0: -1, y1: openH - 30 }, { x0: hx0 - 130, x1: hx1 + 130, y0: openH - 30, y1: openH + 115 }] }), fd, y0f, fy1, Math.PI / 2);
+    panel(fieldstone(fd, RZ - y0f, { over: [0, 50, 0, 0] }), 0, y0f, fy1, 0);
+    panel(fieldstone(fd, RZ - y0f, { over: [50, 0, 0, 0] }), fd, y0f, fy0, Math.PI);
+    // the raised hearth: bigger stones
+    const big = { cell: [250, 150], bulge: [30, 70] };
+    panel(fieldstone(FW + 200, hearthH + 6, { ...big, over: [50, 50, 0, 0] }), fd, 0, fy1 + 100, Math.PI / 2);
+    panel(fieldstone(fd, hearthH + 6, { ...big, over: [0, 50, 0, 0] }), 0, 0, fy1 + 100, 0);
+    panel(fieldstone(fd, hearthH + 6, { ...big, over: [50, 0, 0, 0] }), fd, 0, fy0 - 100, Math.PI);
+    // inside the firebox: the same stones, smaller and blackened
+    const sooty = { cell: [150, 105], bulge: [8, 26], soot: 0.85 };
+    panel(fieldstone(openW, openH - 30, sooty), fbk, y0f, fc + openW / 2, Math.PI / 2, sootRock);
+    panel(fieldstone(fd - fbk, openH - 30, { ...sooty, soot: 0.3 }), fd, y0f, fc + openW / 2, Math.PI, sootRock);
+    panel(fieldstone(fd - fbk, openH - 30, { ...sooty, soot: 0.3 }), fbk, y0f, fc - openW / 2, 0, sootRock);
+    // one long stone carries the breast over the opening
+    panel(stoneBlock(openW + 260, 145, 72, { tint: [0.52, 0.5, 0.47] }), fd, hearthH + openH, fy1 - (hx0 - 130), Math.PI / 2);
+    // hearthstones: a few broad flags, proud of the stonework
+    const flags = new THREE.Mesh(fieldstone(FW + 300, fd + 70, { cell: [520, 300], bulge: [34, 44], joint: 9, flat: 1, tint: [0.4, 0.4, 0.4] }), rock);
+    flags.rotation.set(-Math.PI / 2, 0, -Math.PI / 2); flags.position.set(-6, hearthH, fy0 - 150); flags.castShadow = flags.receiveShadow = true; g.add(flags);
+    const mantelM = pbr('rough_wood', { gray: true, color: 0x4a3222, rough: 0.8, normal: 1.0 });
+    const mantel = mesh(hewnBeam(FW + 260, 150, fd + 130, { mm: 600, r: 16, wobble: 2.5 }), mantelM, fd / 2 + 70, hearthH + openH + 235, fc); mantel.rotation.y = Math.PI / 2;
+    for (const dz of [-1, 1]) mesh(roundBox(120, 150, 100, 10, 500, 'y'), mantelM, fd + 86, hearthH + openH + 105, fc + dz * (FW / 2 - 110));   // corbels under the mantel
+    const bark = pbr('pine_bark', { rough: 1.0, normal: 1.5, color: 0xc8b8a8 });
+    this.fireFx = new Fire({ width: 620, bark, light: 3.4e6 });
+    this.fireFx.group.position.set(fd * 0.55 + 20, hearthH + 40, fc); g.add(this.fireFx.group);
+    this.fireLight = this.fireFx.light;
+    this.t = 0; this.fire = 0; this.fireTarget = 0;   // the fire is laid but unlit until you light the candle
     this.moon = [2.6, RY / 1000 + 3, 3.6];
     this.clock = wallMount(g, [RX, RY], regulator(), 'y1', 1150, 1460);
     // an Alpine watercolour over the mantel, in a carved Swiss frame; the alphorn in the corner
-    wallMount(g, [RX, RY], { g: framedWatercolour() }, 'x0', fc, hearthH + openH + 640, fd + 2);
+    wallMount(g, [RX, RY], { g: framedWatercolour() }, 'x0', fc, hearthH + openH + 760, fd + 70);
     const horn = alphorn(); horn.position.set(110, 0, RY - 110); horn.rotation.y = Math.PI / 4; g.add(horn);
     // where Christmas goes (built the first time it's wanted): the tree in the corner by the hearth, a garland on the mantel
-    this.xmasAt = { mantelX: fd + 105, mantelY: hearthH + openH + 135, z0: fy0 - 60, z1: fy1 + 60, fc, RX, RY };
+    this.xmasAt = { mantelX: fd + 125, mantelY: hearthH + openH + 310, z0: fy0 - 60, z1: fy1 + 60, fc, RX, RY };
+    // a woven rug before the hearth
+    const rugT = rugTexture();
+    const rug = mesh(new THREE.PlaneGeometry(1250, 1900, 24, 36), new THREE.MeshStandardMaterial({ map: rugT, roughness: 1, color: 0xd8d0c8 }), fd + 900, 7, fc, { cast: false });
+    { const P = rug.geometry.attributes.position; for (let i = 0; i < P.count; i++) P.setZ(i, 2.5 * Math.sin(P.getX(i) * 0.011 + 1) * Math.sin(P.getY(i) * 0.008) + 1.5 * Math.sin(P.getY(i) * 0.031)); rug.geometry.computeVertexNormals(); }
+    rug.rotation.x = -Math.PI / 2; rug.rotation.z = Math.PI / 2 + 0.04;
+    rugT.rotation = 0; this.rug = rug;
 
     // ---- a corner bench (the Eckbank of a farmhouse Stube) and firewood by the hearth ----
-    const benchM = timber(2); benchM.color = new THREE.Color(0x9a7a60);
+    const benchM = pbr('wood_table_worn', { color: new THREE.Color(2.0, 1.75, 1.5), rough: 0.85 });
     const bench = (len, x, z, alongX) => {
-      const seat = new THREE.Mesh(alongX ? new THREE.BoxGeometry(len, 50, 420) : new THREE.BoxGeometry(420, 50, len), benchM); seat.position.set(x, 440, z); seat.castShadow = seat.receiveShadow = true; g.add(seat);
-      const front = new THREE.Mesh(alongX ? new THREE.BoxGeometry(len, 415, 30) : new THREE.BoxGeometry(30, 415, len), benchM);
-      front.position.set(alongX ? x : x + (x < RX / 2 ? 190 : -190), 208, alongX ? z + (z < RY / 2 ? 190 : -190) : z); g.add(front);
-      const back = new THREE.Mesh(alongX ? new THREE.BoxGeometry(len, 420, 40) : new THREE.BoxGeometry(40, 420, len), benchM);
-      back.position.set(alongX ? x : x + (x < RX / 2 ? -190 : 190), 690, alongX ? z + (z < RY / 2 ? -190 : 190) : z); back.rotation[alongX ? 'x' : 'z'] = (alongX ? (z < RY / 2 ? -1 : 1) : (x < RX / 2 ? 1 : -1)) * 0.12; g.add(back);
+      const gr = alongX ? 'x' : 'z';
+      mesh(alongX ? roundBox(len, 50, 420, 9, 560, gr) : roundBox(420, 50, len, 9, 560, gr), benchM, x, 440, z);
+      mesh(alongX ? roundBox(len, 415, 30, 5, 560, gr) : roundBox(30, 415, len, 5, 560, gr), benchM, alongX ? x : x + (x < RX / 2 ? 190 : -190), 208, alongX ? z + (z < RY / 2 ? 190 : -190) : z);
+      const back = mesh(alongX ? roundBox(len, 420, 40, 7, 560, gr) : roundBox(40, 420, len, 7, 560, gr), benchM, alongX ? x : x + (x < RX / 2 ? -190 : 190), 690, alongX ? z + (z < RY / 2 ? -190 : 190) : z);
+      back.rotation[alongX ? 'x' : 'z'] = (alongX ? (z < RY / 2 ? -1 : 1) : (x < RX / 2 ? 1 : -1)) * 0.12;
     };
     bench(2200, RX - 1100, RY - 210, true); bench(1900, RX - 210, RY - 420 - 950, false);
+    // a folded woollen blanket and a cushion left on the bench
+    const wool = pbr('poly_wool_herringbone', { color: 0x6a2e22, gray: true, rough: 1, normal: 1.4, repeat: [3, 3] });
+    const blanket = mesh(roundBox(520, 70, 360, 28, 99999), wool, RX - 1750, 500, RY - 215); blanket.rotation.y = 0.12;
+    const cush = mesh(roundBox(360, 110, 360, 54, 99999, 'x', 4), pbr('knitted_fleece', { color: 0x4a3a2e, gray: true, rough: 1, normal: 1.5, repeat: [2.5, 2.5] }), RX - 225, 522, RY - 1050); cush.rotation.set(0.04, 0.3, -0.08);
     // candles in iron sconces on the walls over the corner bench, to warm that dark corner (lit with the fire)
     this.sconces = [];
     const iron = new THREE.MeshStandardMaterial({ color: 0x1c1a18, metalness: 0.7, roughness: 0.5 });
@@ -465,7 +484,8 @@ export class Cabin {
       part(new THREE.CylinderGeometry(62, 50, 14, 20), iron, 0, 30, 190);
       part(new THREE.CylinderGeometry(24, 25, 190, 16), wax, 0, 132, 190);
       const drip = part(new THREE.SphereGeometry(10, 8, 6), wax, 14, 210, 205); drip.scale.y = 2;
-      const flame = part(new THREE.SphereGeometry(10, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffd27a }), 0, 252, 190); flame.castShadow = false;
+      const flame = candleFlame(64, 26); flame.position.set(0, 230, 190); s.add(flame);
+      const wick = part(new THREE.CylinderGeometry(2, 2.4, 16, 6), new THREE.MeshStandardMaterial({ color: 0x120c08, roughness: 1 }), 0, 232, 190); wick.castShadow = false;
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.set(0, 250, 190); halo.scale.setScalar(320); s.add(halo);
       this.sconces.push({ flame, halo, ph: R(0, 6) });
     };
@@ -474,10 +494,11 @@ export class Cabin {
     this.sconceLvl = 0;
     // the door, barred with a beam
     mountDoor(g, RX, RY, lockedDoor('cabin'), 'x1', 1150);
-    const woodM = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.95 }), endM = new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.9 });
+    // the woodpile by the hearth: rounds and splits, bark and pale ends
     for (let row = 0; row < 5; row++) for (let k = 0; k < 6 - (row % 2); k++) {
-      const rr = R(55, 70), lg = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, 420, 9), [woodM, endM, endM]);
-      lg.rotation.x = Math.PI / 2; lg.position.set(130 + k * 125 + (row % 2) * 62, 70 + row * 112, fy1 + 360); lg.rotation.y = R(-0.05, 0.05); lg.castShadow = true; g.add(lg);
+      const rr = R(55, 68), kind = Math.random() < 0.45 ? 'round' : Math.random() < 0.6 ? 'half' : 'quarter';
+      const lg = firewood(rr, R(380, 440), bark, { kind });
+      lg.position.set(130 + k * 125 + (row % 2) * 62, 70 + row * 112, fy1 + 360 + R(-12, 12)); lg.rotation.set(0, R(-0.05, 0.05), R(0, 6.28)); g.add(lg);
     }
   }
 
@@ -544,22 +565,12 @@ export class Cabin {
     let fl = 0;
     for (const c of this.sconces) {
       const k = 0.85 + 0.12 * Math.sin(this.t * (7 + c.ph) + c.ph) + 0.06 * Math.sin(this.t * 19.3 + c.ph * 3);
-      c.flame.visible = c.halo.visible = SL > 0.02; c.flame.scale.set(0.9 * SL, 2.3 * k * SL, 0.9 * SL); c.flame.position.x = 2.5 * Math.sin(this.t * 5.1 + c.ph);
-      c.halo.material.opacity = 0.75 * SL * k; fl += k;
+      c.flame.visible = c.halo.visible = SL > 0.02; const fu = c.flame.material.uniforms; fu.time.value = this.t + c.ph; fu.opacity.value = Math.min(1, SL * 1.5); fu.size.value.set(26 * (0.6 + 0.4 * SL), 64 * k * SL); fu.lean.value = 0.12 * Math.sin(this.t * 2.1 + c.ph) + 0.06 * Math.sin(this.t * 6.7 + c.ph);
+      c.halo.material.opacity = (Q.post ? 0.3 : 0.75) * SL * k; fl += k;
     }
-    this.sconceLight.intensity = 1.6e5 * SL * (fl / Math.max(1, this.sconces.length));
-    // fire: a smoothed random walk drives light and flames
-    this.fireN += (Math.random() * 2 - 1 - this.fireN) * Math.min(1, dt * 8);
-    // catching: kindling first (a few seconds), then the logs; banked back to embers when snuffed
+    this.sconceLight.intensity = 5.5e5 * SL * (fl / Math.max(1, this.sconces.length));
+    // fire: catching (kindling first, a few seconds, then the logs); banked back to embers when snuffed
     this.fire += (this.fireTarget - this.fire) * Math.min(1, dt * (this.fireTarget > this.fire ? 0.45 : 0.25));
-    const F = this.fire, lvl = (1 + 0.22 * this.fireN + 0.08 * Math.sin(this.t * 13.7)) * F;
-    this.fireLight.intensity = 2.4e6 * lvl + 4e4;
-    this.embers.material.color.setRGB(0.25 + 0.75 * F, 0.06 + 0.3 * F + 0.08 * lvl, 0.02 + 0.06 * F);
-    for (const f of this.flames) {
-      const s = (0.7 + 0.3 * Math.sin(this.t * (5 + f.ph) + f.ph) + 0.15 * this.fireN) * Math.min(1, F * 1.4) + 1e-3;
-      f.m.visible = F > 0.02;
-      f.m.scale.set(f.w * 0.8 * Math.min(1, 0.4 + F), f.h * s, f.w * Math.min(1, 0.4 + F));
-      f.m.position.set(f.base.x, f.base.y + f.h * s * 0.5, f.base.z + 18 * Math.sin(this.t * 3.1 + f.ph));
-    }
+    this.fireFx.update(dt, this.fire);
   }
 }

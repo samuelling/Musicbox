@@ -3,7 +3,8 @@
 // clock of its own showing the real time.
 import * as THREE from 'three';
 import { woodMaterial } from './materials.js';
-import { Cabin, valleyTexture, flakeTexture, stoneTexture } from './cabin.js';
+import { Cabin, valleyTexture, flakeTexture, stoneTexture, NIGHT } from './cabin.js';
+import { pbr } from './pbr.js';
 import { cuckoo, mantel, longcase, chapelDial, labClock, wallMount } from './clocks.js';
 import { lockedDoor, mountDoor, sealedHatch } from './doors.js';
 import { addOldMan } from './oldman.js';
@@ -79,7 +80,7 @@ class Room {
   // floor, ceiling and four walls; holes: [{ wall:'y1', x0, x1, z0, z1 }] window openings
   shell(floorMat, wallMat, ceilMat, holes = [], wallRep = 2000) {
     const { RX, RY, RZ } = this;
-    const pl = (w, h, mat, x, y, z, rx, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); m.receiveShadow = true; this.group.add(m); return m; };
+    const pl = (w, h, mat, x, y, z, rx, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); m.receiveShadow = true; m.castShadow = true; this.group.add(m); return m; };
     pl(RX, RY, floorMat, RX / 2, 0, RY / 2, -Math.PI / 2, 0);
     pl(RX, RY, ceilMat, RX / 2, RZ, RY / 2, Math.PI / 2, 0);
     const wallUV = (m, w, h, u0 = 0, v0 = 0) => { const uv = m.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, (u0 + uv.getX(i) * w) / wallRep, (v0 + uv.getY(i) * h) / wallRep); };
@@ -113,7 +114,7 @@ class Room {
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(ww, wh), new THREE.MeshPhysicalMaterial({ color: 0xdfe8f5, roughness: 0.05, transparent: true, opacity: 0.1, depthWrite: false }));
     glass.position.set(cx, cy, zf); glass.rotation.y = Math.PI; this.group.add(glass);
     // the snowy night: a lit-from-nowhere valley and falling flakes, calmer than the hut's storm
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(14000, 6200), new THREE.MeshBasicMaterial({ map: sky || valleyTexture(), fog: false, color: 0xb8c0d0 }));
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(14000, 6200), new THREE.MeshBasicMaterial({ map: sky || valleyTexture(), fog: false, color: NIGHT.valley }));
     back.position.set(cx, 2000, RY + 5000); back.rotation.y = Math.PI; this.group.add(back);
     if (snow) this.snow(cx, RY);
     this.updaters.push(addOldMan(this.group, { x0, x1, y0: z0, zGlass: zf }));   // a very rare visitor
@@ -130,7 +131,7 @@ class Room {
     const NF = 900, pos = new Float32Array(NF * 3), flakes = [];
     for (let i = 0; i < NF; i++) flakes.push({ x: R(cx - 3000, cx + 3000), y: R(-600, 4600), z: R(RY + 250, RY + 4500), v: R(350, 750), ph: R(0, 6.28), a: R(60, 200) });
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 30, map: flakeTexture(), transparent: true, depthWrite: false, color: 0xdfe8ff, fog: false }));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 30, map: flakeTexture(), transparent: true, depthWrite: false, color: NIGHT.flake, fog: false }));
     pts.frustumCulled = false; this.group.add(pts);
     let t = 0;
     this.updaters.push((dt) => {
@@ -180,7 +181,7 @@ class Nursery extends Room {
     super(dims); const { RX, RY, RZ } = this;
     const wp = wallpaper();
     const W = { x0: 650, x1: 1650, z0: 900, z1: 2050 };
-    this.shell(new THREE.MeshStandardMaterial({ map: (() => { const t = carpet(); t.repeat.set(RX / 900, RY / 900); return t; })(), roughness: 1 }),
+    this.shell(pbr('dirty_carpet', { gray: true, color: 0xcfc2a8, rough: 1, normal: 1.6, repeat: [RX / 700, RY / 700] }),
       new THREE.MeshStandardMaterial({ map: wp, roughness: 0.85 }), new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.9 }), [{ wall: 'y1', ...W }], 900);
     const white = new THREE.MeshStandardMaterial({ color: 0xf1ede4, roughness: 0.55 });
     this.skirting(white, 110);
@@ -238,7 +239,7 @@ class Living extends Room {
     super(dims); const { RX, RY, RZ } = this;
     const W = { x0: 1600, x1: 2900, z0: 850, z1: 2200 };
     const fl = herringbone([168, 120, 72], [120, 80, 46]); fl.repeat.set(RX / 1600, RY / 1600);
-    this.shell(new THREE.MeshStandardMaterial({ map: fl, roughness: 0.55 }), new THREE.MeshStandardMaterial({ map: plaster('#8c9a84'), roughness: 0.92 }), new THREE.MeshStandardMaterial({ color: 0xece8de, roughness: 0.95 }), [{ wall: 'y1', ...W }], 1600);
+    this.shell(pbr('herringbone_parquet', { color: new THREE.Color(1.15, 1.0, 0.85), rough: 0.9, repeat: [RX / 3000, RY / 3000], physical: { clearcoat: 0.25, clearcoatRoughness: 0.35 } }), pbr('painted_plaster_wall', { gray: true, color: 0x8c9a84, rough: 1, normal: 1.2 }), new THREE.MeshStandardMaterial({ color: 0xece8de, roughness: 0.95 }), [{ wall: 'y1', ...W }], 1600);
     const white = new THREE.MeshStandardMaterial({ color: 0xeee8dc, roughness: 0.55 });
     this.skirting(white, 160);
     // dado rail and picture rail
@@ -293,7 +294,7 @@ class Parlor extends Room {
     const W = { x0: 2550, x1: 4050, z0: 800, z1: 2900 };
     const fl = herringbone([150, 98, 56], [96, 58, 30]); fl.repeat.set(RX / 2000, RY / 2000);
     const oak = woodMaterial('oak', { gloss: 0.55, mm: 900 }); oak.color = new THREE.Color(0xa8805a);
-    this.shell(new THREE.MeshStandardMaterial({ map: fl, roughness: 0.45 }), oak, new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.8 }), [{ wall: 'y1', ...W }], 2400);
+    this.shell(pbr('rectangular_parquet', { color: new THREE.Color(1.1, 0.95, 0.85), rough: 0.85, repeat: [RX / 2250, RY / 2250], physical: { clearcoat: 0.35, clearcoatRoughness: 0.3 } }), pbr('wooden_panels', { color: new THREE.Color(1.9, 1.6, 1.4), rough: 0.9, normal: 1.3, physical: { clearcoat: 0.2, clearcoatRoughness: 0.4 } }), new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.8 }), [{ wall: 'y1', ...W }], 2400);
     // raised panels on every wall up to the frieze, a cornice and coffered beams overhead
     const rail = woodMaterial('oak', { gloss: 0.6, mm: 600 }); rail.color = new THREE.Color(0x8a6444);
     const panels = (len, put) => { const pw = 700; for (let u = 120; u + pw < len - 60; u += pw + 120) for (const [z0, z1] of [[200, 900], [1050, 2550]]) put(u + pw / 2, (z0 + z1) / 2, pw, z1 - z0); };
@@ -363,7 +364,7 @@ class Chapel extends Room {
     // keep the window behind the box clear for the great clock
     const bx = box ? box[0] * 1000 : RX / 2;
     const lan = lancets.filter((l) => l.wall !== 'y1' || Math.abs((l.x0 + l.x1) / 2 - bx) > 1300);
-    this.shell(new THREE.MeshStandardMaterial({ map: fl, roughness: 0.8 }), wallM, new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 }), lan, 2400);
+    this.shell(pbr('slate_floor_02', { color: new THREE.Color(1.2, 1.2, 1.25), gray: true, rough: 0.85, normal: 1.4, repeat: [RX / 2600, RY / 2600] }), pbr('medieval_blocks_05', { color: 0xcfc6b8, rough: 1, normal: 1.6, ao: 1.2 }), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 }), lan, 2600);
     for (const [i, l] of lan.entries()) {
       const w = l.x1 - l.x0, h = l.z1 - l.z0, z = l.wall === 'y1' ? RY + 80 : -80;
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: stainedGlass(i), color: 0x4a5878, fog: false }));

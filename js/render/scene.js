@@ -7,6 +7,30 @@ import { HamsterRig, CAGE } from './hamster-scene.js';
 import { woodMaterial, boxGeo, velvetMaterial, inlayMaterial } from './materials.js';
 import { makeRoom } from './rooms.js';
 import { SnowGlobe } from './snowglobe.js';
+import { Q } from './quality.js';
+import { PostFX } from './postfx.js';
+import { onTexture, pbr, metal, boxUV } from './pbr.js';
+import { roundBox } from './detail.js';
+
+// the case woods, as scanned veneers under lacquer (grain shrunk to suit a small box)
+const VENEER = { maple: ['white_maple_veneer', 240], walnut: ['walnut_veneer', 320], rosewood: ['rosewood_veneer1', 420] };
+const veneer = (kind, gloss = 0.6) => pbr(VENEER[kind][0], { rough: 0.85, normal: 0.5, physical: { clearcoat: gloss, clearcoatRoughness: 0.1 } });
+// a slotted screw, head up (+y), radius r
+function screw(r, mat, slotMat) {
+  const g = new THREE.Group();
+  const head = new THREE.Mesh(new THREE.LatheGeometry([[0, 0.62], [0.55, 0.6], [0.92, 0.42], [1, 0.12], [1, 0], [0, 0]].map(([x, y]) => new THREE.Vector2(x * r, y * r)), 20), mat); head.castShadow = true; g.add(head);
+  const slot = new THREE.Mesh(new THREE.BoxGeometry(r * 1.9, r * 0.3, r * 0.28), slotMat); slot.position.y = r * 0.52; g.add(slot);
+  g.rotation.y = Math.random() * Math.PI;
+  return g;
+}
+// a spur gear blank with teeth, axis along x
+function gearGeo(R, teeth, thick, bore = 0) {
+  const sh = new THREE.Shape(), N = teeth * 4, h = Math.min(0.9, R * 0.08);
+  for (let i = 0; i <= N; i++) { const a = (i / N) * Math.PI * 2, k = i % 4, r = k === 1 || k === 2 ? R + h : R - h * 0.4; const x = Math.cos(a) * r, y = Math.sin(a) * r; if (i) sh.lineTo(x, y); else sh.moveTo(x, y); }
+  if (bore) { const p = new THREE.Path(); p.absarc(0, 0, bore, 0, Math.PI * 2, true); sh.holes.push(p); }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: thick, bevelEnabled: false, curveSegments: 4 }); g.translate(0, 0, -thick / 2); g.rotateY(Math.PI / 2);
+  return g;
+}
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { TINE_MATERIALS, PLATE_MATERIALS, ENCLOSURES, SURFACES, PIN } from '../physics/constants.js';
@@ -18,7 +42,7 @@ export class MusicBoxScene {
   constructor(canvas) {
     this.canvas = canvas;
     const r = (this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' }));
-    r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    r.setPixelRatio(Math.min(Q.maxPixelRatio, window.devicePixelRatio || 1));
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 0.95;
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -27,8 +51,16 @@ export class MusicBoxScene {
     this.scene.background = new THREE.Color(0x070504);
     this.scene.fog = this.baseFog = new THREE.Fog(0x070504, 450, 2200);
     const pm = new THREE.PMREMGenerator(r);
-    this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.pmrem = pm;
+    this.scene.environment = this.studioEnv = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.12;
+    // the room photographs itself from where the box stands (a cube probe), and everything is lit and
+    // mirrored by that picture: brass shows the fire and the window, corners keep their warmth
+    this.probeRT = new THREE.WebGLCubeRenderTarget(Q.probe, { type: THREE.HalfFloatType, generateMipmaps: false });
+    this.probeCam = new THREE.CubeCamera(40, 40000, this.probeRT);
+    this.envDirty = 0; this.envAt = 0;
+    this.fx = new PostFX(r);
+    onTexture(() => { this.dirty = Math.max(this.dirty, 2); this.envDirty = Math.max(this.envDirty, 1); });
     this.camera = new THREE.PerspectiveCamera(38, 1, 1, 30000);
     this.camera.position.set(95, 85, 120);
     this.controls = new OrbitControls(this.camera, canvas);
@@ -40,7 +72,7 @@ export class MusicBoxScene {
     const hemi = (this.hemi = new THREE.HemisphereLight(0x8a7a6a, 0x120c08, 0.16)); this.scene.add(hemi);
     const key = (this.keyLight = new THREE.DirectionalLight(0x9db4ff, 0.32));   // moonlight through a window
     key.position.set(160, 260, 140); key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(Q.shadow, Q.shadow); key.shadow.bias = -0.0004; key.shadow.normalBias = 2;
     const sc = key.shadow.camera; sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 10; sc.far = 900;
     this.scene.add(key);
     const rim = new THREE.DirectionalLight(0x9fb7ff, 0.12); rim.position.set(-200, 120, -180); this.scene.add(rim);
@@ -51,12 +83,14 @@ export class MusicBoxScene {
     this.root = new THREE.Group(); this.scene.add(this.root);
     this.smoke = this.makeSmoke(); this.scene.add(this.smoke.group);
     this.mats = {
-      brass: new THREE.MeshStandardMaterial({ color: 0xcaa24e, metalness: 1, roughness: 0.28 }),
-      steel: new THREE.MeshStandardMaterial({ color: 0xc9ced4, metalness: 1, roughness: 0.22 }),
+      brass: metal('brass', { repeat: [1, 6], brushed: 0.55 }),
+      steel: metal('steel', { repeat: [1, 4], brushed: 0.4 }),
       dark: new THREE.MeshStandardMaterial({ color: 0x2a2826, metalness: 0.6, roughness: 0.5 }),
-      zinc: new THREE.MeshStandardMaterial({ color: 0x8f969c, metalness: 0.85, roughness: 0.45 }),
-      lead: new THREE.MeshStandardMaterial({ color: 0x55585c, metalness: 0.5, roughness: 0.6 }),
-      pin: new THREE.MeshStandardMaterial({ color: 0xe8ecf0, metalness: 1, roughness: 0.18 }),
+      zinc: metal('zinc', { repeat: [2, 2], brushed: 0.25 }),
+      lead: metal('lead', { repeat: [1, 1], brushed: 0.2 }),
+      pin: new THREE.MeshStandardMaterial({ color: 0xe8ecf0, metalness: 1, roughness: 0.2 }),
+      slot: new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 0.9 }),
+      blued: metal('blued', { repeat: [1, 1], brushed: 0.2 }),
     };
     this.tines = []; this.selected = -1;
     this.raycaster = new THREE.Raycaster();
@@ -137,6 +171,7 @@ export class MusicBoxScene {
     this.dirty = 3;
     const w = this.canvas.clientWidth || 300, h = this.canvas.clientHeight || 300;
     this.renderer.setSize(w, h, false);
+    this.fx.setSize(w, h, this.renderer.getPixelRatio());
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     if (this.globe) this.globe.resize(w, h);
   }
@@ -229,9 +264,10 @@ export class MusicBoxScene {
     let bottomY = -floorH;
     if (enc.boxed) {
       const wooden = ['maple', 'walnut', 'rosewood'].includes(enc.caseMat);
-      const cm = wooden ? woodMaterial(enc.caseMat, { gloss: 0.6 }) : woodMat(caseCol, enc.caseMat === 'abs' ? 0.45 : 0.55);
+      const cm = wooden ? veneer(enc.caseMat) : woodMat(caseCol, enc.caseMat === 'abs' ? 0.45 : 0.55);
+      const vmm = wooden ? VENEER[enc.caseMat][1] : 220;
       const box = new THREE.Group();
-      const add = (w, h, d, x, y, z, m = cm) => { const ms = new THREE.Mesh(wooden && m === cm ? boxGeo(w, h, d) : new THREE.BoxGeometry(w, h, d), m); ms.position.set(x, y, z); ms.castShadow = true; ms.receiveShadow = true; box.add(ms); return ms; };
+      const add = (w, h, d, x, y, z, m = cm) => { const ms = new THREE.Mesh(wooden && m === cm ? roundBox(w, h, d, Math.min(1.1, wall * 0.22), vmm, w >= d ? 'x' : 'z') : new THREE.BoxGeometry(w, h, d), m); ms.position.set(x, y, z); ms.castShadow = true; ms.receiveShadow = true; box.add(ms); return ms; };
       const cx = floorCx, cz = floorCy;
       const yb = -floorH - wall * 0.4;
       add(Lx, wall * 0.8, Ly, cx, yb, cz);                                    // bottom rim
@@ -248,14 +284,15 @@ export class MusicBoxScene {
       add(wall, H, Ly, cx + Lx / 2 - wall / 2, yb + H / 2, cz);
       if (wooden) {
         // velvet lining on the inner walls, a moulded plinth, brass hinges and a keyhole plate
-        const vel = velvetMaterial(enc.caseMat === 'maple' ? 0x1d3a2c : 0x5a0f1c);
+        const velC = enc.caseMat === 'maple' ? 0x1f4a34 : 0x6a1222;
+        const vel = pbr('velour_velvet', { gray: true, color: velC, rough: 1, normal: 0.8, physical: { sheen: 1, sheenRoughness: 0.5, sheenColor: new THREE.Color(velC).lerp(new THREE.Color(0xffffff), 0.45) } });
         const vh = H - wall * 1.2, vy = yb + wall * 0.4 + vh / 2 + wall * 0.4;
-        const lin = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), vel); m.position.set(x, y, z); m.receiveShadow = true; box.add(m); };
+        const lin = (w, h, d, x, y, z) => { const m = new THREE.Mesh(boxUV(w, h, d, 90), vel); m.position.set(x, y, z); m.receiveShadow = true; box.add(m); };
         lin(Lx - 2 * wall, vh, 0.6, cx, vy, cz - Ly / 2 + wall + 0.3);
         lin(0.6, vh, Ly - 2 * wall, cx - Lx / 2 + wall + 0.3, vy, cz);
         lin(0.6, vh, Ly - 2 * wall, cx + Lx / 2 - wall - 0.3, vy, cz);
         add(Lx + 4, wall * 0.9, Ly + 4, cx, yb - wall * 0.2, cz);             // plinth moulding
-        const brassM = new THREE.MeshStandardMaterial({ color: 0xc8a050, metalness: 1, roughness: 0.28 });
+        const brassM = this.mats.brass;
         for (const sx of [-1, 1]) {
           const hg = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, Math.min(26, Lx * 0.14), 12), brassM);
           hg.rotation.z = Math.PI / 2; hg.position.set(cx + sx * Lx * 0.3, yb + H + 0.5, cz - Ly / 2 - 0.6); hg.castShadow = true; box.add(hg);
@@ -272,7 +309,7 @@ export class MusicBoxScene {
       let lid;
       if (wooden) {
         // inlaid lid: mother-of-pearl on the top, and again on the inside panel you see when it is open
-        const side = woodMaterial(enc.caseMat, { gloss: 0.6 }), inl = inlayMaterial(Math.round(Lx + 3), Math.round(Ly + 3), enc.caseMat);
+        const side = cm, inl = inlayMaterial(Math.round(Lx + 3), Math.round(Ly + 3), enc.caseMat);
         lid = new THREE.Mesh(new THREE.BoxGeometry(Lx + 3, lidT, Ly + 3), [side, side, inl, inl, side, side]);
         lid.position.set(0, lidT / 2, (Ly + 3) / 2 - 1.5);
       } else {
@@ -305,10 +342,11 @@ export class MusicBoxScene {
       const col = WOOD[tp.mat] ?? 0x8a6a4a;
       const tmat = tp.mat === 'glass'
         ? new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.05, metalness: 0, transmission: 0.6, transparent: true, opacity: 0.55 })
-        : tp.mat === 'oak' ? woodMaterial('oak', { gloss: 0.35, planks: 6, mm: tp.a * MM })
+        : tp.mat === 'oak' ? pbr('wood_table_worn', { color: new THREE.Color(2.3, 2.0, 1.7), rough: 0.8, normal: 1.2, physical: { clearcoat: 0.12, clearcoatRoughness: 0.5 } })
         : tp.mat === 'spruce' ? woodMaterial('spruce', { gloss: 0.2, mm: 300 })
         : woodMat(col, tp.mat === 'marble' ? 0.25 : 0.7);
-      const top = new THREE.Mesh(boxGeo(tp.a * MM, tp.h * MM, tp.b * MM, tp.mat === 'oak' ? tp.a * MM : 300), tmat);
+      const top = new THREE.Mesh(tp.mat === 'oak' ? roundBox(tp.a * MM, tp.h * MM, tp.b * MM, 5, 560, 'x') : boxGeo(tp.a * MM, tp.h * MM, tp.b * MM, 300), tmat);
+      top.castShadow = true;
       // slide the table under the box so its candle side and the hamster's cage both fit on it
       const A0 = tp.a * MM, bxR = enc.boxed ? floorCx + Lx / 2 : floorCx + a / 2, bxL = enc.boxed ? floorCx - Lx / 2 : floorCx - a / 2;
       const needR = bxR + CAGE.gap + CAGE.L + 40 - A0 / 2, maxL = bxL - 230 + A0 / 2;
@@ -325,11 +363,11 @@ export class MusicBoxScene {
         const legM = tp.mat === 'glass' ? this.mats.steel : tmat;
         const legH = Hh - th;
         for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-          const leg = new THREE.Mesh(new THREE.CylinderGeometry(26, 20, legH, 12), legM);
+          const leg = new THREE.Mesh(tp.mat === 'oak' ? roundBox(54, legH, 54, 5, 560, 'y') : new THREE.CylinderGeometry(26, 20, legH, 12), legM);
           leg.position.set(top.position.x + sx * (A / 2 - 70), bottomY - th - legH / 2, top.position.z + sz * (B / 2 - 70)); leg.castShadow = true; leg.receiveShadow = true; this.root.add(leg);
         }
         if (tp.mat !== 'glass') for (const [w, d, x, z] of [[A - 120, 24, 0, B / 2 - 70], [A - 120, 24, 0, -(B / 2 - 70)], [24, B - 120, A / 2 - 70, 0], [24, B - 120, -(A / 2 - 70), 0]]) {
-          const ap = new THREE.Mesh(boxGeo(w, 90, d, 600), tmat); ap.position.set(top.position.x + x, bottomY - th - 45, top.position.z + z); ap.castShadow = true; this.root.add(ap);
+          const ap = new THREE.Mesh(tp.mat === 'oak' ? roundBox(w, 90, d, 3, 560, w > d ? 'x' : 'z') : boxGeo(w, 90, d, 600), tmat); ap.receiveShadow = true; ap.position.set(top.position.x + x, bottomY - th - 45, top.position.z + z); ap.castShadow = true; this.root.add(ap);
         }
       }
       // an old candle on the table, beside the box (inside the table's edge)
@@ -340,8 +378,10 @@ export class MusicBoxScene {
     }
 
     // ---------- bedplate ----------
-    const bed = new THREE.Mesh(new THREE.BoxGeometry(bedLen * MM, bedTop, bedDep * MM), this.mats.zinc);
+    const bed = new THREE.Mesh(roundBox(bedLen * MM, bedTop, bedDep * MM, 0.6, 60), this.mats.zinc);
     bed.position.set(0, bedTop / 2, 0); bed.castShadow = true; bed.receiveShadow = true; this.root.add(bed);
+    // the bedplate is screwed down to the soundboard at its corners
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const sc = screw(1.9, this.mats.steel, this.mats.slot); sc.position.set(sx * (bedLen * MM / 2 - 3.6), bedTop, sz * (bedDep * MM / 2 - 3.6)); this.root.add(sc); }
 
     // ---------- cylinder with pins ----------
     const cyl = (this.cylinder = new THREE.Group());
@@ -351,8 +391,14 @@ export class MusicBoxScene {
     const arbor = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, combLen + 26, 12), this.mats.steel);
     arbor.rotation.z = Math.PI / 2; cyl.add(arbor);
     // drive gear at the right end
-    const gear = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.12, R * 1.12, 2, 48), this.mats.brass);
-    gear.rotation.z = Math.PI / 2; gear.position.x = combLen / 2 + 4; cyl.add(gear);
+    const gear = new THREE.Mesh(gearGeo(R * 1.12, Math.max(24, Math.round(R * 3.4)), 2, 1.2), this.mats.brass);
+    gear.position.x = combLen / 2 + 4; gear.castShadow = true; cyl.add(gear);
+    // turned end caps with a raised boss, pinned to the arbor
+    for (const sx of [-1, 1]) {
+      const cap = new THREE.Mesh(new THREE.LatheGeometry([[1.2, 0], [R * 0.34, 0], [R * 0.36, 0.5], [R * 0.86, 0.5], [R * 0.9, 0.15], [R + 0.35, 0.15], [R + 0.35, -1.1], [1.2, -1.1]].map(([x, y]) => new THREE.Vector2(x, y)), 64), this.mats.brass);
+      cap.rotation.z = -sx * Math.PI / 2; cap.position.x = sx * (combLen / 2 + 2.05); cap.castShadow = true; cyl.add(cap);
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 2.2, 20), this.mats.steel); collar.rotation.z = Math.PI / 2; collar.position.x = sx * (combLen / 2 + 3.6); cyl.add(collar);
+    }
     // index mark so rotation is visible
     const mark = new THREE.Mesh(new THREE.BoxGeometry(combLen + 4.4, 0.6, 0.9), this.mats.dark);
     mark.position.set(0, 0, R); cyl.add(mark);
@@ -360,12 +406,13 @@ export class MusicBoxScene {
     this.buildPins(info, patch, pinsList);
     // support blocks
     for (const sx of [-1, 1]) {
-      const blk = new THREE.Mesh(new THREE.BoxGeometry(5, axZ + 2, 10), this.mats.zinc);
-      blk.position.set(sx * (combLen / 2 + 9), (axZ + 2) / 2, axY); blk.castShadow = true; this.root.add(blk);
+      const blk = new THREE.Mesh(roundBox(5, axZ + 2, 10, 0.7, 60), this.mats.zinc);
+      blk.position.set(sx * (combLen / 2 + 9), (axZ + 2) / 2, axY); blk.castShadow = true; blk.receiveShadow = true; this.root.add(blk);
+      const bush = new THREE.Mesh(new THREE.TorusGeometry(1.9, 0.55, 8, 20), this.mats.brass); bush.rotation.y = Math.PI / 2; bush.position.set(sx * (combLen / 2 + 9 - sx * 2.5), axZ, axY); this.root.add(bush);
     }
 
     // ---------- comb ----------
-    const tineMat = new THREE.MeshStandardMaterial({ color: tm.color, metalness: cfg.material === 'glass' ? 0 : 1, roughness: cfg.material === 'glass' ? 0.05 : 0.2, transparent: cfg.material === 'glass', opacity: cfg.material === 'glass' ? 0.75 : 1 });
+    const tineMat = new THREE.MeshStandardMaterial({ color: tm.color, metalness: cfg.material === 'glass' ? 0 : 1, roughness: cfg.material === 'glass' ? 0.05 : 0.24, normalMap: cfg.material === 'glass' ? null : this.mats.steel.normalMap, normalScale: new THREE.Vector2(0.35, 0.35), transparent: cfg.material === 'glass', opacity: cfg.material === 'glass' ? 0.75 : 1 });
     this.tineMat = tineMat;
     const [uy, uz] = [g.uy, g.uz];
     const dirY = -uy, dirZ = -uz; // root -> tip
@@ -394,8 +441,11 @@ export class MusicBoxScene {
       this.tines.push({ pivot: holder, mesh, base: alpha, L });
     });
     // comb base bar
-    const baseBar = new THREE.Mesh(new THREE.BoxGeometry(combLen, Math.max(3, baseZtop), 9), new THREE.MeshStandardMaterial({ color: tm.color, metalness: 1, roughness: 0.3 }));
-    baseBar.position.copy(toV(0, baseY + 4.5, Math.max(3, baseZtop) / 2)); baseBar.castShadow = true; this.root.add(baseBar);
+    const combM = metal('steel', { color: tm.color, rough: 0.3, repeat: [1, 3], brushed: 0.5 });
+    const baseBar = new THREE.Mesh(roundBox(combLen, Math.max(3, baseZtop), 9, 0.5, 60), cfg.material === 'glass' ? tineMat : combM);
+    baseBar.position.copy(toV(0, baseY + 4.5, Math.max(3, baseZtop) / 2)); baseBar.castShadow = true; baseBar.receiveShadow = true; this.root.add(baseBar);
+    { const ns = Math.max(3, Math.round(combLen / 16)); for (let k = 0; k < ns; k++) { const sc = screw(1.7, this.mats.blued, this.mats.slot); sc.position.copy(toV(-combLen / 2 + (k + 0.5) * combLen / ns, baseY + 4.5, Math.max(3, baseZtop))); this.root.add(sc);
+      const wsh = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.25, 20), this.mats.brass); wsh.position.copy(sc.position); wsh.position.y += 0.1; this.root.add(wsh); } }
 
     // ---------- governor & barrel ----------
     const gov = new THREE.Group();
@@ -519,13 +569,13 @@ export class MusicBoxScene {
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo.material.map, color: 0xfff0d0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
     flare.position.set(7, 9 + H + 4, 5); flare.scale.set(1, 1, 1); g.add(flare);
     // the light itself: warm, physically falling off with distance (scene units are mm)
-    const light = new THREE.PointLight(0xffa04a, 34000, 0, 2);
+    const light = new THREE.PointLight(0xffa04a, 52000, 0, 2);
     light.position.y = 9 + H + 16; light.castShadow = true;
-    light.shadow.mapSize.set(512, 512); light.shadow.camera.near = 4; light.shadow.camera.far = 2500;
-    light.shadow.bias = -0.0008; light.shadow.radius = 4;
+    light.shadow.mapSize.set(Q.candleShadow, Q.candleShadow); light.shadow.camera.near = 4; light.shadow.camera.far = 9000;
+    light.shadow.bias = -0.0012; light.shadow.normalBias = 0.6; light.shadow.radius = 3;
     g.add(light);
     this.root.add(g);
-    this.candle = { g, flame, outer, core, light, halo, wax, tip, flare, H, base: 34000, n1: 0, n2: 0, t: 0 };
+    this.candle = { g, flame, outer, core, light, halo, wax, tip, flare, H, base: 52000, n1: 0, n2: 0, t: 0 };
     this.flicker(0);
   }
 
@@ -533,6 +583,7 @@ export class MusicBoxScene {
   get isLit() { return this.litTarget === 1; }
   lightCandle() {
     if (this.litTarget === 1) return;
+    this.envDirty = 30;            // the room's light is about to change for a while (the fire catching)
     this.litTarget = 1; this.igniteT = 0; this.smokeT = -1;
     clearTimeout(this.fireTimer);
     this.fireTimer = setTimeout(() => { if (this.roomObj && this.roomObj.setFire && this.litTarget === 1) this.roomObj.setFire(true); }, 700);
@@ -545,6 +596,7 @@ export class MusicBoxScene {
   }
   snuffCandle() {
     if (this.litTarget === 0) return;
+    this.envDirty = 30;
     clearTimeout(this.fireTimer); if (this.roomObj && this.roomObj.setFire) this.roomObj.setFire(false);
     this.litTarget = 0; this.igniteT = -1; this.smokeT = 0; this.ember = 1;
     this.dirty = Math.max(this.dirty, 2);
@@ -712,10 +764,40 @@ export class MusicBoxScene {
   exitGlobe(done) { if (this.globeOn()) this.globe.exit(done); else if (done) done(); }
   leaveGlobe() { if (!this.globe) return; this.globe.active = false; this.globe.anim = null; this.controls.enabled = this.globePrevCtl ?? true; this.dirty = 4; }
   shakeGlobe(k) { if (this.globeOn()) this.globe.shake(k); }
+  // the light that has bounced about the room: a soft, warm fill that follows the fire and the lamps
+  adaptLight(dt) {
+    const room = this.roomObj; if (!room) return;
+    const glow = room.fire !== undefined ? room.fire : (room.fill ?? 0.6);
+    const want = 0.035 + 0.15 * glow;
+    if (Math.abs(want - this.hemi.intensity) > 0.002) { this.hemi.intensity += (want - this.hemi.intensity) * Math.min(1, dt * 3); this.dirty = Math.max(this.dirty, 1); }
+    this.hemi.color.setRGB(0.55 + 0.45 * glow, 0.5 + 0.2 * glow, 0.5 - 0.1 * glow); this.hemi.groundColor.setRGB(0.1 + 0.2 * glow, 0.07 + 0.08 * glow, 0.05 + 0.02 * glow);
+  }
+  // photograph the room into the probe and use the picture as the scene's environment. The box, the cage
+  // and you are left out (they would only see themselves); the candle and the room are in.
+  captureEnv(now = performance.now()) {
+    if (!this.roomObj || !this.tipWorld) { this.envDirty = 0; return; }
+    this.envDirty--; this.envAt = now;
+    const hide = [];
+    for (const c of this.root.children) if (c !== this.roomOuter && !(this.candle && c === this.candle.g) && c.visible) { c.visible = false; hide.push(c); }
+    for (const c of [this.avatar, this.avatarRing, this.smoke.group]) if (c && c.visible) { c.visible = false; hide.push(c); }
+    const env = this.scene.environment, bg = this.scene.background;
+    this.scene.environment = null;            // direct light only: no feeding the last picture back in
+    this.probeCam.position.copy(this.tipWorld); this.probeCam.position.y += 260;
+    const xr = this.renderer.shadowMap.autoUpdate;
+    this.probeCam.update(this.renderer, this.scene);
+    this.renderer.shadowMap.autoUpdate = xr;
+    for (const c of hide) c.visible = true;
+    this.scene.background = bg;
+    const tex = this.pmrem.fromCubemap(this.probeRT.texture).texture;
+    if (this.roomEnv) this.roomEnv.dispose();
+    this.roomEnv = tex; this.scene.environment = tex; this.scene.environmentIntensity = this.envGain ?? 1.2;
+    void env;
+    this.dirty = Math.max(this.dirty, 1);
+  }
   // r: { dims, boxPos (m, room), boxYaw, tableTop (m) or null if held, cabin }
   // Christmas decorations (the hut has a tree and a garland)
-  setXmas(on) { this.xmas = on; if (this.globe) this.globe.setXmas(on); if (this.roomObj && this.roomObj.setXmas) this.roomObj.setXmas(on); this.dirty = 4; }
-  setHanukkah(on) { this.hanukkah = on; if (this.globe) this.globe.setHanukkah(on); if (this.roomObj && this.roomObj.setHanukkah) this.roomObj.setHanukkah(on); this.dirty = 4; }
+  setXmas(on) { this.xmas = on; this.envDirty = 2; if (this.globe) this.globe.setXmas(on); if (this.roomObj && this.roomObj.setXmas) this.roomObj.setXmas(on); this.dirty = 4; }
+  setHanukkah(on) { this.hanukkah = on; this.envDirty = 2; if (this.globe) this.globe.setHanukkah(on); if (this.roomObj && this.roomObj.setHanukkah) this.roomObj.setHanukkah(on); this.dirty = 4; }
   placeRoom(r) {
     this.roomDef = r;
     const key = [r.kind, r.dims.join(), r.boxPos ? r.boxPos.map((v) => v.toFixed(2)).join() : 'held'].join('|');
@@ -738,10 +820,23 @@ export class MusicBoxScene {
     const moon = this.roomObj && this.roomObj.moon;
     if (moon) {
       // moonlight comes in through the window, cold and low
+      this.root.updateMatrixWorld(true);
       const w = this.toScene(...moon), o = this.toScene(r.boxPos ? r.boxPos[0] : 2.4, r.boxPos ? r.boxPos[1] : 1.8, 0.8);
-      this.keyLight.position.copy(w.sub(o).normalize().multiplyScalar(600));
-      this.keyLight.intensity = 0.32; this.hemi.intensity = 0.1;
-    } else { this.keyLight.position.set(160, 260, 140); this.keyLight.intensity = r.kind === 'anechoic' ? 0.12 : 0.32; this.hemi.intensity = 0.16; }
+      // (aimed at the middle of the floor, its shadow box covering the whole room, so the window wall
+      // shadows everything but a cold patch the shape of the panes)
+      const mid = this.toScene(r.dims[0] / 2, r.dims[1] / 2, 0.4), dir = w.sub(o).normalize(), span = Math.hypot(r.dims[0], r.dims[1], r.dims[2]) * 560;
+      this.keyLight.target.position.copy(mid); if (!this.keyLight.target.parent) this.scene.add(this.keyLight.target);
+      this.keyLight.position.copy(mid).addScaledVector(dir, span * 2.2);
+      const sc = this.keyLight.shadow.camera; sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = span * 0.4; sc.far = span * 4; sc.updateProjectionMatrix();
+      this.keyLight.shadow.normalBias = 12; this.keyLight.shadow.bias = -0.0006;
+      this.keyLight.intensity = 0.9; this.hemi.intensity = 0.05;
+    } else {
+      this.keyLight.target.position.set(0, 0, 0);
+      this.keyLight.position.set(160, 260, 140); this.keyLight.intensity = r.kind === 'anechoic' ? 0.12 : 0.32; this.hemi.intensity = 0.1;
+      const sc = this.keyLight.shadow.camera; sc.left = -260; sc.right = 260; sc.top = 260; sc.bottom = -260; sc.near = 10; sc.far = 900; sc.updateProjectionMatrix();
+      this.keyLight.shadow.normalBias = 2;
+    }
+    this.envDirty = 3;
     if (this.litTarget !== 1 && !this.everLit && !this.followListener) this.frame('wide', true);
     this.dirty = 3;
   }
@@ -982,7 +1077,7 @@ export class MusicBoxScene {
       const cw = this.canvas.clientWidth, chh = this.canvas.clientHeight;      // the stage can change size under it (the drawer)
       if (cw && chh && (cw !== this.gw || chh !== this.gh)) { this.gw = cw; this.gh = chh; this.resize(); }
       if (this.globe.fire !== (this.litTarget === 1)) this.globe.setFire(this.litTarget === 1);
-      this.globe.frame(dt); this.renderer.render(this.globe.scene, this.globe.camera); return;
+      this.globe.frame(dt); this.fx.render(this.globe.scene, this.globe.camera, dt); return;
     }
     if (this.controls.enabled) this.controls.update();
     if (!this.followListener) this.keepInRoom();
@@ -990,6 +1085,14 @@ export class MusicBoxScene {
     this.updateListenerView();
     const cabinOn = !!this.cabin;
     if (cabinOn) this.cabin.update(dt);
+    {
+      // eyes adapt: wider open across a dim room than close to the flame, wider still with no flame at all
+      const c = this.candle, d = c ? this.camera.position.distanceTo(c.g.getWorldPosition(this._v || (this._v = new THREE.Vector3()))) : 1200;
+      const u = Math.max(0, Math.min(1, (d - 260) / 2000)), want = (1.0 + 0.55 * u * u * (3 - 2 * u)) * (1 + 0.9 * (1 - Math.min(1, this.lit * 1.4)));
+      if (this.exposure === undefined) this.exposure = want;
+      if (Math.abs(want - this.exposure) > 0.004) { this.exposure += (want - this.exposure) * Math.min(1, dt * 1.6); this.dirty = Math.max(this.dirty, 1); }
+      this.renderer.toneMappingExposure = this.exposure;
+    }
     if (this.state.keyAngle !== this.lastKey) { this.lastKey = this.state.keyAngle; this.dirty = Math.max(this.dirty, 1); }
     if ((rigOn || cabinOn) && !(this.candle && this.candleBusy)) {
       // the hamster breathes, blinks and runs: always animate (every frame while he runs)
@@ -1004,7 +1107,9 @@ export class MusicBoxScene {
       if (this.dirty <= 0 && this.candleFrame && !quick) return;
     } else if (this.dirty <= 0) return;      // nothing moved: save the battery
     if (this.dirty > 0) this.dirty--;
-    this.renderer.render(this.scene, this.camera);
+    this.adaptLight(dt);
+    if (this.envDirty > 0 && now - this.envAt > 400) this.captureEnv(now);
+    this.fx.render(this.scene, this.camera, dt);
     if (this.onCandleScreen) this.onCandleScreen(this.candleScreen());
   }
 }
