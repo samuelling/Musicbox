@@ -335,3 +335,5 @@ body.mouse-held .escBadge { opacity: 1; transform: translate(-50%, 0); animation
 body.globe .globeUI { display: flex; }
 body.globe .modeWrap, body.globe #hamInfo, body.globe #gaitCard, body.globe #navCtl, body.globe #lookPad, body.globe #reticle,
 body.globe #mouseHint, body.globe #escBadge, body.globe #lightPrompt, body.globe #globeBtn { display: none !important; }
+
+.gfxRow select { margin-left: 6px; }

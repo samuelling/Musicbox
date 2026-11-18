@@ -141,7 +141,7 @@ class Room {
     });
   }
   lamp(x, y, z, color, intensity, dist = 0) {
-    const l = new THREE.PointLight(color, intensity, dist, 2); l.position.set(x, y, z); this.group.add(l); return l;
+    const l = new THREE.PointLight(color, intensity * 2.4, dist, 2); l.position.set(x, y, z); this.group.add(l); return l;   // (lamps carry the room now that the flat fill is gone)
   }
   clock(c, wall, u, h) { this.clocks.push(wallMount(this.group, this.dims, c, wall, u, h)); }
   // Christmas, built the first time it's wanted by the room's own xmasBuild(group)
@@ -364,7 +364,7 @@ class Chapel extends Room {
     // keep the window behind the box clear for the great clock
     const bx = box ? box[0] * 1000 : RX / 2;
     const lan = lancets.filter((l) => l.wall !== 'y1' || Math.abs((l.x0 + l.x1) / 2 - bx) > 1300);
-    this.shell(pbr('slate_floor_02', { color: new THREE.Color(1.2, 1.2, 1.25), gray: true, rough: 0.85, normal: 1.4, repeat: [RX / 2600, RY / 2600] }), pbr('medieval_blocks_05', { color: 0xcfc6b8, rough: 1, normal: 1.6, ao: 1.2 }), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 }), lan, 2600);
+    this.shell(pbr('slate_floor_02', { color: 0x8c8c94, gray: true, rough: 0.85, normal: 1.4, repeat: [RX / 2600, RY / 2600] }), pbr('medieval_blocks_05', { color: 0xcfc6b8, rough: 1, normal: 1.6, ao: 1.2 }), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 }), lan, 2600);
     for (const [i, l] of lan.entries()) {
       const w = l.x1 - l.x0, h = l.z1 - l.z0, z = l.wall === 'y1' ? RY + 80 : -80;
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: stainedGlass(i), color: 0x4a5878, fog: false }));

@@ -53,7 +53,7 @@ const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4
 export function pbr(name, { repeat = null, rotation = 0, color = 0xffffff, gray = false, rough = 1, normal = 1, ao = 1, physical = null, maps = 'dna', ...rest } = {}) {
   const avg = new THREE.Color(AVG[name] ?? 0x808080), tint = new THREE.Color(color);
   const m = physical ? new THREE.MeshPhysicalMaterial({ roughness: 0.8 * rough, metalness: 0, ...physical, ...rest }) : new THREE.MeshStandardMaterial({ roughness: 0.8 * rough, metalness: 0, ...rest });
-  m.color.copy(gray ? tint : avg.clone().multiply(tint));
+  m.color.copy(gray || !maps.includes('d') ? tint : avg.clone().multiply(tint));
   m.userData.pbr = name;
   const d = maps.includes('d') ? base(name, 'diff') : null, n = maps.includes('n') ? base(name, 'nor') : null, a = maps.includes('a') ? base(name, 'arm') : null;
   let left = [d, n, a].filter(Boolean).length;
@@ -68,7 +68,7 @@ export function pbr(name, { repeat = null, rotation = 0, color = 0xffffff, gray 
   for (const t of [d, n, a]) if (t) whenReady(t, done);
   if (gray && d) {
     // keep only the scan's light and dark (normalised to its average), so `color` sets the hue
-    const L = 0.2126 * lin(avg.r) + 0.7152 * lin(avg.g) + 0.0722 * lin(avg.b);
+    const L = 0.2126 * avg.r + 0.7152 * avg.g + 0.0722 * avg.b;      // (THREE.Color is already linear)
     m.onBeforeCompile = (sh) => {
       sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#ifdef USE_MAP
         vec4 sampledDiffuseColor = texture2D( map, vMapUv );

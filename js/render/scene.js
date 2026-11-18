@@ -342,7 +342,7 @@ export class MusicBoxScene {
       const col = WOOD[tp.mat] ?? 0x8a6a4a;
       const tmat = tp.mat === 'glass'
         ? new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.05, metalness: 0, transmission: 0.6, transparent: true, opacity: 0.55 })
-        : tp.mat === 'oak' ? pbr('wood_table_worn', { color: new THREE.Color(2.3, 2.0, 1.7), rough: 0.8, normal: 1.2, physical: { clearcoat: 0.12, clearcoatRoughness: 0.5 } })
+        : tp.mat === 'oak' ? pbr('wood_table_worn', { color: new THREE.Color(1.7, 1.6, 1.5), rough: 0.8, normal: 1.2, physical: { clearcoat: 0.12, clearcoatRoughness: 0.5 } })
         : tp.mat === 'spruce' ? woodMaterial('spruce', { gloss: 0.2, mm: 300 })
         : woodMat(col, tp.mat === 'marble' ? 0.25 : 0.7);
       const top = new THREE.Mesh(tp.mat === 'oak' ? roundBox(tp.a * MM, tp.h * MM, tp.b * MM, 5, 560, 'x') : boxGeo(tp.a * MM, tp.h * MM, tp.b * MM, 300), tmat);
@@ -569,13 +569,13 @@ export class MusicBoxScene {
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo.material.map, color: 0xfff0d0, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }));
     flare.position.set(7, 9 + H + 4, 5); flare.scale.set(1, 1, 1); g.add(flare);
     // the light itself: warm, physically falling off with distance (scene units are mm)
-    const light = new THREE.PointLight(0xffa04a, 52000, 0, 2);
+    const light = new THREE.PointLight(0xffa04a, 72000, 0, 2);
     light.position.y = 9 + H + 16; light.castShadow = true;
     light.shadow.mapSize.set(Q.candleShadow, Q.candleShadow); light.shadow.camera.near = 4; light.shadow.camera.far = 9000;
     light.shadow.bias = -0.0012; light.shadow.normalBias = 0.6; light.shadow.radius = 3;
     g.add(light);
     this.root.add(g);
-    this.candle = { g, flame, outer, core, light, halo, wax, tip, flare, H, base: 52000, n1: 0, n2: 0, t: 0 };
+    this.candle = { g, flame, outer, core, light, halo, wax, tip, flare, H, base: 72000, n1: 0, n2: 0, t: 0 };
     this.flicker(0);
   }
 
@@ -767,8 +767,8 @@ export class MusicBoxScene {
   // the light that has bounced about the room: a soft, warm fill that follows the fire and the lamps
   adaptLight(dt) {
     const room = this.roomObj; if (!room) return;
-    const glow = room.fire !== undefined ? room.fire : (room.fill ?? 0.6);
-    const want = 0.035 + 0.15 * glow;
+    const glow = room.fire !== undefined ? room.fire : (room.fill ?? 1);
+    const want = 0.05 + 0.24 * glow;
     if (Math.abs(want - this.hemi.intensity) > 0.002) { this.hemi.intensity += (want - this.hemi.intensity) * Math.min(1, dt * 3); this.dirty = Math.max(this.dirty, 1); }
     this.hemi.color.setRGB(0.55 + 0.45 * glow, 0.5 + 0.2 * glow, 0.5 - 0.1 * glow); this.hemi.groundColor.setRGB(0.1 + 0.2 * glow, 0.07 + 0.08 * glow, 0.05 + 0.02 * glow);
   }
@@ -1088,7 +1088,7 @@ export class MusicBoxScene {
     {
       // eyes adapt: wider open across a dim room than close to the flame, wider still with no flame at all
       const c = this.candle, d = c ? this.camera.position.distanceTo(c.g.getWorldPosition(this._v || (this._v = new THREE.Vector3()))) : 1200;
-      const u = Math.max(0, Math.min(1, (d - 260) / 2000)), want = (1.0 + 0.55 * u * u * (3 - 2 * u)) * (1 + 0.9 * (1 - Math.min(1, this.lit * 1.4)));
+      const u = Math.max(0, Math.min(1, (d - 260) / 2000)), want = (1.05 + 0.7 * u * u * (3 - 2 * u)) * (1 + 0.9 * (1 - Math.min(1, this.lit * 1.4)));
       if (this.exposure === undefined) this.exposure = want;
       if (Math.abs(want - this.exposure) > 0.004) { this.exposure += (want - this.exposure) * Math.min(1, dt * 1.6); this.dirty = Math.max(this.dirty, 1); }
       this.renderer.toneMappingExposure = this.exposure;

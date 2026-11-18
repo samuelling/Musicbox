@@ -5,6 +5,7 @@ import { hanukkahTime } from './render/hanukkah.js';
 import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physics/hamster.js';
 import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
+import { Q, storedTier, storeTier } from './render/quality.js';
 import { CrankPad } from './ui/crank.js';
 import { ListenerMap } from './ui/listener-map.js';
 import { PinRoll } from './ui/editor.js';
@@ -1232,4 +1233,8 @@ $('meterSel').value = song.meter.join(',');
 renderSongs();
 setMode('crank');
 requestBuild(0);
+{ // Settings ▸ Graphics: remembered on this device; a change needs the scene rebuilt, so reload
+  const sel = $('gfx');
+  if (sel) { sel.value = storedTier(); sel.title = `Now: ${Q.tier}`; sel.addEventListener('change', () => { storeTier(sel.value); location.reload(); }); }
+}
 window.__mb = { walk, collide,  cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; }, roll };

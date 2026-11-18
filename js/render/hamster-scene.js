@@ -3,14 +3,17 @@
 // Scene units are millimetres; the wheel turns about z (it faces the camera), the crank about x.
 import * as THREE from 'three';
 import { GAITS } from '../physics/hamster.js';
+import { Q } from './quality.js';
+import { Splats } from './splats.js';
+import { pbr, metal } from './pbr.js';
 
 // ---------------------------------------------------------------- signed distance helpers
-const sdEll = (px, py, pz, cx, cy, cz, rx, ry, rz) => {
+export const sdEll = (px, py, pz, cx, cy, cz, rx, ry, rz) => {
   const x = px - cx, y = py - cy, z = pz - cz;
   const k0 = Math.hypot(x / rx, y / ry, z / rz), k1 = Math.hypot(x / (rx * rx), y / (ry * ry), z / (rz * rz));
   return k0 < 1e-9 ? -Math.min(rx, ry, rz) : (k0 * (k0 - 1)) / k1;
 };
-const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - (h * h * k) / 4; };
+export const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - (h * h * k) / 4; };
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const mix = (a, b, t) => a + (b - a) * t;
 // cheap smooth 3D value noise for colour boundaries
@@ -26,7 +29,7 @@ function vnoise(x, y, z) {
 
 // Mesh a star-shaped SDF: shoot a ray from `c` through every vertex of a sphere and stop at
 // the surface; normals from the SDF gradient. Per-vertex colour, fur length, comb, ticking.
-function starMesh(sdf, c, segU, segV, paint) {
+export function starMesh(sdf, c, segU, segV, paint) {
   const g = new THREE.SphereGeometry(1, segU, segV);
   const P = g.attributes.position, n = P.count;
   const nor = new Float32Array(n * 3), col = new Float32Array(n * 3), len = new Float32Array(n), comb = new Float32Array(n * 3), tick = new Float32Array(n);
@@ -112,7 +115,7 @@ const GOLD = C(0xe0a35e), GOLD_DK = C(0xb57839), CREAM = C(0xf6efe3), FLASH = C(
 
 // ---------------------------------------------------------------- the hamster
 export class HamsterModel {
-  constructor({ mass = 0.125, shells = 16 } = {}) {
+  constructor({ mass = 0.125, shells = Q.shells } = {}) {
     const s = Math.cbrt(mass / 0.125);
     this.scale = s;
     const root = (this.root = new THREE.Group());   // origin: on the tread between the feet; +x forward, +y up, +z his left
@@ -195,6 +198,36 @@ export class HamsterModel {
     };
     addFur(bodyG, tor);
     addFur(headG, head);
+    // guard hairs: tens of thousands of Gaussian splats, one per hair, rooted on the skin and lying back
+    // along the coat. They give the fur its individual hairs, its soft outline and its sheen.
+    const RR = (a, b) => a + Math.random() * (b - a);
+    const addHairs = (g, parent, perMm2) => {
+      const P = g.attributes.position.array, N = g.attributes.normal.array, Cc = g.attributes.color.array, Lf = g.attributes.furLen.array, Cb = g.attributes.comb.array, Tk = g.attributes.tick.array, I = g.index.array;
+      const tri = I.length / 3, area = new Float32Array(tri); let tot = 0;
+      const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), A = new THREE.Vector3(), B = new THREE.Vector3(), Cv = new THREE.Vector3();
+      for (let t = 0; t < tri; t++) { A.fromArray(P, I[t * 3] * 3); B.fromArray(P, I[t * 3 + 1] * 3); Cv.fromArray(P, I[t * 3 + 2] * 3); area[t] = e1.subVectors(B, A).cross(e2.subVectors(Cv, A)).length() / 2; tot += area[t]; }
+      const sp = new Splats(Math.ceil(tot * perMm2 * 1.05) + 16, { rough: 0.55, sharp: 2.8, wrap: 0.3, env: 1 });
+      const lerp3 = (arr, i0, i1, i2, u, v, w, k) => arr[i0 * 3 + k] * u + arr[i1 * 3 + k] * v + arr[i2 * 3 + k] * w;
+      for (let t = 0; t < tri; t++) {
+        let cnt = area[t] * perMm2; cnt = Math.floor(cnt) + (Math.random() < cnt % 1 ? 1 : 0);
+        const i0 = I[t * 3], i1 = I[t * 3 + 1], i2 = I[t * 3 + 2];
+        for (let k = 0; k < cnt; k++) {
+          let u = Math.random(), v = Math.random(); if (u + v > 1) { u = 1 - u; v = 1 - v; } const w = 1 - u - v;
+          const len = Lf[i0] * u + Lf[i1] * v + Lf[i2] * w; if (len < 0.9) continue;
+          const px = lerp3(P, i0, i1, i2, u, v, w, 0), py = lerp3(P, i0, i1, i2, u, v, w, 1), pz = lerp3(P, i0, i1, i2, u, v, w, 2);
+          const nx = lerp3(N, i0, i1, i2, u, v, w, 0), ny = lerp3(N, i0, i1, i2, u, v, w, 1), nz = lerp3(N, i0, i1, i2, u, v, w, 2);
+          let dx = nx * 0.55 + lerp3(Cb, i0, i1, i2, u, v, w, 0) + RR(-0.22, 0.22), dy = ny * 0.55 + lerp3(Cb, i0, i1, i2, u, v, w, 1) + RR(-0.22, 0.22), dz = nz * 0.55 + lerp3(Cb, i0, i1, i2, u, v, w, 2) + RR(-0.22, 0.22);
+          const dl = Math.hypot(dx, dy, dz) || 1, L = len * RR(1.0, 1.6) * 0.5; dx *= L / dl; dy *= L / dl; dz *= L / dl;
+          const tick = Tk[i0] * u + Tk[i1] * v + Tk[i2] * w, shade = RR(0.8, 1.15) * (Math.random() < tick * 0.45 ? 0.5 : 1) * (Math.random() < 0.06 ? 1.35 : 1);
+          sp.add(px + dx + nx * 0.3, py + dy + ny * 0.3, pz + dz + nz * 0.3, dx, dy, dz, RR(0.12, 0.2),
+            lerp3(Cc, i0, i1, i2, u, v, w, 0) * shade, lerp3(Cc, i0, i1, i2, u, v, w, 1) * shade, lerp3(Cc, i0, i1, i2, u, v, w, 2) * shade, nx, ny, nz);
+        }
+      }
+      const m = sp.done(); m.renderOrder = 40; parent.add(m);
+      return m;
+    };
+    const dens = { low: 0.8, med: 1.7, high: 2.8 }[Q.tier];
+    this.hairs = [addHairs(bodyG, tor, dens), addHairs(headG, head, dens * 1.3)];
 
     // ----- face -----
     const onSurface = (sdf, from, dir) => {
@@ -209,7 +242,7 @@ export class HamsterModel {
       const eg = new THREE.Group(); eg.position.copy(p).add(new THREE.Vector3(0, 0, -sz * 1.4)); head.add(eg);
       const eye = new THREE.Mesh(new THREE.SphereGeometry(5.2, 24, 16), eyeMat);
       eye.scale.set(1.05, 0.95, 0.75); eg.add(eye);
-      const lid = new THREE.Mesh(new THREE.TorusGeometry(5.1, 0.9, 8, 24), new THREE.MeshStandardMaterial({ color: 0x2a1c14, roughness: 0.8 }));
+      const lid = new THREE.Mesh(new THREE.TorusGeometry(5.0, 0.5, 8, 28), new THREE.MeshStandardMaterial({ color: 0x1c120d, roughness: 0.6 }));
       lid.position.z = sz * 1.6; eg.add(lid);
       eg.rotation.y = sz * 0.25;
       this.eyes.push(eg);
@@ -225,6 +258,17 @@ export class HamsterModel {
       const m = new THREE.Mesh(earG, earMat); m.castShadow = true;
       m.rotation.set(0, Math.PI / 2 - sz * 0.75, sz * 0.35);
       ear.add(m);
+      { // a fringe of fine pale hairs round the rim and down the back of the ear
+        const es = new Splats(360, { rough: 0.6, sharp: 2.6 });
+        for (let k = 0; k < 360; k++) {
+          const a = Math.random() * 6.283, rim = k < 200, rr = rim ? 9.2 + Math.random() * 0.8 : 3 + Math.random() * 6, x = Math.cos(a) * rr * 0.92, y = Math.sin(a) * rr, z = -0.035 * (rr * rr);
+          const L = rim ? 0.7 + Math.random() * 0.7 : 0.5 + Math.random() * 0.5, sgn = rim ? 0 : -1;
+          const dx = Math.cos(a) * (rim ? 1 : 0.5), dy = Math.sin(a) * (rim ? 1 : 0.5), dz = sgn * 0.8 - 0.2, dl = Math.hypot(dx, dy, dz);
+          const c = 0.5 + Math.random() * 0.25;
+          es.add(x + dx / dl * L, y + dy / dl * L, z + dz / dl * L + sgn * 0.1, dx / dl * L, dy / dl * L, dz / dl * L, 0.07 + Math.random() * 0.05, c * 1.0, c * 0.86, c * 0.72, 0, 0, sgn || 1);
+        }
+        m.add(es.done());
+      }
       ear.rotation.z = -0.15;
       this.ears.push(ear);
     }
@@ -271,15 +315,19 @@ export class HamsterModel {
     const legFur = new THREE.MeshStandardMaterial({ color: 0xe6d7c0, roughness: 0.95 });
     const legGold = new THREE.MeshStandardMaterial({ color: 0xbe8546, roughness: 0.95 });
     const skin = new THREE.MeshStandardMaterial({ color: 0xe7a49c, roughness: 0.5, emissive: 0x401512, emissiveIntensity: 0.25 });
+    const clawM = new THREE.MeshPhysicalMaterial({ color: 0xead9c2, roughness: 0.3, transmission: 0, clearcoat: 0.6 });
     const mkBone = (r, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.85, r, 1, 10, 1), mat); m.castShadow = true; return m; };
     const mkPaw = (len, w, toes) => {
       const g = new THREE.Group();
       const sole = new THREE.Mesh(new THREE.CapsuleGeometry(w * 0.5, len - w, 4, 10), skin);
       sole.rotation.z = Math.PI / 2; sole.position.x = len / 2 - w * 0.3; sole.scale.set(0.55, 1, 1); g.add(sole);
       for (let i = 0; i < toes; i++) {
-        const t = new THREE.Mesh(new THREE.SphereGeometry(w * 0.2, 8, 6), skin);
-        const a = (i - (toes - 1) / 2) * 0.42;
-        t.position.set(len - w * 0.15 + Math.cos(a) * 1.5, -0.4, Math.sin(a) * w * 0.55); g.add(t);
+        // a digit (two little pads) and a pale, curved claw
+        const a = (i - (toes - 1) / 2) * 0.42, dg = new THREE.Group();
+        dg.position.set(len - w * 0.35, -0.3, Math.sin(a) * w * 0.5); dg.rotation.y = -a * 0.9; g.add(dg);
+        const d1 = new THREE.Mesh(new THREE.CapsuleGeometry(w * 0.16, w * 0.42, 3, 8), skin); d1.rotation.z = Math.PI / 2; d1.position.x = w * 0.2; d1.castShadow = true; dg.add(d1);
+        const pad = new THREE.Mesh(new THREE.SphereGeometry(w * 0.19, 8, 6), skin); pad.position.set(w * 0.46, -w * 0.05, 0); dg.add(pad);
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(w * 0.085, w * 0.42, 6), clawM); claw.rotation.z = -Math.PI / 2 - 0.45; claw.position.set(w * 0.66, -w * 0.08, 0); dg.add(claw);
       }
       return g;
     };
@@ -295,6 +343,16 @@ export class HamsterModel {
       const b1 = mkBone(d.fore ? 4.2 : 6.5, d.fore ? legGold : legGold), b2 = mkBone(d.fore ? 3 : 3.6, legFur);
       const j = new THREE.Mesh(new THREE.SphereGeometry(d.fore ? 3.2 : 4, 10, 8), legFur);
       const paw = mkPaw(...d.paw);
+      // short fur on the limbs (splats riding on each bone)
+      for (const [bm, r, Ln, col] of [[b1, d.fore ? 4.2 : 6.5, d.L1, [0.5, 0.25, 0.07]], [b2, d.fore ? 3 : 3.6, d.L2, [0.78, 0.68, 0.52]]]) {
+        const ls = new Splats(420, { rough: 0.6, sharp: 2.6 });
+        for (let k = 0; k < 420; k++) {
+          const th = Math.random() * 6.283, y = Math.random() - 0.5, rr = r * (0.85 + 0.15 * (0.5 - y)) * 1.02, hl = 0.9 + Math.random() * 0.9, c = 0.8 + Math.random() * 0.35;
+          const cx = Math.cos(th), cz = Math.sin(th);
+          ls.add(cx * (rr + hl * 0.35), y + hl * 0.9 / Ln, cz * (rr + hl * 0.35), cx * hl * 0.4, hl * 0.9 / Ln, cz * hl * 0.4, 0.14 + Math.random() * 0.1, col[0] * c, col[1] * c, col[2] * c, cx, 0, cz);
+        }
+        bm.add(ls.done());
+      }
       tor.add(b1, b2, j, paw);
       this.limbs.push({ ...d, b1, b2, j, paw, hipV: new THREE.Vector3(...d.hip), foot: new THREE.Vector3(), lift: 0 });
     }
@@ -576,7 +634,7 @@ export class HamsterRig {
 
   buildCage({ L, D, Hc, cx0, cz0, yT, yB, xw, zw, Wd, Rs }) {
     const g = this.group, X = (x) => cx0 + x, Z = (z) => cz0 + z;
-    const wood = new THREE.MeshStandardMaterial({ color: 0x9a7350, roughness: 0.7 });
+    const wood = pbr('wood_table_worn', { color: new THREE.Color(3.0, 2.5, 2.0), rough: 0.8, repeat: [0.5, 0.5] });
     const box = (w, h, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
     // floor, glass walls, wooden corner posts and rim, wire-mesh lid
     box(L + 24, 8, D + 24, X(L / 2), yT + 4, Z(D / 2), wood);
@@ -598,14 +656,14 @@ export class HamsterRig {
     for (let i = 0; i < 2600; i++) { const v = 170 + Math.random() * 70; bx.fillStyle = `rgba(${v + 20},${v},${v - 40},0.8)`; bx.save(); bx.translate(Math.random() * 512, Math.random() * 512); bx.rotate(Math.random() * 6.3); bx.fillRect(-9, -2, 18 + Math.random() * 10, 3 + Math.random() * 3); bx.restore(); }
     for (let i = 0; i < 500; i++) { bx.fillStyle = 'rgba(90,70,45,0.35)'; bx.fillRect(Math.random() * 512, Math.random() * 512, 6, 2); }
     const bt = new THREE.CanvasTexture(bc); bt.colorSpace = THREE.SRGBColorSpace; bt.wrapS = bt.wrapT = THREE.RepeatWrapping; bt.repeat.set(L / 260, D / 260);
-    const bedM = new THREE.MeshStandardMaterial({ map: bt, roughness: 1 });
+    const bedM = pbr('wood_chips', { gray: true, color: 0xcdb78c, rough: 1, normal: 2.2, repeat: [L / 420, D / 420] }); void bt;
     box(L, yB - yT - 8, D, X(L / 2), (yB + yT + 8) / 2, Z(D / 2), bedM);
     this.pile = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), bedM); this.pile.scale.set(60, 1, 45);
     this.pileAt = { x: (xw - cx0 + Rs + L - 175) / 2, z: 70 }; this.pile.position.set(X(this.pileAt.x + 20), yB, Z(this.pileAt.z - 15)); g.add(this.pile);
     // his house: a little wooden hut with a gabled roof and a round door, hay inside
     const hx = L - 100, hz = 85;
     const hut = new THREE.Group(); hut.position.set(X(hx), yB, Z(hz)); g.add(hut);
-    const pine = new THREE.MeshStandardMaterial({ color: 0xc89a62, roughness: 0.75 });
+    const pine = pbr('white_maple_veneer', { color: 0xe2b47a, rough: 0.85, normal: 1, repeat: [0.22, 0.22] });
     const shell = (w, h, d, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pine); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; hut.add(b); };
     shell(150, 110, 10, 0, 55, -55); shell(10, 110, 120, -70, 55, 0); shell(10, 110, 120, 70, 55, 0);
     // front: two jambs and a lintel around an open doorway, so you can see him inside
@@ -614,7 +672,7 @@ export class HamsterRig {
     const hay = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshStandardMaterial({ color: 0xc8b060, roughness: 1 })); hay.scale.set(60, 18, 45); hay.position.set(0, 4, -5); hut.add(hay);
     this.hut = hut; this.hay = hay;
     // a half tier over his house, on four legs, with a slatted ramp rising to it from the left
-    { const T = CAGE.tier, Rm = CAGE.ramp, ply = new THREE.MeshStandardMaterial({ color: 0xc9a26e, roughness: 0.8 });
+    { const T = CAGE.tier, Rm = CAGE.ramp, ply = pbr('white_maple_veneer', { color: 0xdcb07c, rough: 0.85, normal: 1, repeat: [0.3, 0.3] });
       const w = T.x1 - T.x0, d = T.z1 - T.z0;
       const deck = new THREE.Mesh(new THREE.BoxGeometry(w, 10, d), ply); deck.position.set(X(T.x0 + w / 2), yB + T.h - 5, Z(T.z0 + d / 2)); deck.castShadow = deck.receiveShadow = true; g.add(deck);
       for (const [lx, lz] of [[T.x0 + 8, T.z0 + 8], [T.x1 - 8, T.z0 + 8], [T.x0 + 8, T.z1 - 8], [T.x1 - 8, T.z1 - 8]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, T.h - 10, 8), ply); leg.position.set(X(lx), yB + (T.h - 10) / 2, Z(lz)); leg.castShadow = true; g.add(leg); }

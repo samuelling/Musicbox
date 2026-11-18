@@ -333,8 +333,8 @@ export class Cabin {
     const ceil = mesh(planeUV(RY, RX, 3600), pbr('old_wood_floor', { color: new THREE.Color(1.3, 1.05, 0.9), rough: 1.1 }), RX / 2, RZ, RY / 2, { cast: false }); ceil.rotation.set(Math.PI / 2, 0, Math.PI / 2);
     // (the roof above keeps the moon off everything but what the window lets in)
     const roof = mesh(new THREE.PlaneGeometry(RX + 800, RY + 800), new THREE.MeshBasicMaterial({ color: 0x000000 }), RX / 2, RZ + 30, RY / 2, { receive: false }); roof.rotation.x = -Math.PI / 2; roof.material.side = THREE.DoubleSide;
-    const timberM = [0x604531, 0x573d2c, 0x684c36, 0x503a2a].map((c) => pbr('rough_wood', { gray: true, color: c, rough: 1.0, normal: 1.2 }));
-    const beamM = pbr('rough_wood', { gray: true, color: 0x3e2c20, rough: 0.95, normal: 1.2 });
+    const timberM = [0x8a6242, 0x7d573a, 0x916a48, 0x755238].map((c) => pbr('rough_wood', { gray: true, color: c, rough: 1.0, normal: 1.2 }));
+    const beamM = pbr('rough_wood', { gray: true, color: 0x5a3f2c, rough: 0.95, normal: 1.2 });
     for (let k = 1; k <= 3; k++) mesh(hewnBeam(RX + 300, 220, 200, { mm: 620, r: 20, wobble: 4 }), beamM, RX / 2, RZ - 110, (k / 4) * RY);
 
     // ---- walls: square-hewn timbers laid flat (Blockbau), eased and uneven, dark oakum between ----
@@ -403,8 +403,8 @@ export class Cabin {
     // ---- fireplace on the x = 0 wall: raised hearth, dry-laid stone, a timber mantel, a wood fire ----
     const F = CABIN_FEATURES.fireplace, fy0 = F.y0 * 1000, fy1 = F.y1 * 1000, fd = F.depth * 1000, fc = (fy0 + fy1) / 2;
     // fieldstone: every stone its own lump (see masonry.js), bedded in recessed lime mortar
-    const rock = pbr('rock_boulder_dry', { gray: true, vertexColors: true, color: 0xc4c4c4, rough: 1.0, normal: 1.6 });
-    const sootRock = pbr('rock_boulder_dry', { gray: true, vertexColors: true, color: 0x2c2826, rough: 1.1, normal: 1.6 });
+    const rock = pbr('rock_boulder_dry', { gray: true, vertexColors: true, color: 0xe6e6e6, rough: 1.0, normal: 1.6 });
+    const sootRock = pbr('rock_boulder_dry', { gray: true, vertexColors: true, color: 0x5e5852, rough: 1.1, normal: 1.6 });
     const mortar = pbr('painted_plaster_wall', { color: 0x74695c, rough: 1.15, normal: 2.2 });
     const sb = (w, h, d, x, y, z, m = mortar) => mesh(boxUV(w, h, d, 900), m, x, y, z);
     const openW = 820, openH = 640, hearthH = 300, jamb = (fy1 - fy0 - openW) / 2, fbk = 60, FW = fy1 - fy0, y0f = hearthH + 30;
@@ -434,11 +434,11 @@ export class Cabin {
     // hearthstones: a few broad flags, proud of the stonework
     const flags = new THREE.Mesh(fieldstone(FW + 300, fd + 70, { cell: [520, 300], bulge: [34, 44], joint: 9, flat: 1, tint: [0.4, 0.4, 0.4] }), rock);
     flags.rotation.set(-Math.PI / 2, 0, -Math.PI / 2); flags.position.set(-6, hearthH, fy0 - 150); flags.castShadow = flags.receiveShadow = true; g.add(flags);
-    const mantelM = pbr('rough_wood', { gray: true, color: 0x4a3222, rough: 0.8, normal: 1.0 });
+    const mantelM = pbr('rough_wood', { gray: true, color: 0x5e4028, rough: 0.8, normal: 1.0 });
     const mantel = mesh(hewnBeam(FW + 260, 150, fd + 130, { mm: 600, r: 16, wobble: 2.5 }), mantelM, fd / 2 + 70, hearthH + openH + 235, fc); mantel.rotation.y = Math.PI / 2;
     for (const dz of [-1, 1]) mesh(roundBox(120, 150, 100, 10, 500, 'y'), mantelM, fd + 86, hearthH + openH + 105, fc + dz * (FW / 2 - 110));   // corbels under the mantel
     const bark = pbr('pine_bark', { rough: 1.0, normal: 1.5, color: 0xc8b8a8 });
-    this.fireFx = new Fire({ width: 620, bark, light: 3.4e6 });
+    this.fireFx = new Fire({ width: 620, bark, light: 4.6e6 });
     this.fireFx.group.position.set(fd * 0.55 + 20, hearthH + 40, fc); g.add(this.fireFx.group);
     this.fireLight = this.fireFx.light;
     this.t = 0; this.fire = 0; this.fireTarget = 0;   // the fire is laid but unlit until you light the candle
@@ -467,9 +467,9 @@ export class Cabin {
     };
     bench(2200, RX - 1100, RY - 210, true); bench(1900, RX - 210, RY - 420 - 950, false);
     // a folded woollen blanket and a cushion left on the bench
-    const wool = pbr('poly_wool_herringbone', { color: 0x6a2e22, gray: true, rough: 1, normal: 1.4, repeat: [3, 3] });
+    const wool = pbr('poly_wool_herringbone', { color: 0x8a3628, gray: true, rough: 1, normal: 1.4, repeat: [3, 3] });
     const blanket = mesh(roundBox(520, 70, 360, 28, 99999), wool, RX - 1750, 500, RY - 215); blanket.rotation.y = 0.12;
-    const cush = mesh(roundBox(360, 110, 360, 54, 99999, 'x', 4), pbr('knitted_fleece', { color: 0x4a3a2e, gray: true, rough: 1, normal: 1.5, repeat: [2.5, 2.5] }), RX - 225, 522, RY - 1050); cush.rotation.set(0.04, 0.3, -0.08);
+    const cush = mesh(roundBox(360, 110, 360, 54, 99999, 'x', 4), pbr('knitted_fleece', { color: 0x5c6a48, gray: true, rough: 1, normal: 1.5, repeat: [2.5, 2.5] }), RX - 225, 522, RY - 1050); cush.rotation.set(0.04, 0.3, -0.08);
     // candles in iron sconces on the walls over the corner bench, to warm that dark corner (lit with the fire)
     this.sconces = [];
     const iron = new THREE.MeshStandardMaterial({ color: 0x1c1a18, metalness: 0.7, roughness: 0.5 });
@@ -568,7 +568,7 @@ export class Cabin {
       c.flame.visible = c.halo.visible = SL > 0.02; const fu = c.flame.material.uniforms; fu.time.value = this.t + c.ph; fu.opacity.value = Math.min(1, SL * 1.5); fu.size.value.set(26 * (0.6 + 0.4 * SL), 64 * k * SL); fu.lean.value = 0.12 * Math.sin(this.t * 2.1 + c.ph) + 0.06 * Math.sin(this.t * 6.7 + c.ph);
       c.halo.material.opacity = (Q.post ? 0.3 : 0.75) * SL * k; fl += k;
     }
-    this.sconceLight.intensity = 5.5e5 * SL * (fl / Math.max(1, this.sconces.length));
+    this.sconceLight.intensity = 9e5 * SL * (fl / Math.max(1, this.sconces.length));
     // fire: catching (kindling first, a few seconds, then the logs); banked back to embers when snuffed
     this.fire += (this.fireTarget - this.fire) * Math.min(1, dt * (this.fireTarget > this.fire ? 0.45 : 0.25));
     this.fireFx.update(dt, this.fire);

@@ -59,5 +59,11 @@ export class Splats {
     this.center.set([cx, cy, cz], i * 3); this.axis.set([ax, ay, az, w], i * 4); this.color.set([r, g, b], i * 3); this.normal.set([nx, ny, nz], i * 3);
     this.count++; return i;
   }
-  done() { this.geometry.instanceCount = this.count; for (const k of ['iCenter', 'iAxis', 'iColor', 'iNormal']) this.geometry.attributes[k].needsUpdate = true; return this.mesh; }
+  done() {
+    // bounds from the splats themselves (the quad alone says nothing about where they are)
+    const b = new THREE.Box3(), v = new THREE.Vector3();
+    for (let i = 0; i < this.count; i++) { const e = Math.hypot(this.axis[i * 4], this.axis[i * 4 + 1], this.axis[i * 4 + 2]) + this.axis[i * 4 + 3]; v.fromArray(this.center, i * 3); b.expandByPoint(v.clone().addScalar(e)); b.expandByPoint(v.addScalar(-e)); }
+    if (this.count) { this.geometry.boundingBox = b; this.geometry.boundingSphere = b.getBoundingSphere(new THREE.Sphere()); }
+    this.geometry.instanceCount = this.count; for (const k of ['iCenter', 'iAxis', 'iColor', 'iNormal']) this.geometry.attributes[k].needsUpdate = true; return this.mesh;
+  }
 }
