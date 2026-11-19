@@ -226,7 +226,7 @@ export class HamsterModel {
       const m = sp.done(); m.renderOrder = 40; parent.add(m);
       return m;
     };
-    const dens = { low: 0.8, med: 1.7, high: 2.8 }[Q.tier];
+    const dens = Q.fur;
     this.hairs = [addHairs(bodyG, tor, dens), addHairs(headG, head, dens * 1.3)];
 
     // ----- face -----

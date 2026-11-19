@@ -1235,6 +1235,6 @@ setMode('crank');
 requestBuild(0);
 { // Settings ▸ Graphics: remembered on this device; a change needs the scene rebuilt, so reload
   const sel = $('gfx');
-  if (sel) { sel.value = storedTier(); sel.title = `Now: ${Q.tier}`; sel.addEventListener('change', () => { storeTier(sel.value); location.reload(); }); }
+  if (sel) { sel.value = storedTier(); sel.options[0].textContent = `Auto (${{ med: 'Medium', high: 'High' }[Q.auto]})`; sel.addEventListener('change', () => { storeTier(sel.value); location.reload(); }); }
 }
 window.__mb = { walk, collide,  cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; }, roll };

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#15110e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Frisky — a physically modelled music box</title>
-<link rel="stylesheet" href="css/style.css?v=1795050000">
+<link rel="stylesheet" href="css/style.css?v=1795050100">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/" } }</script>
 </head>
 <body>
@@ -107,7 +107,7 @@
         <label>Room <select id="room"></select></label>
         <label class="chk xmasChk" title="On by itself from 1 December to Epiphany (6 January)"><input type="checkbox" id="xmas"> 🎄 Christmas decorations</label>
         <label class="chk xmasChk" title="On by itself for the eight days of Hanukkah"><input type="checkbox" id="hanukkah"> 🕎 Hanukkah decorations</label>
-        <label class="chk gfxRow" title="How hard to push the graphics. Auto: High on a computer, Low on a phone or tablet. Medium adds glow and a film finish; High adds soft contact shadows and the densest fur. Changing it reloads the page.">Graphics <select id="gfx"><option value="auto">Auto</option><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option></select></label>
+        <label class="chk gfxRow" title="How hard to push the graphics. Auto: High on a computer, Medium on a phone or tablet. Low: the plain render. Medium: glow, film finish, the fire's shadows. High: soft contact shadows, bigger shadow maps, denser fur. Ultra: everything turned up (needs a strong graphics card). Changing it reloads the page.">Graphics <select id="gfx"><option value="auto">Auto</option><option value="low">Low</option><option value="med">Medium</option><option value="high">High</option><option value="ultra">Ultra</option></select></label>
       </div>
       <div class="mapBlock">
         <div class="mapWrap"><canvas id="map"></canvas></div>
@@ -264,6 +264,6 @@
   the code is <a href="https://github.com/samuelling/Musicbox" target="_blank" rel="noopener">on GitHub</a>.
   All tunes are public domain, traditional or original.</p>
 </dialog>
-<script type="module" src="js/main.js?v=1795050000"></script>
+<script type="module" src="js/main.js?v=1795050100"></script>
 </body>
 </html>

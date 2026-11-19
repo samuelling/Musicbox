@@ -1,7 +1,8 @@
 // The finishing chain: the scene is drawn into a multisampled HDR buffer, then
 //   ambient occlusion (high only) → bloom on whatever is brighter than white (flames, embers, bulbs)
 //   → tone mapping → a gentle lens finish (vignette, a breath of grain).
-// On the 'low' tier none of this exists and the scene is drawn straight to the screen, as before.
+// On the 'low' tier none of this exists and the scene is drawn straight to the screen, as before;
+// the same happens, by itself, on any device where the chain cannot be built or throws.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -29,15 +30,20 @@ export class PostFX {
   constructor(renderer) {
     this.renderer = renderer; this.on = Q.post;
     if (!this.on) return;
+    try { this.build(renderer); } catch (e) { console.warn('post chain unavailable, drawing directly', e); this.on = false; }
+  }
+  build(renderer) {
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
+    // an HDR buffer where the device can render to one; otherwise 8-bit (the glow still works, a little coarser)
+    const gl = renderer.getContext(), hdr = !!(gl.getExtension('EXT_color_buffer_half_float') || gl.getExtension('EXT_color_buffer_float'));
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: hdr ? THREE.HalfFloatType : THREE.UnsignedByteType, samples: Math.min(Q.msaa, gl.getParameter(gl.MAX_SAMPLES) || 4) });
     const c = (this.composer = new EffectComposer(renderer, rt));
     this.pass = new RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
     c.addPass(this.pass);
     if (Q.ao) {
       const ao = (this.ao = new GTAOPass(this.pass.scene, this.pass.camera, size.x, size.y));
       // scene units are millimetres: occlusion gathered within a few centimetres, falling off by a hand's width
-      ao.updateGtaoMaterial({ radius: 55, distanceExponent: 1.4, thickness: 4, scale: 1.25, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
+      ao.updateGtaoMaterial({ radius: 55, distanceExponent: 1.4, thickness: 4, scale: 1.25, samples: Q.aoSamples, distanceFallOff: 1, screenSpaceRadius: false });
       ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
       ao.blendIntensity = 0.9;
       // glass, flames, glows and other see-through things must not occlude (or be occluded as if solid)
@@ -67,6 +73,7 @@ export class PostFX {
     this.pass.scene = scene; this.pass.camera = camera;
     if (this.ao) { this.ao.scene = scene; this.ao.camera = camera; }
     this.finish.uniforms.time.value += dt;
-    this.composer.render(dt);
+    try { this.composer.render(dt); }
+    catch (e) { console.warn('post chain failed, drawing directly', e); this.on = false; this.renderer.setRenderTarget(null); this.renderer.render(scene, camera); }
   }
 }

@@ -31,7 +31,6 @@ export function santaSeason(d = new Date()) {
 // the man himself, built facing +z, his feet at the origin (mm)
 export function oldMan({ santa = santaSeason() } = {}) {
   const g = new THREE.Group();
-  const lowQ = Q.tier === 'low';
   const add = (geo, m, x, y, z, parent = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; parent.add(o); return o; };
   // cloth: a heavy herringbone wool overcoat (or, in season, a cheap Santa suit of worn red velvet)
   const coat = santa ? pbr('velour_velvet', { gray: true, color: 0x8e1a14, rough: 1, normal: 1.2, repeat: [5, 6], emissive: 0x1a0302 })
@@ -93,7 +92,7 @@ export function oldMan({ santa = santaSeason() } = {}) {
     o.r = c[0] * blotch; o.g = c[1] * blotch; o.b = c[2] * blotch; o.len = 0; o.tick = 0; o.cx = 0; o.cy = 0; o.cz = 0;
   };
   const skinM = pbr('brown_leather', { maps: 'na', vertexColors: true, rough: 0.8, normal: 0.9, repeat: [7, 5], emissive: 0x2a120a, emissiveIntensity: 0.5 });
-  const skull = new THREE.Mesh(starMesh(headSdf, new THREE.Vector3(0, 0, 0), lowQ ? 56 : 96, lowQ ? 40 : 68, headPaint), skinM); skull.castShadow = true; skull.receiveShadow = true; head.add(skull);
+  const skull = new THREE.Mesh(starMesh(headSdf, new THREE.Vector3(0, 0, 0), Q.sculpt[0], Q.sculpt[1], headPaint), skinM); skull.castShadow = true; skull.receiveShadow = true; head.add(skull);
   const earM = new THREE.MeshStandardMaterial({ color: 0xb8705c, roughness: 0.6, emissive: 0x2a120a, emissiveIntensity: 0.5 });
   for (const sx of [-1, 1]) { const e = add(new THREE.SphereGeometry(1, 14, 10), earM, sx * 113, -4, -8, head); e.scale.set(11, 35, 23); e.rotation.set(0, sx * 0.35, sx * -0.12); }
   // eyes: pale, watery, hooded
@@ -130,7 +129,7 @@ export function oldMan({ santa = santaSeason() } = {}) {
   }
   // ---- hair: a big unkempt beard, moustache, wild brows and straggling locks, one Gaussian splat per strand ----
   const greys = [[0.72, 0.71, 0.69], [0.52, 0.51, 0.5], [0.88, 0.87, 0.85], [0.38, 0.37, 0.36], [0.8, 0.78, 0.72]];
-  const nBeard = lowQ ? 1600 : 3800;
+  const nBeard = Q.beard;
   const hair = new Splats(nBeard * 2 + 2400, { rough: 0.5, sharp: 2.4, wrap: 0.4, env: 0.9 });
   const strand = (px, py, pz, dx, dy, dz, len, w, nrm, curl = 0.3, yellow = 0) => {
     // two overlapping splats per strand, the second veering off: enough to read as a curl

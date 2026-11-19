@@ -13,7 +13,7 @@ const TINTS = [[0.5, 0.48, 0.45], [0.6, 0.5, 0.36], [0.5, 0.36, 0.26], [0.36, 0.
 let template = null;
 function sphere() {
   if (template) return template;
-  const [su, sv] = Q.tier === 'low' ? [10, 7] : [16, 11];
+  const [su, sv] = Q.stone;
   const g = new THREE.SphereGeometry(1, su, sv);
   template = { p: g.attributes.position.array, idx: g.index.array, n: g.attributes.position.count };
   return template;
