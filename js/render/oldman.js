@@ -28,6 +28,53 @@ export function santaSeason(d = new Date()) {
   return m === 11 && day >= 13 && day <= 25;
 }
 
+// Seventy winters of skin, drawn in the head's own map (u round the head with the face at u = 0.25,
+// v up): forehead furrows, a scowl between the brows, crow's feet, bags, the folds from nose to mouth,
+// pores and liver spots. Returned as a colour map (lines and spots darken the painted skin) and a
+// normal map made from the same drawing, so the creases catch the firelight.
+let aged = null;
+function agedSkin() {
+  if (aged) return aged;
+  const W = 1024, H = 512;
+  const hc = document.createElement('canvas'); hc.width = W; hc.height = H; const h = hc.getContext('2d');
+  const cc = document.createElement('canvas'); cc.width = W; cc.height = H; const c = cc.getContext('2d');
+  h.fillStyle = '#808080'; h.fillRect(0, 0, W, H); c.fillStyle = '#fff'; c.fillRect(0, 0, W, H);
+  const X = (u) => u * W, Y = (v) => (1 - v) * H;
+  // a crease: a dark groove in the height map with a soft shoulder, and a faint stain in the colour
+  const crease = (pts, w = 2.4, depth = 0.55) => {
+    for (const [ctx, style, lw] of [[h, `rgba(0,0,0,${depth * 0.35})`, w * 3], [h, `rgba(0,0,0,${depth})`, w], [c, `rgba(96,48,36,${depth * 0.45})`, w * 1.4]]) {
+      ctx.strokeStyle = style; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+      pts.forEach(([u, v], i) => (i ? ctx.lineTo(X(u), Y(v)) : ctx.moveTo(X(u), Y(v)))); ctx.stroke();
+    }
+  };
+  const wav = (u0, u1, v, amp, n = 14, ph = R(0, 6)) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n; return [u0 + (u1 - u0) * t, v + amp * Math.sin(t * 5 + ph) + amp * 0.5 * Math.sin(t * 13 + ph * 2) - 0.012 * Math.pow(Math.abs(t - 0.5) * 2, 2)]; });
+  for (let k = 0; k < 5; k++) crease(wav(0.15 + R(0, 0.02), 0.35 - R(0, 0.02), 0.655 + k * 0.021, 0.004), R(2, 3.2), R(0.4, 0.6));     // forehead
+  for (const du of [-0.012, 0.012]) crease([[0.25 + du, 0.66], [0.25 + du * 0.8, 0.625], [0.25 + du * 1.1, 0.6]], 2.6, 0.6);          // the scowl
+  for (const sx of [-1, 1]) {
+    const eu = 0.25 + sx * 0.063, ev = 0.565;
+    for (let k = 0; k < 5; k++) { const a = (k - 2) * 0.32; crease([[eu + sx * 0.022, ev + 0.004 * (k - 2)], [eu + sx * (0.022 + 0.03 * Math.cos(a)), ev + 0.06 * Math.sin(a) + 0.002]], 1.8, 0.5); }   // crow's feet
+    for (let k = 0; k < 3; k++) crease(Array.from({ length: 9 }, (_, i) => { const t = i / 8; return [eu - sx * 0.03 + sx * 0.055 * t, ev - 0.03 - k * 0.013 - (0.012 + 0.004 * k) * Math.sin(t * Math.PI) + 0.002 * Math.sin(t * 9 + k)]; }), R(1.2, 2.2), 0.22 + 0.1 * (k === 0));   // bags
+    crease([[0.25 + sx * 0.03, 0.455], [0.25 + sx * 0.047, 0.42], [0.25 + sx * 0.062, 0.38], [0.25 + sx * 0.068, 0.345]], 3.4, 0.7);       // nose to mouth
+    crease([[0.25 + sx * 0.1, 0.5], [0.25 + sx * 0.112, 0.45], [0.25 + sx * 0.11, 0.4]], 2, 0.35);                                        // a hollow cheek
+  }
+  for (let k = 0; k < 4; k++) crease(wav(0.228, 0.272, 0.505 - k * 0.012, 0.002, 6), 1.4, 0.3);                                        // across the bridge of the nose
+  // pores, and broken veins on the nose and cheeks
+  for (let i = 0; i < 26000; i++) { h.fillStyle = `rgba(${Math.random() < 0.6 ? '0,0,0' : '255,255,255'},${R(0.03, 0.12)})`; h.fillRect(R(0.05, 0.45) * W, R(0.25, 0.8) * H, R(1, 2.2), R(1, 2.2)); }
+  for (let i = 0; i < 70; i++) { const u = 0.25 + R(-0.09, 0.09), v = R(0.4, 0.5); c.strokeStyle = `rgba(150,30,40,${R(0.12, 0.3)})`; c.lineWidth = R(0.6, 1.3); c.beginPath(); c.moveTo(X(u), Y(v)); c.quadraticCurveTo(X(u + R(-0.01, 0.01)), Y(v + R(-0.012, 0.012)), X(u + R(-0.016, 0.016)), Y(v + R(-0.016, 0.016))); c.stroke(); }
+  for (let i = 0; i < 22; i++) { const px = X(R(0.08, 0.42)), py = Y(R(0.45, 0.76)), r = R(4, 11); const g = c.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, `rgba(96,60,34,${R(0.25, 0.5)})`); g.addColorStop(1, 'rgba(96,60,34,0)'); c.fillStyle = g; c.beginPath(); c.ellipse(px, py, r, r * R(0.6, 1), R(0, 3), 0, 7); c.fill(); }   // liver spots
+  // height -> normal
+  const src = h.getImageData(0, 0, W, H).data, nc = document.createElement('canvas'); nc.width = W; nc.height = H; const n = nc.getContext('2d'), out = n.createImageData(W, H);
+  const at = (x, y) => src[(((y + H) % H) * W + ((x + W) % W)) * 4];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = (at(x + 1, y) - at(x - 1, y)) / 255, dy = (at(x, y + 1) - at(x, y - 1)) / 255, k = (y * W + x) * 4;
+    out.data[k] = 128 - dx * 320; out.data[k + 1] = 128 + dy * 320; out.data[k + 2] = 255; out.data[k + 3] = 255;
+  }
+  n.putImageData(out, 0, 0);
+  const map = new THREE.CanvasTexture(cc); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+  const normal = new THREE.CanvasTexture(nc); normal.anisotropy = 4;
+  return (aged = { map, normal });
+}
+
 // the man himself, built facing +z, his feet at the origin (mm)
 export function oldMan({ santa = santaSeason() } = {}) {
   const g = new THREE.Group();
@@ -91,7 +138,8 @@ export function oldMan({ santa = santaSeason() } = {}) {
     const blotch = 0.92 + 0.16 * Math.sin(x * 0.13 + 1.7) * Math.sin(y * 0.11) * Math.sin(z * 0.09 + 0.4);
     o.r = c[0] * blotch; o.g = c[1] * blotch; o.b = c[2] * blotch; o.len = 0; o.tick = 0; o.cx = 0; o.cy = 0; o.cz = 0;
   };
-  const skinM = pbr('brown_leather', { maps: 'na', vertexColors: true, rough: 0.8, normal: 0.9, repeat: [7, 5], emissive: 0x2a120a, emissiveIntensity: 0.5 });
+  const age = agedSkin();
+  const skinM = new THREE.MeshStandardMaterial({ vertexColors: true, map: age.map, normalMap: age.normal, normalScale: new THREE.Vector2(1.05, 1.05), roughness: 0.66, emissive: 0x2a120a, emissiveIntensity: 0.5 });
   const skull = new THREE.Mesh(starMesh(headSdf, new THREE.Vector3(0, 0, 0), Q.sculpt[0], Q.sculpt[1], headPaint), skinM); skull.castShadow = true; skull.receiveShadow = true; head.add(skull);
   const earM = new THREE.MeshStandardMaterial({ color: 0xb8705c, roughness: 0.6, emissive: 0x2a120a, emissiveIntensity: 0.5 });
   for (const sx of [-1, 1]) { const e = add(new THREE.SphereGeometry(1, 14, 10), earM, sx * 113, -4, -8, head); e.scale.set(11, 35, 23); e.rotation.set(0, sx * 0.35, sx * -0.12); }
@@ -109,10 +157,10 @@ export function oldMan({ santa = santaSeason() } = {}) {
     const eg = new THREE.SphereGeometry(13.5, 24, 18); eg.rotateY(-Math.PI / 2);          // the iris (texture centre) looks along +z
     { const uv = eg.attributes.uv, P = eg.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5 + P.getX(i) / 27 * 1.0, 0.5 + P.getY(i) / 27 * 1.0); }
     const eye = add(eg, new THREE.MeshPhysicalMaterial({ color: 0xe6ded2, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.04, emissive: 0x2a2622, emissiveIntensity: 0.25 }), sx * 42, 22, 87, head); eye.castShadow = false;
-    const iris = add(new THREE.CircleGeometry(6.4, 24), new THREE.MeshPhysicalMaterial({ map: irisT, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03 }), 0, -2.5, 13.3, eye); iris.rotation.x = 0.18; iris.castShadow = false;
+    const iris = add(new THREE.CircleGeometry(6.4, 24), new THREE.MeshPhysicalMaterial({ map: irisT, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03 }), 0, -1, 13.4, eye); iris.rotation.x = 0.07; iris.castShadow = false;
     { const uv = iris.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5 + (uv.getX(i) - 0.5) * 0.4, 0.5 + (uv.getY(i) - 0.5) * 0.4); }
-    const lid = add(new THREE.SphereGeometry(14.6, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.4), lidM, sx * 42, 22, 87, head); lid.rotation.x = 0.3; lid.castShadow = false;
-    const low = add(new THREE.SphereGeometry(14.4, 20, 8, 0, Math.PI * 2, Math.PI * 0.7, Math.PI * 0.3), lidM, sx * 42, 22, 87, head); low.rotation.x = -0.42; low.castShadow = false;
+    const lid = add(new THREE.SphereGeometry(14.6, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.4), lidM, sx * 42, 22, 87, head); lid.rotation.x = 0.12; lid.castShadow = false;
+    const low = add(new THREE.SphereGeometry(14.4, 20, 8, 0, Math.PI * 2, Math.PI * 0.7, Math.PI * 0.3), lidM, sx * 42, 22, 87, head); low.rotation.x = -0.74; low.castShadow = false;
   }
   // a knitted cap pulled down (or, in season, a Santa hat with a fur brim and a grubby pompom)
   const cp = add(new THREE.SphereGeometry(131, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.42), cap, 0, 26, -6, head); cp.scale.set(1, 1.06, 1.06);
@@ -209,15 +257,20 @@ export function poseKit(man) {
   };
   kit.reach = (lean) => {
     const p0 = man.position.clone(), r0 = man.rotation.y;
-    let front = 0; const b = new THREE.Box3(), v = new THREE.Vector3();
+    let front = 0; const b = new THREE.Box3(), v = new THREE.Vector3(), m4 = new THREE.Matrix4();
     const heads = lean ? [-0.19, 0.0, 0.09].flatMap((hx) => [-0.66, 0, 0.66].flatMap((hy) => [-0.13, 0.13].map((hz) => [hx, hy, hz]))) : [[0, 0, 0]];
     for (const hr of heads) {
       kit.setLean(lean); head.rotation.set(...hr); man.updateMatrixWorld(true);
       const inv = new THREE.Matrix4().copy(man.matrixWorld).invert();
       man.traverse((o) => {
         if (!o.isMesh || !o.visible) return;
-        if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); b.copy(o.boundingBox); } else { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); b.copy(o.geometry.boundingBox); }
-        for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(o.matrixWorld).applyMatrix4(inv); front = Math.max(front, v.z); }
+        // measured exactly, point by point (boxes round rotated limbs and the beard overstate it by a hand's width,
+        // and he is meant to get his nose right up to the pane)
+        m4.multiplyMatrices(inv, o.matrixWorld); const e = m4.elements;
+        const sp = o.userData.splats;
+        if (sp) { for (let i = 0; i < sp.count; i++) { const cx = sp.center[i * 3], cy = sp.center[i * 3 + 1], cz = sp.center[i * 3 + 2], ax = sp.axis[i * 4], ay = sp.axis[i * 4 + 1], az = sp.axis[i * 4 + 2]; const zc = e[2] * cx + e[6] * cy + e[10] * cz + e[14], za = Math.abs(e[2] * ax + e[6] * ay + e[10] * az); front = Math.max(front, zc + za + sp.axis[i * 4 + 3] * 1.3 * head.scale.x); } }
+        else if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); b.copy(o.boundingBox); for (let i = 0; i < 8; i++) { v.set(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).applyMatrix4(m4); front = Math.max(front, v.z); } }
+        else { const P = o.geometry.attributes.position.array; for (let i = 0; i < P.length; i += 3) front = Math.max(front, e[2] * P[i] + e[6] * P[i + 1] + e[10] * P[i + 2] + e[14]); }
       });
     }
     head.rotation.set(0, 0, 0); man.position.copy(p0); man.rotation.y = r0;
@@ -231,8 +284,10 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
   let withAxe = false;
   man.rotation.y = Math.PI;                // facing into the room (-z)
   man.visible = false; parent.add(man);
-  const fog = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: fogTexture(), transparent: true, opacity: 0, depthWrite: false }));
+  const fog = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: fogTexture(), color: 0x55607a, transparent: true, opacity: 0, depthWrite: false }));
   fog.rotation.y = Math.PI; parent.add(fog);
+  // what the room's light does through the pane: enough to pick out a face that comes up close
+  const spill = new THREE.PointLight(0xffb070, 2.4e5, 1500, 2); spill.position.set((x0 + x1) / 2, y0 + 760, zGlass + 300); parent.add(spill);
   const cx = (x0 + x1) / 2;
   const kit = poseKit(man), setLean = kit.setLean;
   man.rotation.y = Math.PI;
@@ -242,6 +297,9 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
   const q = (() => { try { return location.search; } catch (e) { return ''; } })();
   const params = /[?&]oldman\b/i.test(q), forceAxe = /[?&]oldman=axe\b/i.test(q);
   let wait = params ? 6 : R(900, 3600), t = 0, phase = 'away', side = 1;
+  // ?oldman=peer (or peeraxe): he is at the glass from the start and stays (for looking at him)
+  const hold = /[?&]oldman=peer(axe)?\b/i.test(q);
+  if (hold) { phase = 'peer'; man.visible = true; withAxe = /peeraxe/i.test(q); axe.visible = withAxe; kit.withAxe = withAxe; }
   const z0 = zGlass + clear + front0 + 250;   // standing back from the house, outside
   // so he stands at the window from the waist up whatever the sill height (a little rise of snow outside)
   const lift = Math.max(0, y0 - 650);
@@ -257,7 +315,7 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
     let x = cx, z = z0, lean = 0, bob = 0, peer = 0;
     if (phase === 'walkIn') { const u = Math.min(1, t / 5); x = cx + side * 1900 * (1 - ease(u)); bob = Math.abs(Math.sin(t * 4.2)) * 30; man.rotation.y = Math.PI - side * 0.9 * (1 - ease(Math.min(1, u * 1.3))); if (u >= 1) { phase = 'lean'; t = 0; } }
     else if (phase === 'lean') { const u = Math.min(1, t / 1.8); lean = ease(u); if (u >= 1) { phase = 'peer'; t = 0; } }
-    else if (phase === 'peer') { lean = 1; peer = 1; if (t > 7.5) { phase = 'back'; t = 0; } }
+    else if (phase === 'peer') { lean = 1; peer = 1; if (t > 7.5 && !hold) { phase = 'back'; t = 0; } }
     else if (phase === 'back') { const u = Math.min(1, t / 1.5); lean = 1 - ease(u); if (u >= 1) { phase = 'walkOut'; t = 0; } }
     else if (phase === 'walkOut') { const u = Math.min(1, t / 5); x = cx - side * 1900 * ease(u); bob = Math.abs(Math.sin(t * 4.2)) * 30; man.rotation.y = Math.PI + side * 0.9 * ease(Math.min(1, u * 2)); if (u >= 1) { phase = 'away'; man.visible = false; wait = R(1800, 4200); } }
     if (phase === 'lean' || phase === 'peer' || phase === 'back') man.rotation.y = Math.PI;
@@ -271,6 +329,6 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
     // his breath on the cold pane
     const breathe = peer ? 0.35 + 0.25 * Math.max(0, Math.sin(t * 1.6)) : 0;
     fog.material.opacity += (breathe - fog.material.opacity) * Math.min(1, dt * (breathe > fog.material.opacity ? 3 : 0.4));
-    fog.position.set(x, lift + 1450, zGlass + 6); fog.scale.setScalar(320);
+    fog.position.set(x, lift + 1380, zGlass + 6); fog.scale.setScalar(240);
   };
 }

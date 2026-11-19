@@ -155,3 +155,20 @@ export function metal(kind = 'brass', { rough = null, brushed = 0.5, repeat = [1
   const r = smudgeRoughness().clone(); r.repeat.set(Math.max(1, repeat[0]), Math.max(1, repeat[0])); r.needsUpdate = true;
   return new THREE.MeshStandardMaterial({ color: color ?? P[0], metalness: 1, roughness: ((rough ?? P[1]) / 0.59), roughnessMap: r, normalMap: n, normalScale: new THREE.Vector2(brushed, brushed), ...rest });
 }
+
+// Furniture and joinery woods by the old names. gloss < 0.1 is bare, weathered timber (the hut's);
+// otherwise a lacquered veneer. `color` is the wood's own colour (true albedo for bare timber, a tint
+// for veneers); mm is the tile size the piece's UVs are measured in (see detail.js roundBox / triUV).
+export function wood(kind, color = 0xffffff, gloss = 0.3, mm = 700) {
+  const c = new THREE.Color(color);
+  let m;
+  if (gloss < 0.1) m = pbr('rough_wood', { gray: true, color: c, rough: 1, normal: 1.2 });
+  else {
+    const coat = { clearcoat: Math.min(1, gloss * 0.8), clearcoatRoughness: 0.18 };
+    if (kind === 'walnut') m = pbr('walnut_veneer', { color: c.multiplyScalar(1.5), rough: 0.85, normal: 0.7, physical: coat });
+    else if (kind === 'rosewood') m = pbr('rosewood_veneer1', { color: c, rough: 0.85, normal: 0.6, physical: coat });
+    else m = pbr('wood_table_worn', { color: c.multiplyScalar(2.6), rough: 0.85, normal: 0.9, physical: coat });
+  }
+  m.userData.mm = mm;
+  return m;
+}

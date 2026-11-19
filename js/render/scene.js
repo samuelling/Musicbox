@@ -424,14 +424,18 @@ export class MusicBoxScene {
       const L = t.L * MM, w = t.w * MM, th = ((t.t0 + t.t1) / 2) * MM;
       const pivot = new THREE.Group();
       pivot.position.copy(toV(t.x * MM, t.rootY * MM, t.rootZ * MM + bedTop));
-      const geo = new THREE.BoxGeometry(w, th, L); geo.translate(0, -th / 2, L / 2);
+      // a real tooth: flat on top, its thickness running from t0 at the root to t1 at the tip (the
+      // underside is what the tuner files), and its tip narrowed where the pins catch it
+      const geo = new THREE.BoxGeometry(w, th, L, 1, 1, 10); geo.translate(0, -th / 2, L / 2);
+      const thAt = (u) => (t.t0 + (t.t1 - t.t0) * u) * MM;
+      { const P = geo.attributes.position; for (let k = 0; k < P.count; k++) { const u = P.getZ(k) / L; if (P.getY(k) < -th / 4) P.setY(k, -thAt(u)); if (u > 0.9) P.setX(k, P.getX(k) * (1 - 0.45 * (u - 0.9) / 0.1)); } geo.computeVertexNormals(); }
       const mesh = new THREE.Mesh(geo, tineMat);
       mesh.castShadow = true; mesh.userData.tine = i;
       const holder = new THREE.Group(); holder.rotation.x = alpha; holder.add(mesh); pivot.add(holder);
       if (t.lead > 0) {
         const ll = Math.max(1, t.leadL * MM), lh = 1.6;
         const lead = new THREE.Mesh(new THREE.BoxGeometry(w * 0.98, lh, ll), this.mats.lead);
-        lead.position.set(0, -th - lh / 2, L - ll / 2); holder.add(lead);
+        lead.position.set(0, -thAt(1 - ll / (2 * L)) - lh / 2, L - ll / 2); holder.add(lead);
       }
       // root extension into the comb base
       const extLen = Math.max(0.5, Math.hypot(baseY - t.rootY * MM, 0));
@@ -450,14 +454,45 @@ export class MusicBoxScene {
     // ---------- governor & barrel ----------
     const gov = new THREE.Group();
     const gx = -combLen / 2 - 18, gz = axY * 0 + 8;
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.95, R * 0.95, 14, 40), this.mats.brass);
-    barrel.position.set(gx, axZ, -bedDep * MM / 2 + R * 0.95 + 4); barrel.rotation.z = Math.PI / 2; gov.add(barrel);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.95, R * 0.95, 14, 48), this.mats.brass);
+    barrel.position.set(gx, axZ, -bedDep * MM / 2 + R * 0.95 + 4); barrel.rotation.z = Math.PI / 2; barrel.castShadow = true; gov.add(barrel);
+    {
+      // the spring barrel: a toothed great wheel on its inner end, a lid with turned rings, a steel
+      // ratchet and click on the outer end, the arbor through the middle
+      const Rb = R * 0.95, bz = barrel.position.z;
+      const great = new THREE.Mesh(gearGeo(Rb + 0.9, Math.max(28, Math.round(Rb * 3.6)), 1.6, 1.4), this.mats.brass); great.position.set(gx + 7.6, axZ, bz); great.castShadow = true; gov.add(great);
+      const lid = new THREE.Mesh(new THREE.LatheGeometry([[1.4, 0], [Rb * 0.3, 0], [Rb * 0.32, 0.35], [Rb * 0.6, 0.35], [Rb * 0.62, 0.1], [Rb * 0.9, 0.1], [Rb * 0.93, 0.5], [Rb, 0.5], [Rb, -0.4], [1.4, -0.4]].map(([x, y]) => new THREE.Vector2(x, y)), 48), this.mats.brass);
+      lid.rotation.z = Math.PI / 2; lid.position.set(gx - 7.2, axZ, bz); gov.add(lid);
+      const ratchet = new THREE.Mesh(gearGeo(Rb * 0.42, 14, 1.2, 1.2), this.mats.steel); ratchet.position.set(gx - 8.4, axZ, bz); gov.add(ratchet);
+      const click = new THREE.Mesh(roundBox(1.2, Rb * 0.5, 1.6, 0.3, 60), this.mats.blued); click.position.set(gx - 8.4, axZ + Rb * 0.62, bz + Rb * 0.2); click.rotation.x = 0.5; gov.add(click);
+      const clickScrew = screw(1.1, this.mats.blued, this.mats.slot); clickScrew.rotation.z = Math.PI / 2; clickScrew.position.set(gx - 8.9, axZ + Rb * 0.82, bz + Rb * 0.08); gov.add(clickScrew);
+      const arbor = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 22, 14), this.mats.steel); arbor.rotation.z = Math.PI / 2; arbor.position.set(gx, axZ, bz); gov.add(arbor);
+    }
     const fanArbor = new THREE.Group(); fanArbor.position.set(gx - 4, axZ + R + 10, bedDep * MM / 2 - 8);
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 26, 8), this.mats.steel); fanArbor.add(shaft);
-    const worm = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 7, 12), this.mats.steel); worm.position.y = -8; fanArbor.add(worm);
+    const worm = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 7.4, 14), this.mats.steel); worm.position.y = -8; fanArbor.add(worm);
+    {
+      // the endless screw: a thread wound five times round the arbor
+      class Helix extends THREE.Curve { getPoint(u, o = new THREE.Vector3()) { const a = u * Math.PI * 2 * 5; return o.set(Math.cos(a) * 1.75, -11.4 + u * 6.8, Math.sin(a) * 1.75); } }
+      const thread = new THREE.Mesh(new THREE.TubeGeometry(new Helix(), 120, 0.42, 6, false), this.mats.steel); fanArbor.add(thread);
+      // the wheel it drives, and the bridge that carries the fan's upper pivot
+      const gw = (this.govWheel = new THREE.Mesh(gearGeo(6.2, 26, 1.1, 0.9), this.mats.brass)); gw.position.set(0, -8, -7.9); gw.castShadow = true; fanArbor.add(gw);
+      const gwArbor = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 9, 10), this.mats.steel); gwArbor.rotation.z = Math.PI / 2; gwArbor.position.set(0, -8, -7.9); fanArbor.add(gwArbor);
+      const postH = axZ + R + 10 + 1.5 - bedTop;
+      for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, postH, 12), this.mats.brass); post.position.set(sx * 6.5, 1.5 - postH / 2, 0); post.castShadow = true; fanArbor.add(post); }
+      const bridge = new THREE.Mesh(roundBox(16.5, 1.3, 4.2, 0.4, 60), this.mats.brass); bridge.position.set(0, 2.1, 0); bridge.castShadow = true; fanArbor.add(bridge);
+      for (const sx of [-1, 1]) { const bs = screw(1.0, this.mats.blued, this.mats.slot); bs.position.set(sx * 6.5, 2.75, 0); fanArbor.add(bs); }
+      const jewel = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.5, 16), new THREE.MeshPhysicalMaterial({ color: 0xa01428, roughness: 0.1, clearcoat: 1 })); jewel.position.set(0, 2.9, 0); fanArbor.add(jewel);
+    }
     const blades = (this.fan = new THREE.Group()); blades.position.y = 10;
     const bl = new THREE.MeshStandardMaterial({ color: 0xd8c27a, metalness: 1, roughness: 0.35, side: THREE.DoubleSide });
-    for (const s of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(16, 9, 0.3), bl); p.position.x = s * 9; blades.add(p); }
+    for (const s of [-1, 1]) {
+      // each vane a thin brass leaf, wider at the tip, with a little weight riveted on
+      const sh = new THREE.Shape(); sh.moveTo(0, -2.2); sh.lineTo(14, -4.5); sh.quadraticCurveTo(16.5, 0, 14, 4.5); sh.lineTo(0, 2.2); sh.closePath();
+      const p = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: false }), bl); p.position.set(s * 1.2, 0, -0.15); if (s < 0) p.rotation.y = Math.PI; p.castShadow = true; blades.add(p);
+      const wgt = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.9, 12), this.mats.brass); wgt.rotation.x = Math.PI / 2; wgt.position.set(s * 13, 0, 0.5); blades.add(wgt);
+    }
+    const fanHub = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 5.2, 12), this.mats.brass); blades.add(fanHub);
     fanArbor.add(blades);
     this.fanBlur = new THREE.Mesh(new THREE.CylinderGeometry(17, 17, 9, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0xd8c27a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
     this.fanBlur.position.y = 10; fanArbor.add(this.fanBlur);
@@ -1033,6 +1068,7 @@ export class MusicBoxScene {
         const w = (s.fanRpm || 0) * Math.PI / 30;
         s.fanPhase = (s.fanPhase + w * dt) % (Math.PI * 2);
         this.fan.rotation.y = w > 60 ? s.fanPhase * 0.137 : s.fanPhase; // visual anti-alias
+        if (this.govWheel) this.govWheel.rotation.x = s.fanPhase / 26;
         this.fanBlur.material.opacity = Math.min(0.35, w / 900);
       }
       if (this.windKey) this.windKey.rotation.y = s.keyAngle;

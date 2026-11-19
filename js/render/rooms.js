@@ -4,7 +4,20 @@
 import * as THREE from 'three';
 import { woodMaterial } from './materials.js';
 import { Cabin, valleyTexture, flakeTexture, stoneTexture, NIGHT } from './cabin.js';
-import { pbr } from './pbr.js';
+import { pbr, metal } from './pbr.js';
+import { roundBox } from './detail.js';
+
+// the materials the furniture is made of (scans; their UVs are in real tiles, see Room.box)
+const scanWood = (name, mm, color, gloss = 0.4, rough = 0.85) => { const m = pbr(name, { color, rough, normal: 0.8, physical: gloss ? { clearcoat: gloss, clearcoatRoughness: 0.2 } : null }); m.userData.mm = mm; return m; };
+const WOODS = {
+  rosewood: () => scanWood('rosewood_veneer1', 900, 0xffffff, 0.5),
+  walnut: (c = 0xffffff) => scanWood('walnut_veneer', 900, c, 0.4),
+  oak: (c = new THREE.Color(2.1, 1.8, 1.5)) => scanWood('wood_table_worn', 700, c, 0.15),
+  darkOak: () => scanWood('walnut_veneer', 800, new THREE.Color(0.8, 0.68, 0.56), 0.25),
+};
+// upholstery: soft shapes (generously rounded), a woven surface
+const cloth = (color, mm = 240) => { const m = pbr('poly_wool_herringbone', { gray: true, color, rough: 1, normal: 1.5 }); m.userData.soft = true; m.userData.mm = mm; return m; };
+const hide = (color) => { const m = pbr('brown_leather', { gray: true, color, rough: 0.7, normal: 1.2 }); m.userData.soft = true; m.userData.mm = 500; return m; };
 import { cuckoo, mantel, longcase, chapelDial, labClock, wallMount } from './clocks.js';
 import { lockedDoor, mountDoor, sealedHatch } from './doors.js';
 import { addOldMan } from './oldman.js';
@@ -76,7 +89,14 @@ class Room {
   }
   get RX() { return this.dims[0]; } get RY() { return this.dims[1]; } get RZ() { return this.dims[2]; }
   mesh(geo, mat, x, y, z, shadow = true) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true; this.group.add(m); return m; }
-  box(w, h, d, x, y, z, mat) { return this.mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z); }
+  // a box with eased edges (soft materials much more so) and UVs in real tiles; old canvas-mapped
+  // materials keep the plain box their 0..1 UVs expect
+  box(w, h, d, x, y, z, mat, r) {
+    const mn = Math.min(w, h, d);
+    if ((mat.map && !mat.userData.pbr) || mn < 5) return this.mesh(new THREE.BoxGeometry(w, h, d), mat, x, y, z);
+    const soft = !!mat.userData.soft, rr = r ?? (soft ? Math.max(8, Math.min(70, mn * 0.3)) : Math.max(1.2, Math.min(12, mn * 0.1)));
+    return this.mesh(roundBox(w, h, d, rr, mat.userData.mm || 600, w >= h && w >= d ? 'x' : h >= d ? 'y' : 'z', soft ? 4 : 2), mat, x, y, z);
+  }
   // floor, ceiling and four walls; holes: [{ wall:'y1', x0, x1, z0, z1 }] window openings
   shell(floorMat, wallMat, ceilMat, holes = [], wallRep = 2000) {
     const { RX, RY, RZ } = this;
@@ -192,8 +212,8 @@ class Nursery extends Room {
     const cx = RX - 750, cz = RY - 420, cw = 1250, cd = 650;
     for (const s of [-1, 1]) { this.box(50, 950, 50, cx + s * cw / 2, 475, cz - cd / 2, crib); this.box(50, 950, 50, cx + s * cw / 2, 475, cz + cd / 2, crib); this.box(cw, 40, 40, cx, 900, cz + s * cd / 2, crib); this.box(cw, 40, 40, cx, 330, cz + s * cd / 2, crib); this.box(40, 40, cd, cx + s * cw / 2, 900, cz, crib); }
     for (let i = 1; i < 16; i++) for (const s of [-1, 1]) this.box(16, 570, 16, cx - cw / 2 + i * cw / 16, 615, cz + s * cd / 2, crib);
-    this.box(cw - 60, 120, cd - 60, cx, 380, cz, new THREE.MeshStandardMaterial({ color: 0xbfd6e6, roughness: 1 }));
-    const blanket = this.box(cw * 0.55, 60, cd - 90, cx + 200, 470, cz, new THREE.MeshStandardMaterial({ color: 0xf0d8a8, roughness: 1 })); blanket.rotation.z = 0.03;
+    this.box(cw - 60, 120, cd - 60, cx, 380, cz, cloth(0xbfd6e6));
+    const blanket = this.box(cw * 0.55, 60, cd - 90, cx + 200, 470, cz, (() => { const m = pbr('knitted_fleece', { gray: true, color: 0xf0d8a8, rough: 1, normal: 1.6 }); m.userData.soft = true; m.userData.mm = 300; return m; })()); blanket.rotation.z = 0.03;
     // a dresser on the left wall with a night-light, and a rocking horse
     const dz = 1700;
     this.box(480, 820, 1000, 240, 410, dz, white);
@@ -247,22 +267,22 @@ class Living extends Room {
     this.sill = { x: (W.x0 + W.x1) / 2, y: W.z0 };
     this.window(W.x0, W.x1, W.z0, W.z1, { frame: white, curtain: new THREE.MeshStandardMaterial({ color: 0x5a2a2e, roughness: 0.95, side: THREE.DoubleSide }) });
     // a sofa along the right wall, facing into the room
-    const fabric = new THREE.MeshStandardMaterial({ color: 0x3e5868, roughness: 0.95 });
-    const sx = RX - 480, sz = 2000, sl = 2100;
+    const fabric = cloth(0x3e5868);
+    const sx = RX - 480, sz = 2000, sl = 2100, sofaCush = cloth(0x4a6878);
     this.box(850, 420, sl, sx, 210, sz, fabric); this.box(220, 820, sl, RX - 160, 410, sz, fabric);
     for (const s of [-1, 1]) this.box(850, 620, 200, sx, 310, sz + s * (sl / 2 - 100), fabric);
-    for (let k = 0; k < 3; k++) this.box(560, 140, sl / 3 - 30, sx - 80, 490, sz - sl / 3 + k * sl / 3, new THREE.MeshStandardMaterial({ color: 0x4a6878, roughness: 1 }));
+    for (let k = 0; k < 3; k++) this.box(560, 140, sl / 3 - 30, sx - 80, 490, sz - sl / 3 + k * sl / 3, sofaCush);
     // a sideboard on the back wall with a lamp and the mantel clock
-    const mah = woodMaterial('rosewood', { gloss: 0.6, mm: 700 });
+    const mah = WOODS.rosewood();
     const bx = 4250, bz = RY - 260;
     this.box(1300, 820, 480, bx, 410, bz, mah);
     for (const s of [-1, 1]) this.box(580, 620, 6, bx + s * 320, 430, bz - 243, mah);
     const clk = mantel(); clk.g.position.set(bx - 250, 820, -(RY - 40)); const um = new THREE.Group(); um.scale.z = -1; um.add(clk.g); this.group.add(um); this.clocks.push(clk);
     this.mesh(new THREE.CylinderGeometry(70, 90, 380, 16), new THREE.MeshStandardMaterial({ color: 0x2a3a4a, roughness: 0.3, metalness: 0.2 }), bx + 380, 1010, bz);
     this.mesh(new THREE.CylinderGeometry(150, 230, 260, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xf2e2c0, emissive: 0xffc070, emissiveIntensity: 0.45, side: THREE.DoubleSide, roughness: 0.9 }), bx + 380, 1300, bz);
-    this.lamp(bx + 380, 1260, bz, 0xffb870, 4.5e5);
+    this.lamp(bx + 380, 1260, bz, 0xffb870, 7e5);
     // bookcase on the left wall, a framed picture over it
-    const oak = woodMaterial('oak', { gloss: 0.4, mm: 800 });
+    const oak = WOODS.oak();
     this.box(340, 2000, 1500, 170, 1000, 1700, oak);
     const cols = [0x6a2a22, 0x2a3a5a, 0x3a5a3a, 0x8a6a3a, 0x4a2a4a, 0x1e1e22, 0xa08050];
     for (let sh = 0; sh < 5; sh++) { this.box(330, 20, 1440, 180, 120 + sh * 400, 1700, oak); let z = 1000; while (z < 2380) { const bw = R(30, 60), bh = R(240, 340); const bk = this.box(250, bh, bw, 200, 130 + sh * 400 + bh / 2, z + bw / 2, new THREE.MeshStandardMaterial({ color: cols[Math.floor(R(0, cols.length))], roughness: 0.8 })); bk.castShadow = false; z += bw + 2; } }
@@ -291,14 +311,15 @@ class Living extends Room {
 class Parlor extends Room {
   constructor(dims, box) {
     super(dims); const { RX, RY, RZ } = this;
+    this.fill = 1.8;
     const W = { x0: 2550, x1: 4050, z0: 800, z1: 2900 };
     const fl = herringbone([150, 98, 56], [96, 58, 30]); fl.repeat.set(RX / 2000, RY / 2000);
-    const oak = woodMaterial('oak', { gloss: 0.55, mm: 900 }); oak.color = new THREE.Color(0xa8805a);
+    const oak = WOODS.walnut(0xd8b890);
     this.shell(pbr('rectangular_parquet', { color: new THREE.Color(1.1, 0.95, 0.85), rough: 0.85, repeat: [RX / 2250, RY / 2250], physical: { clearcoat: 0.35, clearcoatRoughness: 0.3 } }), pbr('wooden_panels', { color: new THREE.Color(1.9, 1.6, 1.4), rough: 0.9, normal: 1.3, physical: { clearcoat: 0.2, clearcoatRoughness: 0.4 } }), new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.8 }), [{ wall: 'y1', ...W }], 2400);
     // raised panels on every wall up to the frieze, a cornice and coffered beams overhead
-    const rail = woodMaterial('oak', { gloss: 0.6, mm: 600 }); rail.color = new THREE.Color(0x8a6444);
+    const rail = WOODS.walnut(0xb08a66);
     const panels = (len, put) => { const pw = 700; for (let u = 120; u + pw < len - 60; u += pw + 120) for (const [z0, z1] of [[200, 900], [1050, 2550]]) put(u + pw / 2, (z0 + z1) / 2, pw, z1 - z0); };
-    const mk = (w, h) => new THREE.BoxGeometry(w, h, 24);
+    const mk = (w, h) => roundBox(w, h, 24, 7, 900, 'y');
     panels(RX, (u, z, w, h) => { if (u > W.x0 - 400 && u < W.x1 + 400) return; const m = new THREE.Mesh(mk(w, h), rail); m.position.set(u, z, RY - 12); m.receiveShadow = true; this.group.add(m); });
     panels(RX, (u, z, w, h) => { const m = new THREE.Mesh(mk(w, h), rail); m.position.set(u, z, 12); this.group.add(m); });
     panels(RY, (u, z, w, h) => { const m = new THREE.Mesh(mk(w, h), rail); m.rotation.y = Math.PI / 2; m.position.set(12, z, u); this.group.add(m); });
@@ -310,28 +331,28 @@ class Parlor extends Room {
     this.sill = { x: (W.x0 + W.x1) / 2, y: W.z0 };
     this.window(W.x0, W.x1, W.z0, W.z1, { frame: rail, bars: [3, 4], curtain: new THREE.MeshStandardMaterial({ color: 0x3a1a20, roughness: 0.9, side: THREE.DoubleSide }) });
     // a marble fireplace (cold tonight) on the left wall, a pair of sconces lit either side
-    const marble = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.25 });
+    const marble = new THREE.MeshPhysicalMaterial({ color: 0xb4b0a8, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.15 });
     const fz = 3000;
     this.box(300, 1200, 1800, 150, 600, fz, marble).castShadow = false;
     this.box(320, 900, 1000, 165, 450, fz, new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 1 }));
     this.box(420, 60, 2000, 210, 1230, fz, marble);
-    const brass = new THREE.MeshStandardMaterial({ color: 0xd2a84e, metalness: 1, roughness: 0.3 });
+    const brass = metal('brass', { repeat: [2, 2], brushed: 0.3 });
     for (const s of [-1, 1]) {
       const z = fz + s * 1200;
       this.box(60, 160, 60, 40, 1800, z, brass);
       this.mesh(new THREE.CylinderGeometry(14, 14, 150, 10), new THREE.MeshStandardMaterial({ color: 0xf2ead8, emissive: 0xffd8a0, emissiveIntensity: 0.25 }), 110, 1960, z);
       const fl2 = this.mesh(new THREE.SphereGeometry(12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd27a }), 110, 2052, z, false); fl2.scale.y = 2;
-      this.lamp(180, 2080, z, 0xffa850, 1.6e5);
+      this.lamp(180, 2080, z, 0xffa850, 5e5);
     }
     // armchairs and a bookcase wall on the right
-    const leather = new THREE.MeshStandardMaterial({ color: 0x4a1e14, roughness: 0.55 });
+    const leather = hide(0x6a2a1c);
     for (const [x, z, ry] of [[1200, 1900, 0.5], [1300, 4300, -0.3]]) {
       if (!this.clear(x, z, 900, 900, box)) continue;
       const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; this.group.add(g);
-      const p = (w, h, d, px, py, pz) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), leather); m.position.set(px, py, pz); m.castShadow = true; g.add(m); };
+      const p = (w, h, d, px, py, pz) => { const m = new THREE.Mesh(roundBox(w, h, d, Math.min(70, Math.min(w, h, d) * 0.3), 500, 'x', 4), leather); m.position.set(px, py, pz); m.castShadow = true; m.receiveShadow = true; g.add(m); };
       p(800, 420, 800, 0, 210, 0); p(800, 900, 180, 0, 450, -320); for (const s of [-1, 1]) p(160, 640, 800, s * 320, 320, 0);
     }
-    const walnut = woodMaterial('walnut', { gloss: 0.5, mm: 900 });
+    const walnut = WOODS.walnut();
     this.box(420, 2500, 3600, RX - 210, 1250, 2600, walnut);
     const cols = [0x5a1a14, 0x1e2a44, 0x2a442a, 0x6a4a22, 0x3a1a3a, 0x141414];
     for (let sh = 0; sh < 6; sh++) { let z = 900; while (z < 4320) { const bw = R(35, 70), bh = R(260, 360); this.box(300, bh, bw, RX - 240, 140 + sh * 400 + bh / 2, z + bw / 2, new THREE.MeshStandardMaterial({ color: cols[Math.floor(R(0, cols.length))], roughness: 0.75 })).castShadow = false; z += bw + 2; } }
@@ -357,19 +378,20 @@ class Parlor extends Room {
 class Chapel extends Room {
   constructor(dims, box) {
     super(dims); const { RX, RY, RZ } = this;
+    this.fill = 2.0;
     const fl = flagstones(); fl.repeat.set(RX / 2400, RY / 2400);
-    const wt = ashlar(); const wallM = new THREE.MeshStandardMaterial({ map: wt, roughness: 0.92 });
+    const chapelStone = pbr('medieval_blocks_05', { color: 0xe6ded0, rough: 1, normal: 1.1, ao: 1.0 }); chapelStone.userData.mm = 2600;
     // tall lancet windows down both long walls
     const lancets = []; for (let k = 0; k < 5; k++) { const x = 2600 + k * 4200; lancets.push({ wall: 'y1', x0: x - 500, x1: x + 500, z0: 2600, z1: 6800 }, { wall: 'y0', x0: x - 500, x1: x + 500, z0: 2600, z1: 6800 }); }
     // keep the window behind the box clear for the great clock
     const bx = box ? box[0] * 1000 : RX / 2;
     const lan = lancets.filter((l) => l.wall !== 'y1' || Math.abs((l.x0 + l.x1) / 2 - bx) > 1300);
-    this.shell(pbr('slate_floor_02', { color: 0x8c8c94, gray: true, rough: 0.85, normal: 1.4, repeat: [RX / 2600, RY / 2600] }), pbr('medieval_blocks_05', { color: 0xcfc6b8, rough: 1, normal: 1.6, ao: 1.2 }), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 }), lan, 2600);
+    this.shell(pbr('slate_floor_02', { color: 0x8c8c94, gray: true, rough: 0.85, normal: 1.4, repeat: [RX / 2600, RY / 2600] }), pbr('medieval_blocks_05', { color: 0xe6ded0, rough: 1, normal: 1.1, ao: 1.0 }), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 }), lan, 2600);
     for (const [i, l] of lan.entries()) {
       const w = l.x1 - l.x0, h = l.z1 - l.z0, z = l.wall === 'y1' ? RY + 80 : -80;
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: stainedGlass(i), color: 0x4a5878, fog: false }));
       sg.position.set((l.x0 + l.x1) / 2, (l.z0 + l.z1) / 2, z); sg.rotation.y = l.wall === 'y1' ? Math.PI : 0; this.group.add(sg);
-      const stone = new THREE.MeshStandardMaterial({ map: wt, roughness: 0.9 });
+      const stone = chapelStone;
       const zz = l.wall === 'y1' ? RY + 40 : -40;
       this.box(140, h, 160, l.x0 - 70, (l.z0 + l.z1) / 2, zz, stone); this.box(140, h, 160, l.x1 + 70, (l.z0 + l.z1) / 2, zz, stone);
       this.box(w + 280, 200, 260, (l.x0 + l.x1) / 2, l.z0 - 100, zz, stone);
@@ -377,7 +399,7 @@ class Chapel extends Room {
     }
     this.moon = [bx / 1000, RY / 1000 + 4, 6];
     // pews in two banks either side of the aisle, facing the altar at the east end (x = RX)
-    const oak = woodMaterial('oak', { gloss: 0.4, mm: 900 }); oak.color = new THREE.Color(0x8a6444);
+    const oak = WOODS.darkOak();
     const aisle0 = RY / 2 - 700, aisle1 = RY / 2 + 700;
     for (let x = 3000; x < RX - 4200; x += 1050) for (const [y0, y1] of [[700, aisle0], [aisle1, RY - 700]]) {
       const len = y1 - y0, cz = (y0 + y1) / 2;
@@ -389,11 +411,11 @@ class Chapel extends Room {
       this.pew(x, y0, y1, oak);
     }
     // the altar on a step, two candles and a cross, lit warm
-    const step = new THREE.MeshStandardMaterial({ map: fl, roughness: 0.7 });
+    const step = pbr('slate_floor_02', { color: 0x9a9aa2, gray: true, rough: 0.85, normal: 1.4 }); step.userData.mm = 2600;
     this.box(3000, 180, RY - 1200, RX - 1500, 90, RY / 2, step);
-    this.box(900, 1000, 2400, RX - 1100, 680, RY / 2, new THREE.MeshStandardMaterial({ map: wt, roughness: 0.9 }));
+    this.box(900, 1000, 2400, RX - 1100, 680, RY / 2, chapelStone);
     this.box(950, 20, 2500, RX - 1100, 1190, RY / 2, new THREE.MeshStandardMaterial({ color: 0xefe8da, roughness: 0.9 }));
-    const gold = new THREE.MeshStandardMaterial({ color: 0xd8b060, metalness: 1, roughness: 0.3 });
+    const gold = metal('gilt', { repeat: [2, 2], brushed: 0.25 });
     this.box(60, 900, 60, RX - 1100, 1650, RY / 2, gold); this.box(60, 60, 500, RX - 1100, 1850, RY / 2, gold);
     for (const s of [-1, 1]) {
       const z = RY / 2 + s * 900;
@@ -401,7 +423,7 @@ class Chapel extends Room {
       this.mesh(new THREE.CylinderGeometry(30, 30, 420, 12), new THREE.MeshStandardMaterial({ color: 0xf2ead8, emissive: 0xffd8a0, emissiveIntensity: 0.2 }), RX - 1100, 1710, z);
       const f = this.mesh(new THREE.SphereGeometry(16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd27a }), RX - 1100, 1945, z, false); f.scale.y = 2.2;
     }
-    this.lamp(RX - 1500, 2100, RY / 2, 0xffa850, 2.8e6);
+    this.lamp(RX - 1500, 2100, RY / 2, 0xffa850, 9e6);
     // roof: dark timber trusses
     const truss = new THREE.MeshStandardMaterial({ color: 0x2a1c12, roughness: 0.85 });
     for (let x = 1500; x < RX; x += 3000) { this.box(300, 300, RY, x, RZ - 150, RY / 2, truss); this.box(200, 1600, 200, x, RZ - 800, RY / 2, truss); }

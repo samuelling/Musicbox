@@ -6,6 +6,7 @@ import { GAITS } from '../physics/hamster.js';
 import { Q } from './quality.js';
 import { Splats } from './splats.js';
 import { pbr, metal } from './pbr.js';
+import { roundBox } from './detail.js';
 
 // ---------------------------------------------------------------- signed distance helpers
 export const sdEll = (px, py, pz, cx, cy, cz, rx, ry, rz) => {
@@ -635,7 +636,7 @@ export class HamsterRig {
   buildCage({ L, D, Hc, cx0, cz0, yT, yB, xw, zw, Wd, Rs }) {
     const g = this.group, X = (x) => cx0 + x, Z = (z) => cz0 + z;
     const wood = pbr('wood_table_worn', { color: new THREE.Color(3.0, 2.5, 2.0), rough: 0.8, repeat: [0.5, 0.5] });
-    const box = (w, h, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
+    const box = (w, h, d, x, y, z, m) => { const mn = Math.min(w, h, d), keep = m.transparent || (m.map && !m.userData.pbr) || mn < 1.5; const b = new THREE.Mesh(keep ? new THREE.BoxGeometry(w, h, d) : roundBox(w, h, d, Math.max(0.5, Math.min(3, mn * 0.14)), 220, w >= h && w >= d ? 'x' : h >= d ? 'y' : 'z'), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
     // floor, glass walls, wooden corner posts and rim, wire-mesh lid
     box(L + 24, 8, D + 24, X(L / 2), yT + 4, Z(D / 2), wood);
     const glassM = new THREE.MeshPhysicalMaterial({ color: 0xe8f2f2, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.5 });

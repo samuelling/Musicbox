@@ -7,13 +7,14 @@
 // Built in a door's own frame (mm): the wall is the plane z = 0, the door faces +z into the room, the floor
 // is y = 0 and the opening is centred on x = 0.  mountDoor() stands it on one of a room's walls.
 import * as THREE from 'three';
-import { woodMaterial } from './materials.js';
+import { metal, wood } from './pbr.js';
+import { roundBox } from './detail.js';
 
 const std = (color, rough = 0.6, metal = 0) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
-const IRON = () => std(0x1c1b1a, 0.55, 0.7), BRASS = () => std(0xc9a04a, 0.3, 1), STEEL = () => std(0xb4b8be, 0.35, 0.9);
+const IRON = () => metal('iron', { repeat: [2, 2], brushed: 0.35 }), BRASS = () => metal('brass', { color: 0xc9a04a, repeat: [2, 2], brushed: 0.3 }), STEEL = () => metal('steel', { color: 0xb4b8be, repeat: [2, 2], brushed: 0.35, rough: 0.35 });
 
 function kit(g) {
-  const box = (w, h, d, x, y, z, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+  const box = (w, h, d, x, y, z, m) => { const plain = (m.map && !(m.userData && m.userData.pbr)) || Array.isArray(m) || Math.min(w, h, d) < 3 || h === 1060; const geo = plain ? new THREE.BoxGeometry(w, h, d) : roundBox(w, h, d, Math.max(0.8, Math.min(9, Math.min(w, h, d) * 0.1)), (m.userData && m.userData.mm) || 500, w >= h && w >= d ? 'x' : h >= d ? 'y' : 'z'); const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
   const cyl = (r0, r1, h, x, y, z, m, axis = 'y', seg = 16) => {
     const o = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg), m); o.position.set(x, y, z);
     if (axis === 'z') o.rotation.x = Math.PI / 2; else if (axis === 'x') o.rotation.z = Math.PI / 2;
@@ -64,8 +65,8 @@ export function lockedDoor(style) {
   if (style === 'cabin') {
     // a ledged-and-braced plank door, strap hinges and a thumb latch, barred with a beam in two iron brackets
     const W = 900, H = 1950;
-    const plankM = woodMaterial('walnut', { gloss: 0.05, mm: 700 }); plankM.color = new THREE.Color(0xa88466);
-    const frameM = woodMaterial('walnut', { gloss: 0.08, mm: 900 }); frameM.color = new THREE.Color(0x8a6a50);
+    const plankM = wood('walnut', 0xa88466, 0.05, 700);
+    const frameM = wood('walnut', 0x8a6a50, 0.08, 900);
     K.box(130, H + 130, 60, -W / 2 - 65, (H + 130) / 2, 30, frameM); K.box(130, H + 130, 60, W / 2 + 65, (H + 130) / 2, 30, frameM); K.box(W + 260, 130, 60, 0, H + 65, 30, frameM);
     for (let i = 0; i < 6; i++) K.box(W / 6 - 6, H, 40, -W / 2 + (i + 0.5) * W / 6, H / 2, 6, plankM);
     for (const y of [300, H - 300]) K.box(W - 60, 140, 34, 0, y, 43, plankM);
@@ -74,7 +75,7 @@ export function lockedDoor(style) {
     for (const y of [300, H - 300]) { K.box(620, 46, 8, -W / 2 + 310, y, 64, iron); K.cyl(16, 16, 60, -W / 2 - 10, y, 30, iron); }
     K.box(16, 120, 10, W / 2 - 90, 1040, 64, iron); K.cyl(9, 9, 80, W / 2 - 90, 1100, 74, iron, 'x');
     // the bar: a rough-hewn beam across the whole door, dropped into brackets on the frame
-    const barM = woodMaterial('oak', { gloss: 0.05, mm: 600 }); barM.color = new THREE.Color(0x7a5a3e);
+    const barM = wood('oak', 0x7a5a3e, 0.05, 600);
     const bar = K.box(W + 520, 120, 100, 0, 1150, 118, barM); bar.rotation.z = 0.012;
     for (const s of [-1, 1]) {
       const x = s * (W / 2 + 80);
@@ -114,8 +115,8 @@ export function lockedDoor(style) {
     return { g, W, H };
   }
   if (style === 'parlor') {
-    const W = 920, H = 2250, oak = woodMaterial('oak', { gloss: 0.55, mm: 900 }); oak.color = new THREE.Color(0x9a7050);
-    const rail = woodMaterial('oak', { gloss: 0.6, mm: 600 }); rail.color = new THREE.Color(0x7a5434);
+    const W = 920, H = 2250, oak = wood('oak', 0xffffff, 0.55, 900); oak.color = new THREE.Color(0x9a7050);
+    const rail = wood('oak', 0x7a5434, 0.6, 600);
     const brass = BRASS();
     const zf = frameAndLeaf(g, W, H, rail, oak, { casing: 110 });
     panels(g, W, H, zf, rail, [420, 700, 700], 2);
@@ -138,7 +139,7 @@ export function lockedDoor(style) {
   if (style === 'chapel') {
     // great arched double doors in a stone surround, nail-studded and ring-pulled: barred and chained
     const W = 2000, H = 2700, R = W / 2, T = 90;
-    const oak = woodMaterial('oak', { gloss: 0.15, mm: 700 }); oak.color = new THREE.Color(0x6a4a30);
+    const oak = wood('oak', 0x6a4a30, 0.15, 700);
     const stone = std(0x8a8478, 0.9), iron = IRON();
     const shape = new THREE.Shape(); shape.moveTo(-R, 0); shape.lineTo(R, 0); shape.lineTo(R, H); shape.absarc(0, H, R, 0, Math.PI, false); shape.lineTo(-R, 0);
     const leaf = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: T, bevelEnabled: false, curveSegments: 32 }), oak); leaf.position.z = -30; leaf.castShadow = leaf.receiveShadow = true; g.add(leaf);
@@ -155,7 +156,7 @@ export function lockedDoor(style) {
     K.chain(new THREE.Vector3(-150, 1170, zf + 44), new THREE.Vector3(150, 1150, zf + 44), STEEL(), 13, 120);
     K.padlock(0, 980, zf + 50, iron, 2.2);
     // the beam: a great squared timber across both leaves, in iron hoops on the surround
-    const beamM = woodMaterial('oak', { gloss: 0.05, mm: 600 }); beamM.color = new THREE.Color(0x5a3e28);
+    const beamM = wood('oak', 0x5a3e28, 0.05, 600);
     K.box(W + 900, 220, 180, 0, 1600, zf + 210, beamM);
     for (const sx of [-1, 1]) { const x = sx * (R + 170); K.box(200, 380, 20, x, 1600, 90, iron); K.box(200, 24, 250, x, 1478, 200, iron); K.box(200, 260, 24, x, 1600, 330, iron); }
     return { g, W, H: H + R };

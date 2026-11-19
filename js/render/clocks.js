@@ -2,10 +2,11 @@
 // g is a group whose origin sits at the middle of the clock's back (or the bottom of its back,
 // for standing clocks), with the dial facing local +z.
 import * as THREE from 'three';
-import { woodMaterial } from './materials.js';
+import { pbr, metal, wood } from './pbr.js';
+import { roundBox } from './detail.js';
 
-const brassM = () => new THREE.MeshStandardMaterial({ color: 0xd2a84e, metalness: 1, roughness: 0.22 });
-const box = (g, w, h, d, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
+const brassM = () => metal('brass', { repeat: [2, 2], brushed: 0.3, rough: 0.24 });
+const box = (g, w, h, d, x, y, z, m) => { const plain = (m.map && !(m.userData && m.userData.pbr)) || Array.isArray(m) || Math.min(w, h, d) < 3 || h === 1060; const geo = plain ? new THREE.BoxGeometry(w, h, d) : roundBox(w, h, d, Math.max(0.8, Math.min(9, Math.min(w, h, d) * 0.1)), (m.userData && m.userData.mm) || 500, w >= h && w >= d ? 'x' : h >= d ? 'y' : 'z'); const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); b.castShadow = true; b.receiveShadow = true; g.add(b); return b; };
 const roman = ['XII', 'I', 'II', 'III', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
 // hour and minute angles (radians, clockwise from twelve) for a Date
@@ -62,9 +63,9 @@ function dial(g, tex, r, at, rough = 0.35) {
 // pendulum with a big brass bob over a beat scale.  No driving weight: it is wound by a key.
 export function regulator() {
   const g = new THREE.Group();
-  const oak = woodMaterial('oak', { gloss: 0.45, mm: 700 }); oak.color = new THREE.Color(0xe6c4a0);
+  const oak = wood('oak', 0xe6c4a0, 0.45, 700);
   const inside = new THREE.MeshStandardMaterial({ color: 0x15100b, roughness: 0.85 });
-  const brass = new THREE.MeshStandardMaterial({ color: 0xcfae62, metalness: 1, roughness: 0.32 });
+  const brass = metal('brass', { color: 0xcfae62, repeat: [2, 2], brushed: 0.3, rough: 0.32 });
   const W = 460, H = 1120, D = 170;
   const b = (w, h, d, x, y, z, m = oak) => box(g, w, h, d, x, y, z, m);
   b(W - 40, H - 40, 10, 0, 0, 5, inside);                                      // back, dark inside the case
@@ -113,7 +114,7 @@ export function regulator() {
   // pendulum: flat steel rod, a big brass bob, a pointer over the beat scale
   const pivotY = at.y + 30, bobY = -H / 2 + 250, Lp = pivotY - bobY;
   const pend = new THREE.Group(); pend.position.set(0, pivotY, D - 104); g.add(pend);
-  const steel = new THREE.MeshStandardMaterial({ color: 0x8c8f93, metalness: 1, roughness: 0.35 });
+  const steel = metal('steel', { color: 0x8c8f93, repeat: [2, 2], brushed: 0.35, rough: 0.35 });
   const rod = new THREE.Mesh(new THREE.BoxGeometry(14, Lp, 2), steel); rod.position.y = -Lp / 2; pend.add(rod);
   const bob = new THREE.Mesh(new THREE.SphereGeometry(116, 40, 20), brass); bob.scale.set(1, 1, 0.16); bob.position.y = -Lp; bob.castShadow = true; pend.add(bob);
   const nut = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 22, 10), steel); nut.position.y = -Lp - 126; pend.add(nut);
@@ -159,7 +160,7 @@ export function wallMount(parent, dims, clock, wall, u, h, standoff = 4) {
 // (silently: the nursery is asleep), a leaf pendulum and two pine-cone weights on chains.
 export function cuckoo() {
   const g = new THREE.Group();
-  const wood = woodMaterial('walnut', { gloss: 0.25, mm: 300 }); wood.color = new THREE.Color(0xb08a66);
+  const wood = wood('walnut', 0xb08a66, 0.25, 300);
   const dark = new THREE.MeshStandardMaterial({ color: 0x3a2416, roughness: 0.7 });
   const leaf = new THREE.MeshStandardMaterial({ color: 0x5a3c22, roughness: 0.6 });
   const W = 250, H = 290, D = 130;
@@ -215,7 +216,7 @@ export function cuckoo() {
 // stands on furniture: origin at the bottom of its back
 export function mantel() {
   const g = new THREE.Group();
-  const mah = woodMaterial('rosewood', { gloss: 0.85, mm: 300 }), brass = brassM();
+  const mah = wood('rosewood', 0xffffff, 0.85, 300), brass = brassM();
   const W = 420, H = 230, D = 120;
   const sh = new THREE.Shape(); sh.moveTo(-W / 2, 0); sh.lineTo(-W / 2, 50);
   sh.bezierCurveTo(-W / 2 + 20, 120, -100, 90, -78, 170); sh.bezierCurveTo(-60, 240, 60, 240, 78, 170);
@@ -240,7 +241,7 @@ function moonPhase(now) {
 }
 export function longcase() {
   const g = new THREE.Group();
-  const oak = woodMaterial('walnut', { gloss: 0.6, mm: 700 }), brass = brassM();
+  const oak = wood('walnut', 0xffffff, 0.6, 700), brass = brassM();
   const D = 260, bw = 520, tw = 420, hw = 500;
   box(g, bw, 520, D, 0, 260, D / 2, oak);                             // plinth
   box(g, bw + 30, 30, D + 30, 0, 15, D / 2 + 5, oak); box(g, bw + 20, 30, D + 20, 0, 530, D / 2 + 5, oak);
@@ -304,7 +305,7 @@ export function longcase() {
 // a deep blue painted face with gilt numerals and hands in a carved stone roundel
 export function chapelDial() {
   const g = new THREE.Group();
-  const gilt = new THREE.MeshStandardMaterial({ color: 0xe0b45a, metalness: 1, roughness: 0.3 });
+  const gilt = metal('gilt', { color: 0xe0b45a, repeat: [2, 2], brushed: 0.25 });
   const stone = new THREE.MeshStandardMaterial({ color: 0x9a9284, roughness: 0.9 });
   const R = 520;
   const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 40, 60, 16, 64), stone); ring.position.z = 40; ring.scale.z = 0.6; ring.castShadow = true; g.add(ring);
@@ -323,7 +324,7 @@ export function chapelDial() {
 export function labClock() {
   const g = new THREE.Group();
   const black = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.5, metalness: 0.3 });
-  const steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, metalness: 1, roughness: 0.3 });
+  const steel = metal('steel', { color: 0x9aa0a8, repeat: [2, 2], brushed: 0.35, rough: 0.3 });
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 1500, 12), steel); pole.position.y = 750; g.add(pole);
   for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI * 2; const leg = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 420, 8), steel); leg.position.set(Math.cos(a) * 170, 120, Math.sin(a) * 170); leg.rotation.set(Math.sin(a) * 0.95, 0, -Math.cos(a) * 0.95); g.add(leg); }
   box(g, 520, 170, 90, 0, 1570, 0, black);
