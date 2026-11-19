@@ -6,6 +6,7 @@ import { WHEELS, SURFACES_H, AXLES, GAITS, pulleyRadii, vo2maxW } from './physic
 import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
 import { Q, storedTier, storeTier } from './render/quality.js';
+import { texProgress } from './render/pbr.js';
 import { CrankPad } from './ui/crank.js';
 import { ListenerMap } from './ui/listener-map.js';
 import { PinRoll } from './ui/editor.js';
@@ -88,7 +89,26 @@ function onBuilt(res) {
 }
 
 // ------------------------------------------------------------------ 3D
+// the loading screen (inline in index.html): say what's happening, let it paint, then do the heavy build
+const boot = window.boot || { step() {}, done() {} };
+const twoFrames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+boot.step('Building the room…', 0.5, 'Carving the stones, combing the fur, tuning the comb.');
+await twoFrames();
 const scene = new MusicBoxScene($('view'));
+// the first frame compiles every shader; after it, wait (a while, not forever) for the scanned surfaces
+boot.step('Warming up the lights…', 0.62);
+twoFrames().then(() => {
+  const t0 = performance.now();
+  const wait = () => {
+    const { asked, settled } = texProgress();
+    const left = asked - settled;
+    if (left > 0 && performance.now() - t0 < 12000) {
+      boot.step(`Unpacking textures (${settled} of ${asked})…`, 0.66 + 0.32 * (asked ? settled / asked : 1), 'Wood, stone, wool and brass, scanned from the real thing.');
+      setTimeout(wait, 150);
+    } else twoFrames().then(() => boot.done());
+  };
+  wait();
+});
 scene.onPick = (i) => selectTine(i, true);
 
 // ---- the settings drawer: slides over the room when you want it, out of the way when you don't

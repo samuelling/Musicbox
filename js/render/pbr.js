@@ -14,8 +14,9 @@ const AVG = {
 };
 const loader = new THREE.TextureLoader();
 const cache = new Map();
-let notify = null;
-export function onTexture(fn) { notify = fn; }       // called whenever an image has arrived (redraw, re-probe)
+let notify = null, asked = 0, settled = 0;
+export function onTexture(fn) { notify = fn; }
+export const texProgress = () => ({ asked, settled });   // for the loading screen       // called whenever an image has arrived (redraw, re-probe)
 
 function base(name, kind) {
   const key = `${name}_${kind}`;
@@ -24,12 +25,14 @@ function base(name, kind) {
   t = new THREE.Texture(); t.userData.ready = false; t.userData.waiting = [];
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
+  asked++;
   loader.load(BASE + key + '.jpg', (src) => {
+    settled++;
     t.image = src.image; t.needsUpdate = true; t.userData.ready = true;
     for (const fn of t.userData.waiting) fn();
     t.userData.waiting = null;
     if (notify) notify();
-  }, undefined, () => { t.userData.waiting = null; });
+  }, undefined, () => { settled++; t.userData.waiting = null; });
   cache.set(key, t);
   return t;
 }
