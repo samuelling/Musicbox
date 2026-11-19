@@ -12,12 +12,12 @@ function mobile() {
 function pick() {
   try { const m = /[?&]q=(low|med|high|ultra)\b/.exec(location.search); if (m) return m[1]; } catch (e) { /* no location */ }
   try { const s = localStorage.getItem(KEY); if (TIERS.includes(s)) return s; } catch (e) { /* storage blocked */ }
-  return mobile() ? 'med' : 'high';
+  return mobile() ? 'low' : 'med';
 }
 const tier = pick(), by = (o) => o[tier];
 export const Q = {
   tier,
-  auto: mobile() ? 'med' : 'high',                           // what Auto means on this device
+  auto: mobile() ? 'low' : 'med',                           // what Auto means on this device
   rank: TIERS.indexOf(tier),                                 // 0..3, for "at least" tests
   post: tier !== 'low',                                      // bloom, vignette, grain, multisampled colour buffer
   ao: tier === 'high' || tier === 'ultra',                   // ground-truth ambient occlusion
