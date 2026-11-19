@@ -1243,6 +1243,11 @@ function applyState() {
 }
 
 // ------------------------------------------------------------------ boot
+// in the Christmas season (1 Dec – 6 Jan, same as the decorations) the box opens on a carol
+if (christmasTime()) {
+  const carols = SONGS.filter((s) => s.cat === 'Christmas');
+  if (carols.length) { cat = 'Christmas'; songId = carols[Math.floor(Math.random() * carols.length)].id; }
+}
 renderCats();
 const shared = fromHash();
 if (shared) { song = shared; songId = 'shared'; cat = 'My tunes'; }
