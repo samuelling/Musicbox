@@ -815,6 +815,8 @@ export class MusicBoxScene {
     const hide = [];
     for (const c of this.root.children) if (c !== this.roomOuter && !(this.candle && c === this.candle.g) && c.visible) { c.visible = false; hide.push(c); }
     for (const c of [this.avatar, this.avatarRing, this.smoke.group]) if (c && c.visible) { c.visible = false; hide.push(c); }
+    // decorations' glow halos are a camera effect, not light in the room: keep them out of the reflections
+    if (this.roomOuter) this.roomOuter.traverse((o) => { if (o.userData.noProbe && o.visible) { o.visible = false; hide.push(o); } });
     const env = this.scene.environment, bg = this.scene.background;
     this.scene.environment = null;            // direct light only: no feeding the last picture back in
     this.probeCam.position.copy(this.tipWorld); this.probeCam.position.y += 260;

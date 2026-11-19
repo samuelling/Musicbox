@@ -100,7 +100,7 @@ export function swissTree(H = 2050, Rb = 640, o = {}) {
   const COLS = [0xff2a1a, 0x18c040, 0x2a5cff, 0xff9a10, 0xfff0c8];
   const bulbGeo = new THREE.SphereGeometry(17, 12, 10); bulbGeo.scale(1, 1.55, 1); bulbGeo.translate(0, -20, 0); bulbGeo.scale(Math.sqrt(kS), Math.sqrt(kS), Math.sqrt(kS));
   const sock = new THREE.CylinderGeometry(11, 12, 22, 8);
-  const bulbs = (nb === 1 ? [COLS[0]] : COLS).map((c) => ({ c, m: new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.4, roughness: 0.35 }), list: [] }));
+  const bulbs = (nb === 1 ? [COLS[0]] : COLS).map((c) => ({ c, m: new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.75, roughness: 0.35 }), list: [] }));
   const glowPos = [], glowCol = [], wire = [];
   for (let i = 0; i < nb; i++) {
     const t = nb > 1 ? i / nb : 0.55, y = H * 0.11 + t * (H * 0.84), a = t * turns * Math.PI * 2;
@@ -124,10 +124,10 @@ export function swissTree(H = 2050, Rb = 640, o = {}) {
   if (wire.length > 1) g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(wire), 600, 2.5, 5, false), std(0x1d3a20, 0.6)));
   // a soft halo round every bulb (incandescent glass glows)
   const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glowPos, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(glowCol, 3));
-  const halos = new THREE.Points(gg, new THREE.PointsMaterial({ size: 240 * Math.sqrt(kS), map: glowTexture(), vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
-  g.add(halos);
+  const halos = new THREE.Points(gg, new THREE.PointsMaterial({ size: 240 * Math.sqrt(kS), map: glowTexture(), vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  halos.userData.noProbe = true; g.add(halos);
   // and their light on the room: two warm, coloured lamps inside the tree
-  if (lamps) for (const [y, c, k] of [[H * 0.35, 0xffa060, 2.2e5 * kS], [H * 0.7, 0xff7a70, 1.2e5 * kS]]) { const l = new THREE.PointLight(c, k, 0, 2); l.position.set(0, y, 0); g.add(l); }
+  if (lamps) for (const [y, c, k] of [[H * 0.35, 0xffa060, 6e4 * kS], [H * 0.7, 0xff7a70, 3.5e4 * kS]]) { const l = new THREE.PointLight(c, k, 0, 2); l.position.set(0, y, 0); g.add(l); }
 
   // ornaments, the Swiss way
   const straw = std(0xe8c870, 0.7), red = std(0xb01818, 0.45), apple = std(0xc8202a, 0.3, 0, { emissive: 0x200000 }), gold = std(0xe0b850, 0.3, 0.45, { emissive: 0x3a2200 });
@@ -146,7 +146,7 @@ export function swissTree(H = 2050, Rb = 640, o = {}) {
   }
   // a straw star on top
   const star = strawStar(120 * kS, straw, red); star.position.y = H + 170 * kS; g.add(star);
-  if (lamps) { const starGlow = new THREE.PointLight(0xffd090, 3e4, 0, 2); starGlow.position.y = H + 120; g.add(starGlow); }
+  if (lamps) { const starGlow = new THREE.PointLight(0xffd090, 1.2e4, 0, 2); starGlow.position.y = H + 120; g.add(starGlow); }
   // presents under it
   const papers = [0xa81c1c, 0x1e5a32, 0xe8dcc4, 0x2a3a6a], ribbonM = [std(0xd8b050, 0.3, 0.8), std(0xb01818, 0.5)];
   if (presents) for (const [x, z, w, h, d, r] of [[260, 340, 300, 200, 260, 0.3], [-360, 220, 240, 160, 240, -0.4], [120, -380, 340, 140, 220, 0.9], [-200, -330, 200, 260, 200, 0.1]]) {
@@ -225,18 +225,19 @@ export function lightString(pts, { c9 = false, cols = null, sag = 0 } = {}) {
   const curve = new THREE.CatmullRomCurve3(pts), n = Math.round(curve.getLength() / (c9 ? 140 : 60));
   const COLS = cols || (c9 ? [0xff2a1a, 0x18c040, 0x2a5cff, 0xff9a10, 0xfff0c8] : [0xffd8a0]);
   const geo = c9 ? (() => { const b = new THREE.SphereGeometry(17, 10, 8); b.scale(1, 1.55, 1); b.translate(0, -20, 0); return b; })() : new THREE.SphereGeometry(7, 8, 6);
-  const mats = COLS.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: c9 ? 1.4 : 2, roughness: 0.3 }));
+  const mats = COLS.map((c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: c9 ? 0.75 : 1.0, roughness: 0.3 }));
   const per = COLS.map(() => []), gp = [], gc = [];
   for (let i = 0; i <= n; i++) { const t = i / n, p = curve.getPoint(t); p.y -= sag * Math.sin(Math.PI * t); per[i % COLS.length].push(p); gp.push(p.x, p.y - (c9 ? 18 : 0), p.z); const cc = new THREE.Color(COLS[i % COLS.length]); gc.push(cc.r, cc.g, cc.b); }
   per.forEach((list, k) => { const im = new THREE.InstancedMesh(geo, mats[k], list.length), M = new THREE.Matrix4(); list.forEach((p, i) => { M.makeTranslation(p.x, p.y, p.z); im.setMatrixAt(i, M); }); g.add(im); });
   g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 200, c9 ? 2.5 : 1.2, 5, false), std(c9 ? 0x1d3a20 : 0x2a2a2a, 0.6)));
   const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3)); gg.setAttribute('color', new THREE.Float32BufferAttribute(gc, 3));
-  g.add(new THREE.Points(gg, new THREE.PointsMaterial({ size: c9 ? 240 : 110, map: glowTexture(), vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending })));
+  const hp = new THREE.Points(gg, new THREE.PointsMaterial({ size: c9 ? 240 : 110, map: glowTexture(), vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }));
+  hp.userData.noProbe = true; g.add(hp);
   return g;
 }
 // a Herrnhut (Moravian) star: 26 glowing points, hanging from its cord at the origin
 export function moravianStar(r = 170) {
-  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffc870, emissiveIntensity: 1.3, roughness: 0.7, transparent: true, opacity: 0.95 });
+  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xfff0d0, emissive: 0xffc870, emissiveIntensity: 0.6, roughness: 0.7, transparent: true, opacity: 0.95 });
   const body = new THREE.Group(); body.position.y = -r * 1.6; g.add(body);
   const cone = new THREE.ConeGeometry(r * 0.32, r, 4); cone.translate(0, r * 0.5 + r * 0.3, 0);
   const dirs = [];
@@ -246,8 +247,8 @@ export function moravianStar(r = 170) {
   for (const d of dirs) { if (d[1] === 1 && d[0] === 0 && d[2] === 0) continue; const o = new THREE.Mesh(cone, m); o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...d).normalize()); body.add(o); }
   body.add(new THREE.Mesh(new THREE.SphereGeometry(r * 0.42, 12, 10), m));
   const cord = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, r * 1.2, 4), std(0x8a1a1a, 0.9)); cord.position.y = -r * 0.6; g.add(cord);
-  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffc070, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); halo.scale.setScalar(r * 6); halo.position.y = -r * 1.6; g.add(halo);
-  const l = new THREE.PointLight(0xffb860, 6e4, 0, 2); l.position.y = -r * 1.6; g.add(l);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffc070, transparent: true, opacity: 0.25, depthWrite: false, blending: THREE.AdditiveBlending })); halo.userData.noProbe = true; halo.scale.setScalar(r * 4.5); halo.position.y = -r * 1.6; g.add(halo);
+  const l = new THREE.PointLight(0xffb860, 1.8e4, 0, 2); l.position.y = -r * 1.6; g.add(l);
   return g;
 }
 // an Advent wreath lying flat with four candles, as many lit as Advent Sundays have come (all four out of season)
@@ -264,7 +265,7 @@ export function adventWreath(r = 190, now = new Date()) {
     c.position.set(Math.cos(a) * r, 80 - k * 7.5, Math.sin(a) * r); c.castShadow = true; g.add(c);
     if (k < lit) { const f = new THREE.Mesh(new THREE.SphereGeometry(9, 8, 6), flameM); f.scale.y = 2.2; f.position.set(c.position.x, 160 - k * 15 + 22, c.position.z); g.add(f); flames.push(f); }
   }
-  if (lit) { const l = new THREE.PointLight(0xffa850, 4e4 * lit, 0, 2); l.position.y = 260; g.add(l); }
+  if (lit) { const l = new THREE.PointLight(0xffa850, 1.2e4 * lit, 0, 2); l.position.y = 260; g.add(l); }
   g.userData.flames = flames;
   return g;
 }
