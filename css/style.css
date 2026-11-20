@@ -337,3 +337,13 @@ body.globe .modeWrap, body.globe #hamInfo, body.globe #gaitCard, body.globe #nav
 body.globe #mouseHint, body.globe #escBadge, body.globe #lightPrompt, body.globe #globeBtn { display: none !important; }
 
 .gfxRow select { margin-left: 6px; }
+
+/* Invisible Hands */
+.handsBlock { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.handsBlock h3 { margin: 0 0 6px; font-size: 15px; color: var(--accent); }
+#handsBox { margin: 8px 0; }
+#handsBox button { margin: 2px 4px 2px 0; }
+#handsBox input[type="text"] { max-width: 16em; }
+header .handsBadge { flex: none; margin-right: 6px; }
+#handsBox label { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; text-align: left; }
+#handsBox label input[type="checkbox"] { margin: 0; flex: none; }

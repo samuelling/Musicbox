@@ -303,7 +303,7 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
   const z0 = zGlass + clear + front0 + 250;   // standing back from the house, outside
   // so he stands at the window from the waist up whatever the sill height (a little rise of snow outside)
   const lift = Math.max(0, y0 - 650);
-  return (dt) => {
+  const tick = (dt) => {
     if (phase === 'away') {
       if (document.hidden) return;
       wait -= dt; if (wait > 0) return;
@@ -331,4 +331,7 @@ export function addOldMan(parent, { x0, x1, y0, zGlass }) {
     fog.material.opacity += (breathe - fog.material.opacity) * Math.min(1, dt * (breathe > fog.material.opacity ? 3 : 0.4));
     fog.position.set(x, lift + 1380, zGlass + 6); fog.scale.setScalar(240);
   };
+  // a call from outside (Invisible Hands): if he's away, he sets off now; otherwise he's already about
+  tick.summon = () => { if (phase === 'away') wait = 0; };
+  return tick;
 }

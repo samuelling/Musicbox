@@ -7,6 +7,7 @@ import { HamsterLife } from './sim/hamster-life.js';
 import { MusicBoxScene } from './render/scene.js';
 import { Q, storedTier, storeTier } from './render/quality.js';
 import { texProgress } from './render/pbr.js';
+import './invisible-hands.js';                     // Invisible Hands: lets other apps turn our knobs (globalThis.InvisibleHands)
 import { CrankPad } from './ui/crank.js';
 import { ListenerMap } from './ui/listener-map.js';
 import { PinRoll } from './ui/editor.js';
@@ -284,13 +285,13 @@ function setMode(mode) {
 }
 document.querySelectorAll('.modeSwitch button').forEach((b) => b.addEventListener('click', () => { ensureStarted(); setMode(b.dataset.mode); }));
 let braked = true;
-$('lever').addEventListener('click', () => {
-  ensureStarted();
-  braked = !braked;
+function setBraked(on) {
+  braked = on;
   engine.send({ type: 'brake', on: braked });
   $('lever').textContent = braked ? 'Start' : 'Stop';
   $('lever').classList.toggle('stop', !braked);
-});
+}
+$('lever').addEventListener('click', () => { ensureStarted(); setBraked(!braked); });
 
 // ------------------------------------------------------------------ hamster drive
 const fillH = (id, obj, val) => { const el = $(id); el.innerHTML = ''; for (const [k, v] of Object.entries(obj)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; el.appendChild(o); } el.value = val; };
@@ -1263,3 +1264,79 @@ requestBuild(0);
   if (sel) { sel.value = storedTier(); sel.options[0].textContent = `Auto (${{ low: 'Low', med: 'Medium', high: 'High' }[Q.auto]})`; sel.addEventListener('change', () => { storeTier(sel.value); location.reload(); }); }
 }
 window.__mb = { walk, collide,  cfg, engine, scene, get built() { return built; }, get song() { return song; }, get state() { return lastState; }, roll };
+
+// ------------------------------------------------------------------ Invisible Hands
+// Other apps (MEGA·CV, the Hands console, FlyHarp…) can turn these knobs over the internet. Only cheap, live
+// settings are offered: anything that rebuilds the comb or the rig would never finish under an LFO.
+{
+  const IH = globalThis.InvisibleHands;
+  const lin = (v, lo, hi) => lo + v * (hi - lo), unlin = (x, lo, hi) => Math.min(1, Math.max(0, (x - lo) / (hi - lo)));
+  const expo = (v, lo, hi) => lo * Math.pow(hi / lo, v), unexpo = (x, lo, hi) => Math.min(1, Math.max(0, Math.log(x / lo) / Math.log(hi / lo)));
+  const pick = (v, n) => Math.min(n - 1, Math.floor(v * n)), unpick = (i, n) => (i + 0.5) / n;
+  const rising = () => { let was = 0; return (v, fire) => { if (v > 0.5 && was <= 0.5) fire(); was = v; }; };
+  const setRange = (id, x, txt) => { $(id).value = x; if (txt && $(id + 'v')) $(id + 'v').textContent = txt; };
+  const L = map.listener;
+  const DRIVES = ['crank', 'spring', 'auto'];
+  // a remote hand on the crank: 0 = let go, 0.5 = the written tempo, 1 = twice it
+  const motor = { rate: 0, raf: 0, last: 0, gripping: false };
+  const motorStep = (now) => {
+    const dt = Math.min(0.05, (now - motor.last) / 1000 || 0); motor.last = now;
+    const go = motor.rate > 0.01 && cfg.mode === 'crank' && built && !pad.active;
+    if (go) {
+      pad.total += motor.rate * 2 * built.drive.omegaNom * built.drive.G_crank * dt;
+      engine.send({ type: 'hand', angle: pad.total, active: true }); motor.gripping = true;
+    } else if (motor.gripping) { motor.gripping = false; if (!pad.active) engine.send({ type: 'hand', angle: pad.total, active: false }); }
+    motor.raf = go || motor.gripping ? requestAnimationFrame(motorStep) : 0;
+  };
+  const wakeMotor = () => { if (!motor.raf) { motor.last = performance.now(); motor.raf = requestAnimationFrame(motorStep); } };
+  const placeListener = (x, y) => { [x, y] = collide(x, y, L.x, L.y); L.x = x; L.y = y; map.emit(); };
+  const dims = () => ROOMS[cfg.room].dims;
+  const trig = { wind: rising(), next: rising(), visitor: rising(), shake: rising() };
+
+  const params = [
+    { id: 'crank', label: 'Crank (a remote hand)', get: () => motor.rate, set: (v) => { motor.rate = v; if (v > 0.01) wakeMotor(); else if (motor.gripping) wakeMotor(); } },
+    { id: 'drive', label: 'Drive: crank, wind-up, hamster', get: () => unpick(Math.max(0, DRIVES.indexOf(cfg.mode)), 3), set: (v) => { const m = DRIVES[pick(v, 3)]; if (m !== cfg.mode) setMode(m); } },
+    { id: 'running', label: 'Running (brake off)', kind: 'toggle', get: () => (braked ? 0 : 1), set: (v) => { if ((v <= 0.5) !== braked) setBraked(v <= 0.5); } },
+    { id: 'wind', label: 'Wind the spring', kind: 'trig', get: () => 0, set: (v) => trig.wind(v, () => { engine.send({ type: 'wind', delta: 2 * TAU }); scene.state.keyAngle -= 2 * TAU; }) },
+    { id: 'nextTune', label: 'Next tune', kind: 'trig', get: () => 0, set: (v) => trig.next(v, () => plNext()) },
+    { id: 'airBrake', label: 'Governor air brake', get: () => unexpo(cfg.airBrake, 0.4, 2.5), set: (v) => { cfg.airBrake = expo(v, 0.4, 2.5); setRange('airBrake', cfg.airBrake, '×' + cfg.airBrake.toFixed(2)); engine.send({ type: 'airBrake', value: cfg.airBrake }); } },
+    { id: 'volume', label: 'Volume', get: () => unlin(+$('vol').value, 0, 2), set: (v) => { const g = lin(v, 0, 2); $('vol').value = g; engine.send({ type: 'gain', value: g }); } },
+    { id: 'noise', label: 'Mechanism noise', get: () => unlin(+$('noise').value, 0, 2), set: (v) => { const n = lin(v, 0, 2); $('noise').value = n; engine.send({ type: 'noise', value: n }); } },
+    { id: 'walkX', label: 'Listener: across the room', get: () => unlin(L.x, 0.2, dims()[0] - 0.2), set: (v) => placeListener(lin(v, 0.2, dims()[0] - 0.2), L.y) },
+    { id: 'walkY', label: 'Listener: along the room', get: () => unlin(L.y, 0.2, dims()[1] - 0.2), set: (v) => placeListener(L.x, lin(v, 0.2, dims()[1] - 0.2)) },
+    { id: 'earHeight', label: 'Ear height', get: () => unlin(L.z, 0.3, 1.9), set: (v) => { L.z = walk.zT = lin(v, 0.3, 1.9); setRange('earH', L.z, L.z.toFixed(2) + ' m'); postureLabel(); map.emit(); } },
+    { id: 'facing', label: 'Facing', get: () => unlin(((L.yaw * 180 / Math.PI + 540) % 360) - 180, -180, 180), set: (v) => { const deg = Math.round(lin(v, -180, 180)); map.faceBox = false; $('faceBox').checked = false; L.yaw = deg * Math.PI / 180; setRange('yaw', deg, deg + '°'); map.emit(); } },
+    { id: 'wheelSound', label: 'Hamster wheel sound', get: () => unlin(cfg.ham.vol ?? 1, 0, 2), set: (v) => setHamVol(lin(v, 0, 2)) },
+    { id: 'christmas', label: 'Christmas decorations', kind: 'toggle', get: () => ($('xmas').checked ? 1 : 0), set: (v) => { const on = v > 0.5; if (on !== $('xmas').checked) { $('xmas').checked = on; scene.setXmas(on); } } },
+    { id: 'visitor', label: 'Old man at the window (hut)', kind: 'trig', get: () => 0, set: (v) => trig.visitor(v, () => { const om = scene.roomObj && scene.roomObj.oldMan; if (om && om.summon) om.summon(); }) },
+    { id: 'shakeGlobe', label: 'Shake the snow globe', kind: 'trig', get: () => 0, set: (v) => trig.shake(v, () => scene.shakeGlobe(1)) },
+  ];
+  // what Frisky plays back into the room: how loud, how fast, how wound
+  const outs = [
+    { id: 'level', label: 'Loudness at the ears', get: () => { const st = lastState; if (!st) return 0; const spl = Math.max(st.splL, st.splR); return isFinite(spl) ? unlin(spl, 30, 90) : 0; } },
+    { id: 'tempo', label: 'Cylinder speed (1 = 1.5× written)', get: () => (lastState && built ? unlin(lastState.omega / built.drive.omegaNom, 0, 1.5) : 0) },
+    { id: 'spring', label: 'Spring wound', get: () => (lastState && built && cfg.mode === 'spring' ? unlin(lastState.turns / built.drive.turnsMax, 0, 1) : 0) },
+  ];
+
+  if (IH) {
+    const hands = IH.create({ app: 'frisky', name: 'Frisky', params, outs });
+    // the Hands section in Settings ▸ Listener, and the mark in the header that opens it
+    const box = $('handsBox');
+    box.append(hands.panel());
+    const sandboxed = !/(^|\.)github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+    if (sandboxed) $('handsNote').textContent = 'This copy of Frisky may be in a viewer that blocks outside connections. If the room never links, open Frisky from its GitHub Pages address.';
+    const badge = hands.badge(); badge.classList.add('handsBadge'); badge.title = 'Invisible Hands: let other apps turn Frisky’s knobs';
+    $('aboutBtn').before(badge);
+    badge.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); setDrawer(true); document.querySelector('.tabs button[data-tab="listen"]').click(); setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250); }, true);
+    // the mark beside each control that can move by itself
+    const tagAt = (inputId, pid) => { const el = $(inputId); if (el) el.before(hands.tag(pid)); };
+    tagAt('airBrake', 'airBrake'); tagAt('vol', 'volume'); tagAt('noise', 'noise'); tagAt('earH', 'earHeight'); tagAt('yaw', 'facing');
+    tagAt('hamVol', 'wheelSound'); tagAt('hamVolCage', 'wheelSound'); tagAt('xmas', 'christmas'); tagAt('lever', 'running');
+    // a hand on the same control here re-centres any remote modulation on where you left it
+    const local = { airBrake: 'airBrake', vol: 'volume', noise: 'noise', earH: 'earHeight', yaw: 'facing', hamVol: 'wheelSound', hamVolCage: 'wheelSound' };
+    for (const [id, pid] of Object.entries(local)) $(id).addEventListener('input', () => hands.recenter(pid));
+    $('xmas').addEventListener('change', () => hands.recenter('christmas'));
+    $('map').addEventListener('pointerdown', () => { hands.recenter('walkX'); hands.recenter('walkY'); });
+    globalThis.__hands = hands;
+  }
+}
